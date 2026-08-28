@@ -45,3 +45,10 @@ export async function getAccessToken(): Promise<string> {
     throw new Error("Redirigiendo para renovar la sesión.")
   }
 }
+export async function getCurrentUser(): Promise<{ displayName: string }> {
+  const account = getAccount()
+
+  return {
+    displayName: account?.name || "Usuario Ditalcar"
+  }
+}
