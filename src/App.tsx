@@ -1,8 +1,17 @@
-import { useEffect, useState } from "react"
-import { BrowserRouter, Routes, Route } from "react-router-dom"
+import {
+  useEffect,
+  useState,
+} from "react"
+
+import {
+  BrowserRouter,
+  Route,
+  Routes,
+} from "react-router-dom"
 
 import Shell from "./components/Shell"
 import Brand from "./components/Brand"
+import DemoLogin from "./components/DemoLogin"
 
 import Home from "./pages/Home"
 import Academia from "./pages/Academia"
@@ -11,32 +20,138 @@ import Solicitudes from "./pages/Solicitudes"
 import NuevaSolicitud from "./pages/NuevaSolicitud"
 
 import { appConfig } from "./config"
+
 import {
   getAccount,
   getCurrentUser,
   signIn,
 } from "./services/auth"
 
+import {
+  mockUsers,
+} from "./data/mockData"
+
+import type {
+  UserScope,
+} from "./types"
+
+
+const DEMO_STORAGE_KEY =
+  "ditalcar-demo-user"
+
 
 export default function App() {
-  const [signedIn, setSignedIn] = useState(
-    Boolean(getAccount())
-  )
+  const microsoftAccount =
+    getAccount()
 
-  const [name, setName] = useState(
-    getAccount()?.name || "Usuario Ditalcar"
-  )
+  const [demoUser, setDemoUser] =
+    useState<UserScope | null>(() => {
+      const storedEmail =
+        localStorage.getItem(
+          DEMO_STORAGE_KEY
+        )
 
+      if (!storedEmail) {
+        return null
+      }
+
+      return (
+        mockUsers.find(
+          (user) =>
+            user.email ===
+            storedEmail
+        ) ?? null
+      )
+    })
+
+
+  const [signedIn, setSignedIn] =
+    useState(
+      Boolean(
+        microsoftAccount ||
+        demoUser
+      )
+    )
+
+
+  const [name, setName] =
+    useState(
+      demoUser?.name ||
+      microsoftAccount?.name ||
+      "Usuario Ditalcar"
+    )
+
+
+  // ======================================================
+  // USUARIO REAL MICROSOFT
+  // ======================================================
 
   useEffect(() => {
-    if (!signedIn) return
+    if (
+      !signedIn ||
+      demoUser
+    ) {
+      return
+    }
 
     getCurrentUser()
       .then((user) =>
-        setName(user.displayName)
+        setName(
+          user.displayName
+        )
       )
       .catch(() => {})
-  }, [signedIn])
+  }, [
+    signedIn,
+    demoUser,
+  ])
+
+
+  // ======================================================
+  // ENTRAR EN MODO DEMO
+  // ======================================================
+
+  function enterDemo(
+    user: UserScope
+  ) {
+    localStorage.setItem(
+      DEMO_STORAGE_KEY,
+      user.email
+    )
+
+    setDemoUser(user)
+
+    setName(user.name)
+
+    setSignedIn(true)
+  }
+
+
+  // ======================================================
+  // SALIR
+  // ======================================================
+
+  function exitApp() {
+    if (demoUser) {
+      localStorage.removeItem(
+        DEMO_STORAGE_KEY
+      )
+
+      setDemoUser(null)
+
+      setSignedIn(false)
+
+      setName(
+        "Usuario Ditalcar"
+      )
+
+      return
+    }
+
+    // El cierre Microsoft sigue
+    // realizándose desde Shell
+    // cuando no estamos en demo.
+  }
 
 
   // ======================================================
@@ -46,38 +161,67 @@ export default function App() {
   if (!signedIn) {
     return (
       <div className="login">
+
         <div className="login-card">
 
           <Brand large />
+
 
           <h1>
             Colaboradores
           </h1>
 
+
           <p>
-            Ingresa con tu cuenta corporativa
-            para acceder al portal interno
-            Ditalcar.
+            Ingresa con tu cuenta
+            corporativa para acceder
+            al portal interno Ditalcar.
           </p>
+
 
           <button
             className="primary-btn"
             onClick={async () => {
               await signIn()
+
               setSignedIn(true)
             }}
           >
             Ingresar con Microsoft 365
           </button>
 
+
           <small>
-            Acceso restringido a DITALCAR SA
+            Acceso restringido a
+            DITALCAR SA
           </small>
 
+
+          {/* MODO DEMO */}
+
+          <DemoLogin
+            users={mockUsers}
+            onEnter={enterDemo}
+          />
+
         </div>
+
       </div>
     )
   }
+
+
+  // ======================================================
+  // USUARIO ACTUAL
+  // ======================================================
+
+  const currentBranch =
+    demoUser?.local ??
+    (
+      demoUser
+        ? "Red Ditalcar"
+        : appConfig.pilot.branch
+    )
 
 
   // ======================================================
@@ -89,7 +233,15 @@ export default function App() {
 
       <Shell
         userName={name}
-        branch={appConfig.pilot.branch}
+        branch={currentBranch}
+        demoMode={Boolean(
+          demoUser
+        )}
+        onDemoLogout={
+          demoUser
+            ? exitApp
+            : undefined
+        }
       >
 
         <Routes>
@@ -99,42 +251,57 @@ export default function App() {
             element={
               <Home
                 userName={name}
-                branch={appConfig.pilot.branch}
+                branch={
+                  currentBranch
+                }
               />
             }
           />
 
+
           <Route
             path="/academia"
-            element={<Academia />}
+            element={
+              <Academia />
+            }
           />
+
 
           <Route
             path="/mi-local"
             element={
               <MiLocal
-                branch={appConfig.pilot.branch}
+                branch={
+                  currentBranch
+                }
               />
             }
           />
+
 
           <Route
             path="/solicitudes"
             element={
               <Solicitudes
-                branch={appConfig.pilot.branch}
+                branch={
+                  currentBranch
+                }
               />
             }
           />
 
+
           <Route
             path="/solicitudes/nueva"
-            element={<NuevaSolicitud />}
+            element={
+              <NuevaSolicitud />
+            }
           />
 
         </Routes>
 
       </Shell>
+
     </BrowserRouter>
   )
 }
