@@ -1,10 +1,19 @@
-export default function Brand() {
+type BrandProps = {
+  large?: boolean
+}
+
+export default function Brand({ large = false }: BrandProps) {
   return (
-    <div className="brand">
-      <div className="brand-symbol">D</div>
+    <div className={`brand ${large ? "brand-large" : ""}`}>
+      <img
+        src="/assets/DITALCAR%20%20LOGO%20b.png"
+        alt="Ditalcar"
+        className="brand-logo"
+      />
+
       <div className="brand-copy">
-        <strong>DITALCAR</strong>
-        <span>Experiencia que te lleva lejos</span>
+        <strong>COLABORADORES</strong>
+        <span>Portal interno Ditalcar</span>
       </div>
     </div>
   )
