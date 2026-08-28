@@ -6,7 +6,7 @@ export default function Brand({ large = false }: BrandProps) {
   return (
     <div className={`brand ${large ? "brand-large" : ""}`}>
       <img
-        src="/assets/DITALCAR%20%20LOGO%20b.png"
+        src="/assets/logo-ditalcar-blanco.png"
         alt="Ditalcar"
         className="brand-logo"
       />
