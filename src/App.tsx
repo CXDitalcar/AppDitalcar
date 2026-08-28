@@ -18,6 +18,7 @@ import Academia from "./pages/Academia"
 import MiLocal from "./pages/MiLocal"
 import Solicitudes from "./pages/Solicitudes"
 import NuevaSolicitud from "./pages/NuevaSolicitud"
+import SolicitudDetalle from "./pages/SolicitudDetalle"
 
 import { appConfig } from "./config"
 
@@ -257,7 +258,16 @@ export default function App() {
               />
             }
           />
-
+        <Route
+  path="/solicitudes/:requestId"
+  element={
+    <SolicitudDetalle
+      currentUser={
+        currentUser
+      }
+    />
+  }
+/>
 
           <Route
             path="/academia"
