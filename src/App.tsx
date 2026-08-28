@@ -1,36 +1,62 @@
 import { useEffect, useState } from "react"
 import { BrowserRouter, Routes, Route } from "react-router-dom"
+
 import Shell from "./components/Shell"
 import Brand from "./components/Brand"
+
 import Home from "./pages/Home"
 import Academia from "./pages/Academia"
 import MiLocal from "./pages/MiLocal"
 import Solicitudes from "./pages/Solicitudes"
+import NuevaSolicitud from "./pages/NuevaSolicitud"
+
 import { appConfig } from "./config"
-import { getAccount, getCurrentUser, signIn } from "./services/auth"
+import {
+  getAccount,
+  getCurrentUser,
+  signIn,
+} from "./services/auth"
+
 
 export default function App() {
-  const [signedIn, setSignedIn] = useState(Boolean(getAccount()))
-  const [name, setName] = useState(getAccount()?.name || "Usuario Ditalcar")
+  const [signedIn, setSignedIn] = useState(
+    Boolean(getAccount())
+  )
+
+  const [name, setName] = useState(
+    getAccount()?.name || "Usuario Ditalcar"
+  )
+
 
   useEffect(() => {
     if (!signedIn) return
 
     getCurrentUser()
-      .then((u) => setName(u.displayName))
+      .then((user) =>
+        setName(user.displayName)
+      )
       .catch(() => {})
   }, [signedIn])
+
+
+  // ======================================================
+  // LOGIN
+  // ======================================================
 
   if (!signedIn) {
     return (
       <div className="login">
         <div className="login-card">
+
           <Brand large />
 
-          <h1>Colaboradores</h1>
+          <h1>
+            Colaboradores
+          </h1>
 
           <p>
-            Ingresa con tu cuenta corporativa para acceder al portal interno
+            Ingresa con tu cuenta corporativa
+            para acceder al portal interno
             Ditalcar.
           </p>
 
@@ -44,16 +70,30 @@ export default function App() {
             Ingresar con Microsoft 365
           </button>
 
-          <small>Acceso restringido a DITALCAR SA</small>
+          <small>
+            Acceso restringido a DITALCAR SA
+          </small>
+
         </div>
       </div>
     )
   }
 
+
+  // ======================================================
+  // APP
+  // ======================================================
+
   return (
     <BrowserRouter>
-      <Shell userName={name} branch={appConfig.pilot.branch}>
+
+      <Shell
+        userName={name}
+        branch={appConfig.pilot.branch}
+      >
+
         <Routes>
+
           <Route
             path="/"
             element={
@@ -63,16 +103,37 @@ export default function App() {
               />
             }
           />
-          <Route path="/academia" element={<Academia />} />
+
+          <Route
+            path="/academia"
+            element={<Academia />}
+          />
+
           <Route
             path="/mi-local"
-            element={<MiLocal branch={appConfig.pilot.branch} />}
+            element={
+              <MiLocal
+                branch={appConfig.pilot.branch}
+              />
+            }
           />
+
           <Route
             path="/solicitudes"
-            element={<Solicitudes branch={appConfig.pilot.branch} />}
+            element={
+              <Solicitudes
+                branch={appConfig.pilot.branch}
+              />
+            }
           />
+
+          <Route
+            path="/solicitudes/nueva"
+            element={<NuevaSolicitud />}
+          />
+
         </Routes>
+
       </Shell>
     </BrowserRouter>
   )
