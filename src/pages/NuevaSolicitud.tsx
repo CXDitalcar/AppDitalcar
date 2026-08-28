@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react"
+
 import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
   FileText,
+  Layers3,
   Package,
   Paperclip,
   Users,
-  Layers3,
 } from "lucide-react"
+
+import "./NuevaSolicitud.css"
 
 import {
   mockCurrentUserEmail,
@@ -182,8 +185,13 @@ export default function NuevaSolicitud() {
     family: RequestFamily
   ) {
     setSelectedFamily(family)
+
     setSelectedProcess(null)
+
     setValues({})
+
+    setAttachments([])
+
     setStep(2)
   }
 
@@ -192,7 +200,11 @@ export default function NuevaSolicitud() {
     process: ProcessDefinition
   ) {
     setSelectedProcess(process)
+
     setValues({})
+
+    setAttachments([])
+
     setStep(3)
   }
 
@@ -211,14 +223,48 @@ export default function NuevaSolicitud() {
   }
 
 
+  function removeAttachment(index: number) {
+    setAttachments((current) =>
+      current.filter(
+        (_, currentIndex) =>
+          currentIndex !== index
+      )
+    )
+  }
+
+
+  function resetRequest() {
+    setSubmitted(false)
+
+    setStep(1)
+
+    setSelectedFamily(null)
+
+    setSelectedProcess(null)
+
+    setValues({})
+
+    setAttachments([])
+  }
+
+
   function submitRequest() {
-    if (!selectedProcess || !formIsValid) {
+    if (
+      !selectedProcess ||
+      !formIsValid
+    ) {
       return
     }
 
+    // ==================================================
+    // TEMPORAL
+    //
     // Todavía no guardamos en SharePoint.
     // En esta etapa solo simulamos el envío.
+    // ==================================================
+
     setSubmitted(true)
+
     setStep(4)
   }
 
@@ -227,21 +273,29 @@ export default function NuevaSolicitud() {
   // ENVÍO EXITOSO
   // ======================================================
 
-  if (submitted && selectedProcess) {
+  if (
+    submitted &&
+    selectedProcess
+  ) {
     return (
       <div className="new-request-page">
+
         <div className="request-success">
+
           <div className="request-success-icon">
             <CheckCircle2 size={34} />
           </div>
+
 
           <div className="eyebrow">
             SOLICITUD REGISTRADA
           </div>
 
+
           <h1>
             Tu solicitud fue enviada
           </h1>
+
 
           <p>
             <strong>
@@ -250,50 +304,68 @@ export default function NuevaSolicitud() {
             quedó registrada para revisión.
           </p>
 
+
           <div className="request-success-info">
+
             <div>
-              <span>Solicitante</span>
+              <span>
+                Solicitante
+              </span>
+
               <strong>
                 {currentUser.name}
               </strong>
             </div>
 
+
             <div>
-              <span>Local</span>
+              <span>
+                Local
+              </span>
+
               <strong>
                 {currentUser.local ?? "—"}
               </strong>
             </div>
 
+
             <div>
-              <span>Estado inicial</span>
+              <span>
+                Estado inicial
+              </span>
+
               <strong>
                 Pendiente de aprobación
               </strong>
             </div>
 
+
             <div>
-              <span>Confirmación</span>
+              <span>
+                Confirmación
+              </span>
+
               <strong>
-                {selectedProcess.confirmationHours} h
+                {
+                  selectedProcess
+                    .confirmationHours
+                }{" "}
+                h
               </strong>
             </div>
+
           </div>
+
 
           <button
             className="primary-btn"
-            onClick={() => {
-              setSubmitted(false)
-              setStep(1)
-              setSelectedFamily(null)
-              setSelectedProcess(null)
-              setValues({})
-              setAttachments([])
-            }}
+            onClick={resetRequest}
           >
             Crear otra solicitud
           </button>
+
         </div>
+
       </div>
     )
   }
@@ -302,16 +374,19 @@ export default function NuevaSolicitud() {
   return (
     <div className="new-request-page">
 
-      {/* ===============================================
+      {/* ==================================================
           CABECERA
-      =============================================== */}
+      ================================================== */}
 
       <div className="page-head">
+
         <div className="eyebrow">
           SOLICITUDES
         </div>
 
-        <h1>Nueva solicitud</h1>
+        <h1>
+          Nueva solicitud
+        </h1>
 
         <p>
           Selecciona qué necesitas.
@@ -319,74 +394,119 @@ export default function NuevaSolicitud() {
           el proceso, responsable y SLA
           correspondiente.
         </p>
+
       </div>
 
 
-      {/* ===============================================
+      {/* ==================================================
           PASOS
-      =============================================== */}
+      ================================================== */}
 
       <div className="request-stepper">
 
         <div
           className={`request-step ${
-            step >= 1 ? "active" : ""
+            step >= 1
+              ? "active"
+              : ""
           }`}
         >
-          <span>1</span>
+          <span>
+            1
+          </span>
+
           <div>
-            <strong>Familia</strong>
-            <small>¿Qué necesitas?</small>
+            <strong>
+              Familia
+            </strong>
+
+            <small>
+              ¿Qué necesitas?
+            </small>
           </div>
         </div>
 
-        <div
-          className={`request-step ${
-            step >= 2 ? "active" : ""
-          }`}
-        >
-          <span>2</span>
-          <div>
-            <strong>Proceso</strong>
-            <small>Tipo de gestión</small>
-          </div>
-        </div>
 
         <div
           className={`request-step ${
-            step >= 3 ? "active" : ""
+            step >= 2
+              ? "active"
+              : ""
           }`}
         >
-          <span>3</span>
+          <span>
+            2
+          </span>
+
           <div>
-            <strong>Datos</strong>
-            <small>Completar solicitud</small>
+            <strong>
+              Proceso
+            </strong>
+
+            <small>
+              Tipo de gestión
+            </small>
           </div>
         </div>
 
+
         <div
           className={`request-step ${
-            step >= 4 ? "active" : ""
+            step >= 3
+              ? "active"
+              : ""
           }`}
         >
-          <span>4</span>
+          <span>
+            3
+          </span>
+
           <div>
-            <strong>Enviar</strong>
-            <small>Revisión final</small>
+            <strong>
+              Datos
+            </strong>
+
+            <small>
+              Completar solicitud
+            </small>
+          </div>
+        </div>
+
+
+        <div
+          className={`request-step ${
+            step >= 4
+              ? "active"
+              : ""
+          }`}
+        >
+          <span>
+            4
+          </span>
+
+          <div>
+            <strong>
+              Enviar
+            </strong>
+
+            <small>
+              Revisión final
+            </small>
           </div>
         </div>
 
       </div>
 
 
-      {/* ===============================================
+      {/* ==================================================
           PASO 1 · FAMILIA
-      =============================================== */}
+      ================================================== */}
 
       {step === 1 && (
         <section className="request-section">
 
           <div className="section-head">
+
             <div className="eyebrow">
               PASO 1
             </div>
@@ -394,7 +514,9 @@ export default function NuevaSolicitud() {
             <h2>
               ¿Qué necesitas solicitar?
             </h2>
+
           </div>
+
 
           <div className="request-family-grid">
 
@@ -403,7 +525,8 @@ export default function NuevaSolicitud() {
                 const config =
                   familyInfo[family]
 
-                const Icon = config.icon
+                const Icon =
+                  config.icon
 
                 return (
                   <button
@@ -413,11 +536,14 @@ export default function NuevaSolicitud() {
                       selectFamily(family)
                     }
                   >
+
                     <div className="request-family-icon">
                       <Icon size={25} />
                     </div>
 
+
                     <div>
+
                       <h3>
                         {config.label}
                       </h3>
@@ -425,38 +551,47 @@ export default function NuevaSolicitud() {
                       <p>
                         {config.description}
                       </p>
+
                     </div>
+
 
                     <ArrowRight
                       className="family-arrow"
                       size={20}
                     />
+
                   </button>
                 )
               }
             )}
 
           </div>
+
         </section>
       )}
 
 
-      {/* ===============================================
+      {/* ==================================================
           PASO 2 · PROCESO
-      =============================================== */}
+      ================================================== */}
 
       {step === 2 && (
         <section className="request-section">
 
           <button
             className="back-btn"
-            onClick={() => setStep(1)}
+            onClick={() =>
+              setStep(1)
+            }
           >
             <ArrowLeft size={17} />
+
             Volver a familias
           </button>
 
+
           <div className="section-head">
+
             <div className="eyebrow">
               PASO 2
             </div>
@@ -468,12 +603,15 @@ export default function NuevaSolicitud() {
             <p>
               {
                 selectedFamily
-                  ? familyInfo[selectedFamily]
-                      .label
+                  ? familyInfo[
+                      selectedFamily
+                    ].label
                   : ""
               }
             </p>
+
           </div>
+
 
           {availableProcesses.length ? (
             <div className="process-choice-list">
@@ -487,7 +625,9 @@ export default function NuevaSolicitud() {
                       selectProcess(process)
                     }
                   >
+
                     <div>
+
                       <span className="process-code">
                         {process.code}
                       </span>
@@ -499,9 +639,12 @@ export default function NuevaSolicitud() {
                       <p>
                         {process.description}
                       </p>
+
                     </div>
 
+
                     <ArrowRight size={20} />
+
                   </button>
                 )
               )}
@@ -513,366 +656,519 @@ export default function NuevaSolicitud() {
               configurados para esta familia.
             </div>
           )}
+
         </section>
       )}
 
 
-      {/* ===============================================
+      {/* ==================================================
           PASO 3 · DATOS
-      =============================================== */}
+      ================================================== */}
 
-      {step === 3 && selectedProcess && (
-        <section className="request-section">
+      {step === 3 &&
+        selectedProcess && (
+          <section className="request-section">
 
-          <button
-            className="back-btn"
-            onClick={() => setStep(2)}
-          >
-            <ArrowLeft size={17} />
-            Volver a procesos
-          </button>
+            <button
+              className="back-btn"
+              onClick={() =>
+                setStep(2)
+              }
+            >
+              <ArrowLeft size={17} />
 
-          <div className="request-form-layout">
+              Volver a procesos
+            </button>
 
-            <div className="request-form-main">
 
-              <div className="section-head">
-                <div className="eyebrow">
-                  PASO 3
+            <div className="request-form-layout">
+
+              {/* ==========================================
+                  FORMULARIO
+              ========================================== */}
+
+              <div className="request-form-main">
+
+                <div className="section-head">
+
+                  <div className="eyebrow">
+                    PASO 3
+                  </div>
+
+                  <h2>
+                    {selectedProcess.name}
+                  </h2>
+
+                  <p>
+                    Completa los antecedentes
+                    necesarios para enviar
+                    la solicitud.
+                  </p>
+
                 </div>
 
-                <h2>
-                  {selectedProcess.name}
-                </h2>
 
-                <p>
-                  Completa los antecedentes
-                  necesarios para enviar
-                  la solicitud.
-                </p>
-              </div>
+                <div className="dynamic-form">
 
-
-              <div className="dynamic-form">
-
-                {processFields.map(
-                  (field) => (
-                    <DynamicField
-                      key={field.id}
-                      field={field}
-                      value={
-                        values[field.id] ?? ""
-                      }
-                      onChange={(value) =>
-                        updateValue(
-                          field.id,
+                  {processFields.map(
+                    (field) => (
+                      <DynamicField
+                        key={field.id}
+                        field={field}
+                        value={
+                          values[
+                            field.id
+                          ] ?? ""
+                        }
+                        onChange={(
                           value
-                        )
+                        ) =>
+                          updateValue(
+                            field.id,
+                            value
+                          )
+                        }
+                      />
+                    )
+                  )}
+
+                </div>
+
+
+                {/* ========================================
+                    ADJUNTOS
+                ======================================== */}
+
+                <div className="request-upload">
+
+                  <div className="request-upload-head">
+
+                    <Paperclip size={19} />
+
+                    <div>
+
+                      <strong>
+                        Adjuntos
+                      </strong>
+
+                      <span>
+                        Puedes agregar evidencia
+                        o documentos de respaldo.
+                      </span>
+
+                    </div>
+
+                  </div>
+
+
+                  <label className="secondary-btn">
+
+                    Agregar archivo
+
+                    <input
+                      type="file"
+                      multiple
+                      hidden
+                      onChange={
+                        handleFiles
                       }
                     />
-                  )
-                )}
 
-              </div>
+                  </label>
 
 
-              {/* ADJUNTOS */}
+                  {!!attachments.length && (
+                    <div className="upload-file-list">
 
-              <div className="request-upload">
+                      {attachments.map(
+                        (
+                          file,
+                          index
+                        ) => (
+                          <div
+                            key={`${file.name}-${index}`}
+                            className="upload-file"
+                          >
 
-                <div className="request-upload-head">
-                  <Paperclip size={19} />
+                            <FileText
+                              size={16}
+                            />
 
-                  <div>
-                    <strong>
-                      Adjuntos
-                    </strong>
+                            <span>
+                              {file.name}
+                            </span>
 
-                    <span>
-                      Puedes agregar evidencia
-                      o documentos de respaldo.
-                    </span>
-                  </div>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeAttachment(
+                                  index
+                                )
+                              }
+                            >
+                              Quitar
+                            </button>
+
+                          </div>
+                        )
+                      )}
+
+                    </div>
+                  )}
+
                 </div>
 
-                <label className="secondary-btn">
-                  Agregar archivo
-
-                  <input
-                    type="file"
-                    multiple
-                    hidden
-                    onChange={handleFiles}
-                  />
-                </label>
-
-                {!!attachments.length && (
-                  <div className="upload-file-list">
-
-                    {attachments.map(
-                      (file, index) => (
-                        <div
-                          key={`${file.name}-${index}`}
-                          className="upload-file"
-                        >
-                          <FileText size={16} />
-
-                          <span>
-                            {file.name}
-                          </span>
-
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setAttachments(
-                                (current) =>
-                                  current.filter(
-                                    (_, i) =>
-                                      i !== index
-                                  )
-                              )
-                            }
-                          >
-                            Quitar
-                          </button>
-                        </div>
-                      )
-                    )}
-
-                  </div>
-                )}
-
               </div>
 
-            </div>
 
+              {/* ==========================================
+                  PANEL PROCESO / SLA
+              ========================================== */}
 
-            {/* PANEL DERECHO */}
+              <aside className="request-process-summary">
 
-            <aside className="request-process-summary">
-
-              <div className="eyebrow">
-                ANTES DE ENVIAR
-              </div>
-
-              <h3>
-                {selectedProcess.name}
-              </h3>
-
-              <div className="request-summary-row">
-                <span>
-                  Solicitante
-                </span>
-
-                <strong>
-                  {currentUser.name}
-                </strong>
-              </div>
-
-              <div className="request-summary-row">
-                <span>Local</span>
-
-                <strong>
-                  {currentUser.local ?? "—"}
-                </strong>
-              </div>
-
-              <div className="request-summary-row">
-                <span>
-                  Aprobación
-                </span>
-
-                <strong>
-                  Jefatura Comercial y Clientes
-                </strong>
-              </div>
-
-              <div className="request-summary-row">
-                <span>
-                  SLA aprobación
-                </span>
-
-                <strong>
-                  {selectedProcess
-                    .approvalSLAHours
-                    ? `${selectedProcess.approvalSLAHours} h`
-                    : "Por definir"}
-                </strong>
-              </div>
-
-              <div className="request-summary-row">
-                <span>
-                  Confirmación
-                </span>
-
-                <strong>
-                  {
-                    selectedProcess
-                      .confirmationHours
-                  }{" "}
-                  h
-                </strong>
-              </div>
-
-              <button
-                className="process-manual-link"
-                type="button"
-              >
-                <FileText size={17} />
-
-                Ver proceso, SLA y manual
-              </button>
-
-            </aside>
-
-          </div>
-
-
-          {/* SIGUIENTE */}
-
-          <div className="request-actions">
-
-            <button
-              className="secondary-btn"
-              onClick={() => setStep(2)}
-            >
-              Atrás
-            </button>
-
-            <button
-              className="primary-btn"
-              disabled={!formIsValid}
-              onClick={() => setStep(4)}
-            >
-              Revisar solicitud
-              <ArrowRight size={17} />
-            </button>
-
-          </div>
-
-        </section>
-      )}
-
-
-      {/* ===============================================
-          PASO 4 · REVISIÓN
-      =============================================== */}
-
-      {step === 4 && selectedProcess && (
-        <section className="request-section">
-
-          <button
-            className="back-btn"
-            onClick={() => setStep(3)}
-          >
-            <ArrowLeft size={17} />
-            Volver a editar
-          </button>
-
-          <div className="section-head">
-            <div className="eyebrow">
-              PASO 4
-            </div>
-
-            <h2>
-              Revisa antes de enviar
-            </h2>
-          </div>
-
-
-          <div className="request-review">
-
-            <div className="request-review-head">
-
-              <div>
-                <span>
-                  {familyInfo[
-                    selectedProcess.family
-                  ].label}
-                </span>
+                <div className="eyebrow">
+                  ANTES DE ENVIAR
+                </div>
 
                 <h3>
                   {selectedProcess.name}
                 </h3>
-              </div>
-
-              <span className="status requested">
-                Nueva solicitud
-              </span>
-
-            </div>
 
 
-            <div className="request-review-grid">
+                <div className="request-summary-row">
 
-              {processFields.map(
-                (field) => (
-                  <div
-                    key={field.id}
-                    className="request-review-field"
-                  >
+                  <span>
+                    Solicitante
+                  </span>
+
+                  <strong>
+                    {currentUser.name}
+                  </strong>
+
+                </div>
+
+
+                <div className="request-summary-row">
+
+                  <span>
+                    Local
+                  </span>
+
+                  <strong>
+                    {currentUser.local ?? "—"}
+                  </strong>
+
+                </div>
+
+
+                <div className="request-summary-row">
+
+                  <span>
+                    Aprobación
+                  </span>
+
+                  <strong>
+                    {selectedProcess.code ===
+                    "UNI-BON-01"
+                      ? "Jefatura Comercial y Clientes"
+                      : "Según proceso"}
+                  </strong>
+
+                </div>
+
+
+                <div className="request-summary-row">
+
+                  <span>
+                    SLA aprobación
+                  </span>
+
+                  <strong>
+                    {
+                      selectedProcess
+                        .approvalSLAHours
+                        ? `${selectedProcess.approvalSLAHours} h`
+                        : "Por definir"
+                    }
+                  </strong>
+
+                </div>
+
+
+                {selectedProcess
+                  .hasManagementStage && (
+                  <div className="request-summary-row">
+
                     <span>
-                      {field.label}
+                      SLA resolución
                     </span>
 
                     <strong>
-                      {formatReviewValue(
-                        field,
-                        values[field.id]
-                      )}
+                      {
+                        selectedProcess
+                          .resolutionSLAHours
+                          ? `${selectedProcess.resolutionSLAHours} h`
+                          : "Por definir"
+                      }
                     </strong>
+
                   </div>
-                )
-              )}
+                )}
+
+
+                <div className="request-summary-row">
+
+                  <span>
+                    Confirmación
+                  </span>
+
+                  <strong>
+                    {
+                      selectedProcess
+                        .confirmationHours
+                    }{" "}
+                    h
+                  </strong>
+
+                </div>
+
+
+                <button
+                  className="process-manual-link"
+                  type="button"
+                >
+                  <FileText size={17} />
+
+                  Ver proceso, SLA y manual
+                </button>
+
+              </aside>
 
             </div>
 
 
-            {!!attachments.length && (
-              <div className="review-attachments">
+            {/* ============================================
+                ACCIONES
+            ============================================ */}
 
-                <span>
-                  Adjuntos
+            <div className="request-actions">
+
+              <button
+                className="secondary-btn"
+                onClick={() =>
+                  setStep(2)
+                }
+              >
+                Atrás
+              </button>
+
+
+              <button
+                className="primary-btn"
+                disabled={
+                  !formIsValid
+                }
+                onClick={() =>
+                  setStep(4)
+                }
+              >
+                Revisar solicitud
+
+                <ArrowRight
+                  size={17}
+                />
+              </button>
+
+            </div>
+
+          </section>
+        )}
+
+
+      {/* ==================================================
+          PASO 4 · REVISIÓN
+      ================================================== */}
+
+      {step === 4 &&
+        selectedProcess && (
+          <section className="request-section">
+
+            <button
+              className="back-btn"
+              onClick={() =>
+                setStep(3)
+              }
+            >
+              <ArrowLeft size={17} />
+
+              Volver a editar
+            </button>
+
+
+            <div className="section-head">
+
+              <div className="eyebrow">
+                PASO 4
+              </div>
+
+              <h2>
+                Revisa antes de enviar
+              </h2>
+
+              <p>
+                Confirma que la información
+                esté correcta antes de
+                registrar la solicitud.
+              </p>
+
+            </div>
+
+
+            <div className="request-review">
+
+              <div className="request-review-head">
+
+                <div>
+
+                  <span>
+                    {
+                      familyInfo[
+                        selectedProcess
+                          .family
+                      ].label
+                    }
+                  </span>
+
+                  <h3>
+                    {selectedProcess.name}
+                  </h3>
+
+                </div>
+
+
+                <span className="status requested">
+                  Nueva solicitud
                 </span>
 
-                {attachments.map(
-                  (file, index) => (
+              </div>
+
+
+              <div className="request-review-grid">
+
+                <div className="request-review-field">
+
+                  <span>
+                    Solicitante
+                  </span>
+
+                  <strong>
+                    {currentUser.name}
+                  </strong>
+
+                </div>
+
+
+                <div className="request-review-field">
+
+                  <span>
+                    Local
+                  </span>
+
+                  <strong>
+                    {currentUser.local ?? "—"}
+                  </strong>
+
+                </div>
+
+
+                {processFields.map(
+                  (field) => (
                     <div
-                      key={`${file.name}-${index}`}
+                      key={field.id}
+                      className="request-review-field"
                     >
-                      <Paperclip size={15} />
-                      {file.name}
+
+                      <span>
+                        {field.label}
+                      </span>
+
+                      <strong>
+                        {formatReviewValue(
+                          field,
+                          values[
+                            field.id
+                          ]
+                        )}
+                      </strong>
+
                     </div>
                   )
                 )}
 
               </div>
-            )}
-
-          </div>
 
 
-          <div className="request-actions">
+              {!!attachments.length && (
+                <div className="review-attachments">
 
-            <button
-              className="secondary-btn"
-              onClick={() => setStep(3)}
-            >
-              Editar
-            </button>
+                  <span>
+                    Adjuntos
+                  </span>
 
-            <button
-              className="primary-btn"
-              onClick={submitRequest}
-            >
-              Enviar solicitud
-              <CheckCircle2 size={17} />
-            </button>
 
-          </div>
+                  {attachments.map(
+                    (
+                      file,
+                      index
+                    ) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                      >
+                        <Paperclip
+                          size={15}
+                        />
 
-        </section>
-      )}
+                        {file.name}
+                      </div>
+                    )
+                  )}
+
+                </div>
+              )}
+
+            </div>
+
+
+            <div className="request-actions">
+
+              <button
+                className="secondary-btn"
+                onClick={() =>
+                  setStep(3)
+                }
+              >
+                Editar
+              </button>
+
+
+              <button
+                className="primary-btn"
+                onClick={
+                  submitRequest
+                }
+              >
+                Enviar solicitud
+
+                <CheckCircle2
+                  size={17}
+                />
+              </button>
+
+            </div>
+
+          </section>
+        )}
 
     </div>
   )
@@ -905,24 +1201,31 @@ function DynamicField({
         )}
       </span>
 
+
       {field.type === "TEXTAREA" ? (
         <textarea
           value={value}
           placeholder={field.placeholder}
           onChange={(event) =>
-            onChange(event.target.value)
+            onChange(
+              event.target.value
+            )
           }
         />
       ) : field.type === "SELECT" ? (
         <select
           value={value}
           onChange={(event) =>
-            onChange(event.target.value)
+            onChange(
+              event.target.value
+            )
           }
         >
+
           <option value="">
             Seleccionar
           </option>
+
 
           {field.options?.map(
             (option) => (
@@ -934,6 +1237,7 @@ function DynamicField({
               </option>
             )
           )}
+
         </select>
       ) : (
         <input
@@ -948,7 +1252,9 @@ function DynamicField({
                 : "text"
           }
           onChange={(event) =>
-            onChange(event.target.value)
+            onChange(
+              event.target.value
+            )
           }
         />
       )}
@@ -959,7 +1265,7 @@ function DynamicField({
 
 
 // ======================================================
-// FORMATO VISTA REVISIÓN
+// FORMATO DE VALORES EN REVISIÓN
 // ======================================================
 
 function formatReviewValue(
@@ -971,9 +1277,12 @@ function formatReviewValue(
   }
 
   if (field.type === "CURRENCY") {
-    const number = Number(value)
+    const number =
+      Number(value)
 
-    if (!Number.isNaN(number)) {
+    if (
+      !Number.isNaN(number)
+    ) {
       return new Intl.NumberFormat(
         "es-CL",
         {
