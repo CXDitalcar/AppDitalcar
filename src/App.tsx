@@ -5,6 +5,7 @@ import {
 
 import {
   BrowserRouter,
+  Navigate,
   Route,
   Routes,
 } from "react-router-dom"
@@ -18,6 +19,7 @@ import Academia from "./pages/Academia"
 import MiLocal from "./pages/MiLocal"
 import Solicitudes from "./pages/Solicitudes"
 import NuevaSolicitud from "./pages/NuevaSolicitud"
+import Aprobaciones from "./pages/Aprobaciones"
 import SolicitudDetalle from "./pages/SolicitudDetalle"
 
 import { appConfig } from "./config"
@@ -29,8 +31,13 @@ import {
 } from "./services/auth"
 
 import {
+  mockProcessAssignments,
   mockUsers,
 } from "./data/mockData"
+
+import {
+  canAccessApprovalInbox,
+} from "./services/permissions"
 
 import type {
   UserScope,
@@ -44,6 +51,11 @@ const DEMO_STORAGE_KEY =
 export default function App() {
   const microsoftAccount =
     getAccount()
+
+
+  // ======================================================
+  // USUARIO DEMO
+  // ======================================================
 
   const [demoUser, setDemoUser] =
     useState<UserScope | null>(() => {
@@ -59,12 +71,15 @@ export default function App() {
       return (
         mockUsers.find(
           (user) =>
-            user.email ===
-            storedEmail
+            user.email === storedEmail
         ) ?? null
       )
     })
 
+
+  // ======================================================
+  // SESIÓN
+  // ======================================================
 
   const [signedIn, setSignedIn] =
     useState(
@@ -84,7 +99,7 @@ export default function App() {
 
 
   // ======================================================
-  // USUARIO REAL MICROSOFT
+  // USUARIO MICROSOFT
   // ======================================================
 
   useEffect(() => {
@@ -109,7 +124,7 @@ export default function App() {
 
 
   // ======================================================
-  // ENTRAR EN MODO DEMO
+  // ENTRAR EN DEMO
   // ======================================================
 
   function enterDemo(
@@ -129,29 +144,21 @@ export default function App() {
 
 
   // ======================================================
-  // SALIR
+  // SALIR DE DEMO
   // ======================================================
 
-  function exitApp() {
-    if (demoUser) {
-      localStorage.removeItem(
-        DEMO_STORAGE_KEY
-      )
+  function exitDemo() {
+    localStorage.removeItem(
+      DEMO_STORAGE_KEY
+    )
 
-      setDemoUser(null)
+    setDemoUser(null)
 
-      setSignedIn(false)
+    setSignedIn(false)
 
-      setName(
-        "Usuario Ditalcar"
-      )
-
-      return
-    }
-
-    // El cierre Microsoft sigue
-    // realizándose desde Shell
-    // cuando no estamos en demo.
+    setName(
+      "Usuario Ditalcar"
+    )
   }
 
 
@@ -167,18 +174,15 @@ export default function App() {
 
           <Brand large />
 
-
           <h1>
             Colaboradores
           </h1>
-
 
           <p>
             Ingresa con tu cuenta
             corporativa para acceder
             al portal interno Ditalcar.
           </p>
-
 
           <button
             className="primary-btn"
@@ -191,14 +195,11 @@ export default function App() {
             Ingresar con Microsoft 365
           </button>
 
-
           <small>
             Acceso restringido a
             DITALCAR SA
           </small>
 
-
-          {/* MODO DEMO */}
 
           <DemoLogin
             users={mockUsers}
@@ -216,12 +217,41 @@ export default function App() {
   // USUARIO ACTUAL
   // ======================================================
 
+  const currentUser: UserScope =
+    demoUser ?? {
+      email:
+        microsoftAccount?.username ??
+        "",
+
+      name,
+
+      role: "VENDEDOR",
+
+      local:
+        appConfig.pilot.branch,
+
+      active: true,
+    }
+
+
+  // ======================================================
+  // ÁMBITO ACTUAL
+  // ======================================================
+
   const currentBranch =
-    demoUser?.local ??
-    (
-      demoUser
-        ? "Red Ditalcar"
-        : appConfig.pilot.branch
+    currentUser.local ??
+    currentUser.zone ??
+    "Red Ditalcar"
+
+
+  // ======================================================
+  // PERMISOS
+  // ======================================================
+
+  const showApprovals =
+    canAccessApprovalInbox(
+      currentUser,
+      mockProcessAssignments
     )
 
 
@@ -240,12 +270,17 @@ export default function App() {
         )}
         onDemoLogout={
           demoUser
-            ? exitApp
+            ? exitDemo
             : undefined
+        }
+        showApprovals={
+          showApprovals
         }
       >
 
         <Routes>
+
+          {/* INICIO */}
 
           <Route
             path="/"
@@ -258,16 +293,9 @@ export default function App() {
               />
             }
           />
-        <Route
-  path="/solicitudes/:requestId"
-  element={
-    <SolicitudDetalle
-      currentUser={
-        currentUser
-      }
-    />
-  }
-/>
+
+
+          {/* ACADEMIA */}
 
           <Route
             path="/academia"
@@ -276,6 +304,8 @@ export default function App() {
             }
           />
 
+
+          {/* MI LOCAL */}
 
           <Route
             path="/mi-local"
@@ -289,6 +319,8 @@ export default function App() {
           />
 
 
+          {/* MIS SOLICITUDES */}
+
           <Route
             path="/solicitudes"
             element={
@@ -301,10 +333,64 @@ export default function App() {
           />
 
 
+          {/* NUEVA SOLICITUD */}
+
           <Route
             path="/solicitudes/nueva"
             element={
-              <NuevaSolicitud />
+              <NuevaSolicitud
+                currentUser={
+                  currentUser
+                }
+              />
+            }
+          />
+
+
+          {/* APROBACIONES */}
+
+          <Route
+            path="/aprobaciones"
+            element={
+              showApprovals ? (
+                <Aprobaciones
+                  currentUser={
+                    currentUser
+                  }
+                />
+              ) : (
+                <Navigate
+                  to="/"
+                  replace
+                />
+              )
+            }
+          />
+
+
+          {/* DETALLE DE SOLICITUD */}
+
+          <Route
+            path="/solicitudes/:requestId"
+            element={
+              <SolicitudDetalle
+                currentUser={
+                  currentUser
+                }
+              />
+            }
+          />
+
+
+          {/* RUTA DESCONOCIDA */}
+
+          <Route
+            path="*"
+            element={
+              <Navigate
+                to="/"
+                replace
+              />
             }
           />
 
