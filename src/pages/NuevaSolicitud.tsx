@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
   type ChangeEvent,
@@ -8,16 +9,25 @@ import {
   ArrowLeft,
   ArrowRight,
   CheckCircle2,
+  ClipboardCheck,
   FileText,
   Layers3,
+  Link2,
   Package,
   Paperclip,
   Users,
 } from "lucide-react"
 
+import {
+  useSearchParams,
+} from "react-router-dom"
+
 import "./NuevaSolicitud.css"
 
 import {
+  mockFormBreaches,
+  mockFormExecutions,
+  mockForms,
   mockProcessFields,
   mockProcesses,
 } from "../data/mockData"
@@ -85,8 +95,26 @@ export default function NuevaSolicitud({
 }: {
   currentUser: UserScope
 }) {
+  const [
+    searchParams,
+  ] = useSearchParams()
+
+
+  const processFromUrl =
+    searchParams.get(
+      "process"
+    )
+
+
+  const breachFromUrl =
+    searchParams.get(
+      "breach"
+    )
+
+
   const [step, setStep] =
     useState(1)
+
 
   const [
     selectedFamily,
@@ -96,6 +124,7 @@ export default function NuevaSolicitud({
       null
     )
 
+
   const [
     selectedProcess,
     setSelectedProcess,
@@ -104,8 +133,10 @@ export default function NuevaSolicitud({
       null
     )
 
+
   const [values, setValues] =
     useState<FormValues>({})
+
 
   const [
     attachments,
@@ -113,11 +144,158 @@ export default function NuevaSolicitud({
   ] =
     useState<File[]>([])
 
+
   const [
     submitted,
     setSubmitted,
   ] =
     useState(false)
+
+
+  // ======================================================
+  // BRECHA DE ORIGEN
+  // ======================================================
+
+  const sourceBreach =
+    useMemo(
+      () =>
+        breachFromUrl
+          ? mockFormBreaches.find(
+              (breach) =>
+                breach.id ===
+                breachFromUrl
+            )
+          : undefined,
+      [
+        breachFromUrl,
+      ]
+    )
+
+
+  const sourceExecution =
+    useMemo(
+      () =>
+        sourceBreach
+          ? mockFormExecutions.find(
+              (execution) =>
+                execution.id ===
+                sourceBreach.executionId
+            )
+          : undefined,
+      [
+        sourceBreach,
+      ]
+    )
+
+
+  const sourceForm =
+    useMemo(
+      () =>
+        sourceExecution
+          ? mockForms.find(
+              (form) =>
+                form.code ===
+                sourceExecution.formCode
+            )
+          : undefined,
+      [
+        sourceExecution,
+      ]
+    )
+
+
+  const requestLocal =
+    sourceBreach?.local ??
+    currentUser.local ??
+    "—"
+
+
+  // ======================================================
+  // ABRIR AUTOMÁTICAMENTE DESDE BRECHA
+  // ======================================================
+
+  useEffect(() => {
+    if (
+      !processFromUrl ||
+      !sourceBreach
+    ) {
+      return
+    }
+
+
+    const process =
+      mockProcesses.find(
+        (item) =>
+          item.code ===
+          processFromUrl &&
+          item.active
+      )
+
+
+    if (!process) {
+      return
+    }
+
+
+    setSelectedFamily(
+      process.family
+    )
+
+
+    setSelectedProcess(
+      process
+    )
+
+
+    setStep(3)
+
+
+    setValues(
+      (current) => {
+        const nextValues = {
+          ...current,
+        }
+
+
+        // ----------------------------------------------
+        // CREDENCIAL
+        // Precargamos el local desde la brecha.
+        // ----------------------------------------------
+
+        if (
+          process.code ===
+          "COL-CRE-01"
+        ) {
+          nextValues[
+            "CRE_LOCAL"
+          ] =
+            sourceBreach.local
+        }
+
+
+        // ----------------------------------------------
+        // PIE DE FIRMA
+        // Precargamos el local/área.
+        // ----------------------------------------------
+
+        if (
+          process.code ===
+          "COL-FIR-01"
+        ) {
+          nextValues[
+            "FIR_LOCAL"
+          ] =
+            sourceBreach.local
+        }
+
+
+        return nextValues
+      }
+    )
+  }, [
+    processFromUrl,
+    sourceBreach,
+  ])
 
 
   // ======================================================
@@ -132,8 +310,6 @@ export default function NuevaSolicitud({
         ) as RequestFamily[]
 
 
-      // Vendedores no ven
-      // Insumos y Showroom.
       if (
         currentUser.role ===
         "VENDEDOR"
@@ -147,7 +323,9 @@ export default function NuevaSolicitud({
 
 
       return allFamilies
-    }, [currentUser.role])
+    }, [
+      currentUser.role,
+    ])
 
 
   // ======================================================
@@ -173,7 +351,8 @@ export default function NuevaSolicitud({
         )
         .sort(
           (a, b) =>
-            a.order - b.order
+            a.order -
+            b.order
         )
     }, [
       selectedFamily,
@@ -201,9 +380,12 @@ export default function NuevaSolicitud({
         )
         .sort(
           (a, b) =>
-            a.order - b.order
+            a.order -
+            b.order
         )
-    }, [selectedProcess])
+    }, [
+      selectedProcess,
+    ])
 
 
   // ======================================================
@@ -308,8 +490,6 @@ export default function NuevaSolicitud({
     )
 
 
-    // Permite volver a seleccionar
-    // el mismo archivo después.
     event.target.value = ""
   }
 
@@ -368,10 +548,19 @@ export default function NuevaSolicitud({
 
 
     // ================================================
-    // TEMPORAL
+    // DEMO
     //
-    // Todavía no guarda en SharePoint.
-    // En modo demo solo simulamos el envío.
+    // Después guardaremos:
+    //
+    // ProcesoCodigo
+    // OrigenFormularioCodigo
+    // OrigenEjecucionID
+    // OrigenBrechaID
+    // Local
+    // Solicitante
+    // EstadoFlujo
+    //
+    // en Tablero General Solicitudes.
     // ================================================
 
     setSubmitted(true)
@@ -429,7 +618,9 @@ export default function NuevaSolicitud({
               </span>
 
               <strong>
-                {currentUser.name}
+                {
+                  currentUser.name
+                }
               </strong>
             </div>
 
@@ -441,8 +632,7 @@ export default function NuevaSolicitud({
 
               <strong>
                 {
-                  currentUser.local ??
-                  "—"
+                  requestLocal
                 }
               </strong>
             </div>
@@ -477,6 +667,102 @@ export default function NuevaSolicitud({
             </div>
 
           </div>
+
+
+          {sourceBreach && (
+            <div className="request-review">
+
+              <div className="request-review-head">
+
+                <div>
+
+                  <span>
+                    ORIGEN
+                  </span>
+
+
+                  <h3>
+                    {
+                      sourceForm?.name ??
+                      "Formulario"
+                    }
+                  </h3>
+
+                </div>
+
+
+                <span className="status requested">
+                  Desde brecha
+                </span>
+
+              </div>
+
+
+              <div className="request-review-grid">
+
+                <div className="request-review-field">
+
+                  <span>
+                    Local
+                  </span>
+
+                  <strong>
+                    {
+                      sourceBreach.local
+                    }
+                  </strong>
+
+                </div>
+
+
+                <div className="request-review-field">
+
+                  <span>
+                    Sección
+                  </span>
+
+                  <strong>
+                    {
+                      sourceBreach.section
+                    }
+                  </strong>
+
+                </div>
+
+
+                <div className="request-review-field">
+
+                  <span>
+                    Brecha
+                  </span>
+
+                  <strong>
+                    {
+                      sourceBreach.question
+                    }
+                  </strong>
+
+                </div>
+
+
+                <div className="request-review-field">
+
+                  <span>
+                    Ejecución
+                  </span>
+
+                  <strong>
+                    {
+                      sourceBreach.executionId
+                    }
+                  </strong>
+
+                </div>
+
+              </div>
+
+            </div>
+          )}
 
 
           <button
@@ -526,6 +812,108 @@ export default function NuevaSolicitud({
         </p>
 
       </div>
+
+
+      {/* ==================================================
+          ORIGEN DESDE FORMULARIO
+      ================================================== */}
+
+      {sourceBreach && (
+        <div className="request-review">
+
+          <div className="request-review-head">
+
+            <div>
+
+              <span>
+                SOLICITUD DESDE BRECHA
+              </span>
+
+
+              <h3>
+                {
+                  sourceForm?.name ??
+                  "Revisión del local"
+                }
+              </h3>
+
+            </div>
+
+
+            <span className="status requested">
+              Precargada
+            </span>
+
+          </div>
+
+
+          <div className="request-review-grid">
+
+            <div className="request-review-field">
+
+              <span>
+                Local
+              </span>
+
+              <strong>
+                {
+                  sourceBreach.local
+                }
+              </strong>
+
+            </div>
+
+
+            <div className="request-review-field">
+
+              <span>
+                Sección
+              </span>
+
+              <strong>
+                {
+                  sourceBreach.section
+                }
+              </strong>
+
+            </div>
+
+
+            <div className="request-review-field">
+
+              <span>
+                Brecha detectada
+              </span>
+
+              <strong>
+                {
+                  sourceBreach.question
+                }
+              </strong>
+
+            </div>
+
+
+            <div className="request-review-field">
+
+              <span>
+                Proceso sugerido
+              </span>
+
+              <strong>
+                {
+                  selectedProcess?.name ??
+                  sourceBreach.mappedProcessCode ??
+                  "—"
+                }
+              </strong>
+
+            </div>
+
+          </div>
+
+        </div>
+      )}
 
 
       {/* ==================================================
@@ -832,23 +1220,23 @@ export default function NuevaSolicitud({
         selectedProcess && (
           <section className="request-section">
 
-            <button
-              className="back-btn"
-              onClick={() =>
-                setStep(2)
-              }
-            >
-              <ArrowLeft
-                size={17}
-              />
+            {!sourceBreach && (
+              <button
+                className="back-btn"
+                onClick={() =>
+                  setStep(2)
+                }
+              >
+                <ArrowLeft
+                  size={17}
+                />
 
-              Volver a procesos
-            </button>
+                Volver a procesos
+              </button>
+            )}
 
 
             <div className="request-form-layout">
-
-              {/* FORMULARIO */}
 
               <div className="request-form-main">
 
@@ -1040,12 +1428,48 @@ export default function NuevaSolicitud({
 
                   <strong>
                     {
-                      currentUser.local ??
-                      "—"
+                      requestLocal
                     }
                   </strong>
 
                 </div>
+
+
+                {sourceBreach && (
+                  <>
+
+                    <div className="request-summary-row">
+
+                      <span>
+                        Origen
+                      </span>
+
+                      <strong>
+                        {
+                          sourceForm?.name ??
+                          "Formulario"
+                        }
+                      </strong>
+
+                    </div>
+
+
+                    <div className="request-summary-row">
+
+                      <span>
+                        Brecha
+                      </span>
+
+                      <strong>
+                        {
+                          sourceBreach.section
+                        }
+                      </strong>
+
+                    </div>
+
+                  </>
+                )}
 
 
                 <div className="request-summary-row">
@@ -1138,14 +1562,16 @@ export default function NuevaSolicitud({
 
             <div className="request-actions">
 
-              <button
-                className="secondary-btn"
-                onClick={() =>
-                  setStep(2)
-                }
-              >
-                Atrás
-              </button>
+              {!sourceBreach && (
+                <button
+                  className="secondary-btn"
+                  onClick={() =>
+                    setStep(2)
+                  }
+                >
+                  Atrás
+                </button>
+              )}
 
 
               <button
@@ -1271,12 +1697,48 @@ export default function NuevaSolicitud({
 
                   <strong>
                     {
-                      currentUser.local ??
-                      "—"
+                      requestLocal
                     }
                   </strong>
 
                 </div>
+
+
+                {sourceBreach && (
+                  <>
+
+                    <div className="request-review-field">
+
+                      <span>
+                        Formulario origen
+                      </span>
+
+                      <strong>
+                        {
+                          sourceForm?.name ??
+                          "Formulario"
+                        }
+                      </strong>
+
+                    </div>
+
+
+                    <div className="request-review-field">
+
+                      <span>
+                        Brecha
+                      </span>
+
+                      <strong>
+                        {
+                          sourceBreach.question
+                        }
+                      </strong>
+
+                    </div>
+
+                  </>
+                )}
 
 
                 {processFields.map(
@@ -1343,6 +1805,103 @@ export default function NuevaSolicitud({
               )}
 
             </div>
+
+
+            {sourceBreach && (
+              <div className="request-review">
+
+                <div className="request-review-head">
+
+                  <div>
+
+                    <span>
+                      TRAZABILIDAD
+                    </span>
+
+
+                    <h3>
+                      Origen de la solicitud
+                    </h3>
+
+                  </div>
+
+
+                  <Link2
+                    size={18}
+                  />
+
+                </div>
+
+
+                <div className="request-review-grid">
+
+                  <div className="request-review-field">
+
+                    <span>
+                      Formulario
+                    </span>
+
+                    <strong>
+                      {
+                        sourceForm?.code ??
+                        sourceBreach.formCode
+                      }
+                    </strong>
+
+                  </div>
+
+
+                  <div className="request-review-field">
+
+                    <span>
+                      Ejecución
+                    </span>
+
+                    <strong>
+                      {
+                        sourceBreach.executionId
+                      }
+                    </strong>
+
+                  </div>
+
+
+                  <div className="request-review-field">
+
+                    <span>
+                      ID Brecha
+                    </span>
+
+                    <strong>
+                      {
+                        sourceBreach.id
+                      }
+                    </strong>
+
+                  </div>
+
+
+                  <div className="request-review-field">
+
+                    <span>
+                      Estado original
+                    </span>
+
+                    <strong>
+                      {
+                        sourceBreach.status ===
+                        "NO_CUMPLE"
+                          ? "No cumple"
+                          : "Solicitado"
+                      }
+                    </strong>
+
+                  </div>
+
+                </div>
+
+              </div>
+            )}
 
 
             <div className="request-actions">
