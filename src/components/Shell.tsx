@@ -37,6 +37,10 @@ type ShellProps = {
 
   currentUser?: UserScope
 
+  // Se mantienen para compatibilidad con App.tsx
+  userName?: string
+  branch?: string
+
   demoMode?: boolean
 
   onDemoLogout?: () => void
@@ -96,6 +100,8 @@ const mainNavigation: NavigationItem[] = [
 export default function Shell({
   children,
   currentUser,
+  userName,
+  branch,
   demoMode = false,
   onDemoLogout,
   showApprovals = false,
@@ -104,6 +110,33 @@ export default function Shell({
     mobileMenuOpen,
     setMobileMenuOpen,
   ] = useState(false)
+
+
+  // ======================================================
+  // DATOS VISIBLES DEL USUARIO
+  //
+  // currentUser corresponde al modelo nuevo.
+  // userName / branch mantienen compatibilidad con App.tsx
+  // mientras terminamos la transición.
+  // ======================================================
+
+  const displayName =
+    currentUser?.name ??
+    userName ??
+    "Usuario Ditalcar"
+
+
+  const displayBranch =
+    currentUser?.local ??
+    branch
+
+
+  const displayRole =
+    currentUser
+      ? formatRole(
+          currentUser.role
+        )
+      : "Ditalcar Colaboradores"
 
 
   const closeMobileMenu = () => {
@@ -126,7 +159,9 @@ export default function Shell({
         }`}
       >
 
-        {/* CABECERA */}
+        {/* ==================================================
+            CABECERA SIDEBAR
+        ================================================== */}
 
         <div className="sidebar-head">
 
@@ -146,7 +181,9 @@ export default function Shell({
         </div>
 
 
-        {/* NAVEGACIÓN */}
+        {/* ==================================================
+            NAVEGACIÓN PRINCIPAL
+        ================================================== */}
 
         <nav className="sidebar-nav">
 
@@ -203,7 +240,9 @@ export default function Shell({
           )}
 
 
-          {/* APROBACIONES */}
+          {/* ==================================================
+              APROBACIONES
+          ================================================== */}
 
           {showApprovals && (
             <>
@@ -262,48 +301,44 @@ export default function Shell({
           )}
 
 
-          {currentUser && (
-            <div className="sidebar-user-info">
+          <div className="sidebar-user-info">
 
-              <div className="sidebar-user-avatar">
+            <div className="sidebar-user-avatar">
+              {
+                getInitials(
+                  displayName
+                )
+              }
+            </div>
+
+
+            <div className="sidebar-user-text">
+
+              <strong>
                 {
-                  getInitials(
-                    currentUser.name
-                  )
+                  displayName
                 }
-              </div>
+              </strong>
 
 
-              <div className="sidebar-user-text">
+              <span>
+                {
+                  displayRole
+                }
+              </span>
 
-                <strong>
+
+              {displayBranch && (
+                <small>
                   {
-                    currentUser.name
+                    displayBranch
                   }
-                </strong>
-
-
-                <span>
-                  {
-                    formatRole(
-                      currentUser.role
-                    )
-                  }
-                </span>
-
-
-                {currentUser.local && (
-                  <small>
-                    {
-                      currentUser.local
-                    }
-                  </small>
-                )}
-
-              </div>
+                </small>
+              )}
 
             </div>
-          )}
+
+          </div>
 
 
           {demoMode &&
@@ -347,12 +382,14 @@ export default function Shell({
 
 
       {/* ==================================================
-          CONTENIDO
+          CONTENIDO PRINCIPAL
       ================================================== */}
 
       <main className="shell-main">
 
-        {/* TOPBAR MÓVIL */}
+        {/* ==================================================
+            TOPBAR MÓVIL
+        ================================================== */}
 
         <header className="shell-mobile-header">
 
@@ -374,6 +411,10 @@ export default function Shell({
 
         </header>
 
+
+        {/* ==================================================
+            CONTENIDO DE LA PÁGINA
+        ================================================== */}
 
         <div className="shell-content">
           {children}
