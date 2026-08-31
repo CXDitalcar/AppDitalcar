@@ -177,11 +177,14 @@ function formatRole(
     GERENCIA_COMERCIAL:
       "Gerencia Comercial",
 
-    JEFATURA_MARKETING:
-      "Jefatura de Marketing",
+   JEFATURA_MARKETING:
+  "Jefatura de Marketing",
 
-    ADMINISTRATIVO:
-      "Administrativo",
+EXPERIENCIA_CLIENTES:
+  "Experiencia de Clientes",
+
+ADMINISTRATIVO:
+  "Administrativo",
 
     EQUIPO_COMERCIAL:
       "Equipo Comercial",
