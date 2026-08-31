@@ -12,9 +12,7 @@ import {
   X,
 } from "lucide-react"
 
-import {
-  NavLink,
-} from "react-router-dom"
+import { NavLink } from "react-router-dom"
 
 import {
   useState,
@@ -22,43 +20,7 @@ import {
 } from "react"
 
 import Brand from "./Brand"
-
-import {
-  signOut,
-} from "../services/auth"
-
-
-const nav = [
-  [
-    "/",
-    "Inicio",
-    Home,
-  ],
-
-  [
-    "/academia",
-    "Academia",
-    GraduationCap,
-  ],
-
-  [
-    "/mi-local",
-    "Mi Local",
-    ClipboardCheck,
-  ],
-
-  [
-    "/solicitudes",
-    "Solicitudes",
-    MessagesSquare,
-  ],
-
-  [
-    "/solicitudes/nueva",
-    "Nueva solicitud",
-    FilePlus2,
-  ],
-] as const
+import { signOut } from "../services/auth"
 
 
 export default function Shell({
@@ -76,24 +38,69 @@ export default function Shell({
   onDemoLogout?: () => void
   showApprovals?: boolean
 }) {
-}: {
-  children: ReactNode
-  userName: string
-  branch: string
-  demoMode?: boolean
-  onDemoLogout?: () => void
-}) {
-  const [open, setOpen] =
-    useState(false)
+  const [open, setOpen] = useState(false)
 
+
+  // ======================================================
+  // NAVEGACIÓN
+  // ======================================================
+
+  const nav = [
+    {
+      to: "/",
+      label: "Inicio",
+      icon: Home,
+      end: true,
+    },
+
+    {
+      to: "/academia",
+      label: "Academia",
+      icon: GraduationCap,
+      end: false,
+    },
+
+    {
+      to: "/mi-local",
+      label: "Mi Local",
+      icon: ClipboardCheck,
+      end: false,
+    },
+
+    {
+      to: "/solicitudes",
+      label: "Solicitudes",
+      icon: MessagesSquare,
+      end: true,
+    },
+
+    ...(showApprovals
+      ? [
+          {
+            to: "/aprobaciones",
+            label: "Aprobaciones",
+            icon: CheckSquare2,
+            end: false,
+          },
+        ]
+      : []),
+
+    {
+      to: "/solicitudes/nueva",
+      label: "Nueva solicitud",
+      icon: FilePlus2,
+      end: false,
+    },
+  ]
+
+
+  // ======================================================
+  // CERRAR SESIÓN
+  // ======================================================
 
   async function handleLogout() {
-    if (
-      demoMode &&
-      onDemoLogout
-    ) {
+    if (demoMode && onDemoLogout) {
       onDemoLogout()
-
       return
     }
 
@@ -107,23 +114,16 @@ export default function Shell({
       {/* SIDEBAR */}
 
       <aside
-        className={`sidebar ${
-          open
-            ? "open"
-            : ""
-        }`}
+        className={`sidebar ${open ? "open" : ""}`}
       >
 
         <div className="sidebar-top">
 
           <Brand />
 
-
           <button
             className="icon-btn mobile-close"
-            onClick={() =>
-              setOpen(false)
-            }
+            onClick={() => setOpen(false)}
           >
             <X size={20} />
           </button>
@@ -143,8 +143,7 @@ export default function Shell({
               size={13}
               style={{
                 marginRight: 6,
-                verticalAlign:
-                  "middle",
+                verticalAlign: "middle",
               }}
             />
 
@@ -156,32 +155,26 @@ export default function Shell({
         <nav>
 
           {nav.map(
-            (
-              [
-                to,
-                label,
-                Icon,
-              ]
-            ) => (
+            ({
+              to,
+              label,
+              icon: Icon,
+              end,
+            }) => (
               <NavLink
                 key={to}
                 to={to}
+                end={end}
                 onClick={() =>
                   setOpen(false)
                 }
-                className={({
-                  isActive,
-                }) =>
+                className={({ isActive }) =>
                   `nav-link ${
-                    isActive
-                      ? "active"
-                      : ""
+                    isActive ? "active" : ""
                   }`
                 }
               >
-                <Icon
-                  size={19}
-                />
+                <Icon size={19} />
 
                 <span>
                   {label}
@@ -196,18 +189,13 @@ export default function Shell({
         <div className="sidebar-foot">
 
           <div className="pilot-pill">
-            {demoMode
-              ? "Vista"
-              : "Piloto"}{" "}
-            · {branch}
+            {demoMode ? "Vista" : "Piloto"} · {branch}
           </div>
 
 
           <button
             className="logout"
-            onClick={
-              handleLogout
-            }
+            onClick={handleLogout}
           >
             <LogOut size={17} />
 
@@ -227,9 +215,7 @@ export default function Shell({
 
           <button
             className="icon-btn mobile-menu"
-            onClick={() =>
-              setOpen(true)
-            }
+            onClick={() => setOpen(true)}
           >
             <Menu size={21} />
           </button>
@@ -252,9 +238,7 @@ export default function Shell({
 
               <span>
                 {branch}
-                {demoMode
-                  ? " · Demo"
-                  : ""}
+                {demoMode ? " · Demo" : ""}
               </span>
 
             </div>
@@ -274,9 +258,7 @@ export default function Shell({
       {open && (
         <div
           className="scrim"
-          onClick={() =>
-            setOpen(false)
-          }
+          onClick={() => setOpen(false)}
         />
       )}
 
