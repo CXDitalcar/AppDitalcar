@@ -22,6 +22,8 @@ import {
 
 import Brand from "./Brand"
 
+import "./Shell.css"
+
 import type {
   UserScope,
 } from "../types"
@@ -49,7 +51,7 @@ type ShellProps = {
 
 
 // ======================================================
-// MENÚ
+// MENÚ PRINCIPAL
 // ======================================================
 
 type NavigationItem = {
@@ -111,10 +113,6 @@ export default function Shell({
   ] = useState(false)
 
 
-  // ======================================================
-  // DATOS VISIBLES DEL USUARIO
-  // ======================================================
-
   const displayName =
     currentUser?.name ??
     userName ??
@@ -140,29 +138,31 @@ export default function Shell({
 
 
   return (
-    <div className="shell">
+    <div className="app-shell">
 
       {/* ==================================================
           SIDEBAR
       ================================================== */}
 
       <aside
-        className={`sidebar ${
+        className={`app-sidebar ${
           mobileMenuOpen
-            ? "sidebar-open"
+            ? "app-sidebar-open"
             : ""
         }`}
       >
 
-        {/* CABECERA */}
+        {/* ==================================================
+            LOGO
+        ================================================== */}
 
-        <div className="sidebar-head">
+        <div className="app-sidebar-brand">
 
           <Brand />
 
           <button
             type="button"
-            className="sidebar-close"
+            className="app-sidebar-close"
             onClick={
               closeMobileMenu
             }
@@ -178,98 +178,119 @@ export default function Shell({
             NAVEGACIÓN
         ================================================== */}
 
-        <nav className="sidebar-nav">
+        <nav className="app-sidebar-nav">
 
-          <div className="sidebar-nav-label">
+          <div className="app-sidebar-section-label">
             PRINCIPAL
           </div>
 
 
-          {mainNavigation.map(
-            (item) => {
-              const Icon =
-                item.icon
+          <div className="app-sidebar-links">
+
+            {mainNavigation.map(
+              (item) => {
+                const Icon =
+                  item.icon
 
 
-              return (
+                return (
+                  <NavLink
+                    key={
+                      item.to
+                    }
+                    to={
+                      item.to
+                    }
+                    end={
+                      item.to === "/"
+                    }
+                    onClick={
+                      closeMobileMenu
+                    }
+                    className={({
+                      isActive,
+                    }) =>
+                      `app-sidebar-link ${
+                        isActive
+                          ? "app-sidebar-link-active"
+                          : ""
+                      }`
+                    }
+                  >
+
+                    <span className="app-sidebar-link-icon">
+
+                      <Icon
+                        size={18}
+                        strokeWidth={1.9}
+                      />
+
+                    </span>
+
+
+                    <span className="app-sidebar-link-text">
+                      {
+                        item.label
+                      }
+                    </span>
+
+                  </NavLink>
+                )
+              }
+            )}
+
+          </div>
+
+
+          {/* ==================================================
+              GESTIÓN
+          ================================================== */}
+
+          {showApprovals && (
+            <div className="app-sidebar-management">
+
+              <div className="app-sidebar-section-label">
+                GESTIÓN
+              </div>
+
+
+              <div className="app-sidebar-links">
+
                 <NavLink
-                  key={
-                    item.to
-                  }
-                  to={
-                    item.to
-                  }
-                  end={
-                    item.to ===
-                    "/"
-                  }
+                  to="/aprobaciones"
                   onClick={
                     closeMobileMenu
                   }
                   className={({
                     isActive,
                   }) =>
-                    `sidebar-link ${
+                    `app-sidebar-link ${
                       isActive
-                        ? "active"
+                        ? "app-sidebar-link-active"
                         : ""
                     }`
                   }
                 >
 
-                  <Icon
-                    size={18}
-                  />
+                  <span className="app-sidebar-link-icon">
 
-                  <span>
-                    {
-                      item.label
-                    }
+                    <ShieldCheck
+                      size={18}
+                      strokeWidth={1.9}
+                    />
+
+                  </span>
+
+
+                  <span className="app-sidebar-link-text">
+                    Aprobaciones
                   </span>
 
                 </NavLink>
-              )
-            }
-          )}
 
-
-          {/* ==================================================
-              APROBACIONES
-          ================================================== */}
-
-          {showApprovals && (
-            <>
-              <div className="sidebar-nav-label sidebar-nav-label-secondary">
-                GESTIÓN
               </div>
 
-
-              <NavLink
-                to="/aprobaciones"
-                onClick={
-                  closeMobileMenu
-                }
-                className={({
-                  isActive,
-                }) =>
-                  `sidebar-link ${
-                    isActive
-                      ? "active"
-                      : ""
-                  }`
-                }
-              >
-
-                <ShieldCheck
-                  size={18}
-                />
-
-                <span>
-                  Aprobaciones
-                </span>
-
-              </NavLink>
-            </>
+            </div>
           )}
 
         </nav>
@@ -279,24 +300,26 @@ export default function Shell({
             USUARIO
         ================================================== */}
 
-        <div className="sidebar-user">
+        <div className="app-sidebar-user">
 
           {demoMode && (
-            <div className="demo-mode-badge">
+            <div className="app-demo-badge">
 
               <BadgeCheck
                 size={14}
               />
 
-              MODO DEMO
+              <span>
+                MODO DEMO
+              </span>
 
             </div>
           )}
 
 
-          <div className="sidebar-user-info">
+          <div className="app-user-card">
 
-            <div className="sidebar-user-avatar">
+            <div className="app-user-avatar">
               {
                 getInitials(
                   displayName
@@ -305,7 +328,7 @@ export default function Shell({
             </div>
 
 
-            <div className="sidebar-user-text">
+            <div className="app-user-data">
 
               <strong>
                 {
@@ -338,7 +361,7 @@ export default function Shell({
             onDemoLogout && (
             <button
               type="button"
-              className="demo-logout-btn"
+              className="app-demo-logout"
               onClick={
                 onDemoLogout
               }
@@ -348,7 +371,9 @@ export default function Shell({
                 size={16}
               />
 
-              Cambiar perfil
+              <span>
+                Cambiar perfil
+              </span>
 
             </button>
           )}
@@ -365,7 +390,7 @@ export default function Shell({
       {mobileMenuOpen && (
         <button
           type="button"
-          className="sidebar-overlay"
+          className="app-sidebar-overlay"
           onClick={
             closeMobileMenu
           }
@@ -375,18 +400,20 @@ export default function Shell({
 
 
       {/* ==================================================
-          CONTENIDO PRINCIPAL
+          ÁREA PRINCIPAL
       ================================================== */}
 
-      <main className="shell-main">
+      <main className="app-main">
 
-        {/* TOPBAR MÓVIL */}
+        {/* ==================================================
+            HEADER MÓVIL
+        ================================================== */}
 
-        <header className="shell-mobile-header">
+        <header className="app-mobile-header">
 
           <button
             type="button"
-            className="mobile-menu-btn"
+            className="app-mobile-menu-button"
             onClick={() =>
               setMobileMenuOpen(
                 true
@@ -394,16 +421,24 @@ export default function Shell({
             }
             aria-label="Abrir menú"
           >
-            <Menu size={21} />
+            <Menu
+              size={21}
+            />
           </button>
 
 
-          <Brand />
+          <div className="app-mobile-brand">
+            <Brand />
+          </div>
 
         </header>
 
 
-        <div className="shell-content">
+        {/* ==================================================
+            CONTENIDO
+        ================================================== */}
+
+        <div className="app-main-content">
           {children}
         </div>
 
