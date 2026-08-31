@@ -44,11 +44,12 @@ const familyInfo: Record<
     icon: Package,
   },
 
-  INSUMOS_ADMINISTRACION: {
-    label: "Insumos y Administración",
-    description:
-      "Patentes, materiales, reposiciones e insumos administrativos.",
-    icon: Layers3,
+INSUMOS_SHOWROOM: {
+  label: "Insumos y Showroom",
+  description:
+    "Insumos, zonas de experiencia, mobiliario, equipamiento e instalaciones del local.",
+  icon: Layers3,
+},
   },
 
   COLABORADORES: {
@@ -104,7 +105,7 @@ export default function NuevaSolicitud({
     if (currentUser.role === "VENDEDOR") {
       return allFamilies.filter(
         (family) =>
-          family !== "INSUMOS_ADMINISTRACION"
+          family !== "INSUMOS_SHOWROOM"
       )
     }
 
