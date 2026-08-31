@@ -21,7 +21,6 @@ import {
 } from "react-router-dom"
 
 import Brand from "./Brand"
-import "./Shell.css"
 
 import type {
   UserScope,
@@ -37,7 +36,7 @@ type ShellProps = {
 
   currentUser?: UserScope
 
-  // Se mantienen para compatibilidad con App.tsx
+  // Compatibilidad con App.tsx actual
   userName?: string
   branch?: string
 
@@ -114,10 +113,6 @@ export default function Shell({
 
   // ======================================================
   // DATOS VISIBLES DEL USUARIO
-  //
-  // currentUser corresponde al modelo nuevo.
-  // userName / branch mantienen compatibilidad con App.tsx
-  // mientras terminamos la transición.
   // ======================================================
 
   const displayName =
@@ -139,7 +134,7 @@ export default function Shell({
       : "Ditalcar Colaboradores"
 
 
-  const closeMobileMenu = () => {
+  function closeMobileMenu() {
     setMobileMenuOpen(false)
   }
 
@@ -159,9 +154,7 @@ export default function Shell({
         }`}
       >
 
-        {/* ==================================================
-            CABECERA SIDEBAR
-        ================================================== */}
+        {/* CABECERA */}
 
         <div className="sidebar-head">
 
@@ -182,7 +175,7 @@ export default function Shell({
 
 
         {/* ==================================================
-            NAVEGACIÓN PRINCIPAL
+            NAVEGACIÓN
         ================================================== */}
 
         <nav className="sidebar-nav">
@@ -387,9 +380,7 @@ export default function Shell({
 
       <main className="shell-main">
 
-        {/* ==================================================
-            TOPBAR MÓVIL
-        ================================================== */}
+        {/* TOPBAR MÓVIL */}
 
         <header className="shell-mobile-header">
 
@@ -411,10 +402,6 @@ export default function Shell({
 
         </header>
 
-
-        {/* ==================================================
-            CONTENIDO DE LA PÁGINA
-        ================================================== */}
 
         <div className="shell-content">
           {children}
