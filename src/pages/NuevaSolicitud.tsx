@@ -14,16 +14,15 @@ import {
 import "./NuevaSolicitud.css"
 
 import {
-  mockCurrentUserEmail,
   mockProcessFields,
   mockProcesses,
-  mockUsers,
 } from "../data/mockData"
 
 import type {
   ProcessDefinition,
   ProcessFieldDefinition,
   RequestFamily,
+   UserScope,
 } from "../types"
 
 
@@ -68,11 +67,11 @@ const familyInfo: Record<
 }
 
 
-export default function NuevaSolicitud() {
-  const currentUser =
-    mockUsers.find(
-      (user) => user.email === mockCurrentUserEmail
-    ) ?? mockUsers[0]
+export default function NuevaSolicitud({
+  currentUser,
+}: {
+  currentUser: UserScope
+}) {
 
   const [step, setStep] = useState(1)
 
