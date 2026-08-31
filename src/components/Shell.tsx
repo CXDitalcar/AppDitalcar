@@ -283,7 +283,7 @@ export default function Shell({
 
 
                   <span className="app-sidebar-link-text">
-                    Aprobaciones
+                    Gestión
                   </span>
 
                 </NavLink>
