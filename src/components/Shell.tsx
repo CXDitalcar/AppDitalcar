@@ -1,5 +1,6 @@
 import {
   Bell,
+  CheckSquare2,
   ClipboardCheck,
   FilePlus2,
   GraduationCap,
