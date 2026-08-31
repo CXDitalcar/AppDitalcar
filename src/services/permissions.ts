@@ -7,75 +7,40 @@ import type {
 
 
 // ======================================================
-// HELPERS DE ROL
+// ROLES CON VISIBILIDAD AMPLIA
 // ======================================================
 
-const managementRoles = [
+const managementRoles: UserScope["role"][] = [
   "GERENCIA_VENTAS",
   "GERENCIA_COMERCIAL",
   "GERENCIA_ADMINISTRACION",
   "GERENCIA_GENERAL",
-] as const
-
-
-function isManagementRole(role: UserScope["role"]) {
-  return managementRoles.includes(
-    role as (typeof managementRoles)[number]
-  )
-}
+]
 
 
 // ======================================================
-// VISIBILIDAD DE SOLICITUD
-// ======================================================
-//
-// Reglas iniciales:
-// - Solicitante siempre puede ver.
-// - Jefatura de Local puede ver solicitudes de su local.
-// - Gerencias pueden ver solicitudes dentro de su ámbito.
-// - Aprobadores/gestores pueden ver solicitudes de procesos
-//   que tengan asignados.
-// - Más adelante agregaremos Marca/Zona con datos reales.
+// REVISAR SI UNA ASIGNACIÓN APLICA AL USUARIO
 // ======================================================
 
-export function canViewRequest(
+function assignmentMatchesUser(
   user: UserScope,
-  request: RequestItem,
-  assignments: ProcessAssignment[]
+  assignment: ProcessAssignment
 ): boolean {
-  if (!user.active) return false
-
-  // Solicitante
-  if (user.email === request.requesterEmail) {
-    return true
+  if (!assignment.active) {
+    return false
   }
 
-  // Jefatura local
   if (
-    user.role === "JEFATURA_LOCAL" &&
-    user.local &&
-    user.local === request.local
+    assignment.email &&
+    assignment.email === user.email
   ) {
     return true
   }
 
-  // Gerencias con visibilidad amplia
-  if (isManagementRole(user.role)) {
-    return true
-  }
-
-  // Responsables del proceso
-  const isAssignedToProcess = assignments.some(
-    (assignment) =>
-      assignment.active &&
-      assignment.processCode === request.processCode &&
-      (
-        assignment.email === user.email ||
-        assignment.role === user.role
-      )
-  )
-
-  if (isAssignedToProcess) {
+  if (
+    assignment.role &&
+    assignment.role === user.role
+  ) {
     return true
   }
 
@@ -84,7 +49,64 @@ export function canViewRequest(
 
 
 // ======================================================
-// APROBACIÓN
+// VER SOLICITUD
+// ======================================================
+
+export function canViewRequest(
+  user: UserScope,
+  request: RequestItem,
+  assignments: ProcessAssignment[]
+): boolean {
+  if (!user.active) {
+    return false
+  }
+
+
+  // Solicitante
+  if (
+    request.requesterEmail ===
+    user.email
+  ) {
+    return true
+  }
+
+
+  // Jefatura local
+  if (
+    user.role ===
+      "JEFATURA_LOCAL" &&
+    user.local &&
+    user.local === request.local
+  ) {
+    return true
+  }
+
+
+  // Gerencias con visión amplia
+  if (
+    managementRoles.includes(
+      user.role
+    )
+  ) {
+    return true
+  }
+
+
+  // Responsable del proceso
+  return assignments.some(
+    (assignment) =>
+      assignment.processCode ===
+        request.processCode &&
+      assignmentMatchesUser(
+        user,
+        assignment
+      )
+  )
+}
+
+
+// ======================================================
+// APROBAR SOLICITUD
 // ======================================================
 
 export function canApproveRequest(
@@ -92,23 +114,26 @@ export function canApproveRequest(
   request: RequestItem,
   assignments: ProcessAssignment[]
 ): boolean {
-  if (!user.active) return false
+  if (!user.active) {
+    return false
+  }
 
   return assignments.some(
     (assignment) =>
-      assignment.active &&
-      assignment.processCode === request.processCode &&
-      assignment.type === "APPROVER" &&
-      (
-        assignment.email === user.email ||
-        assignment.role === user.role
+      assignment.processCode ===
+        request.processCode &&
+      assignment.type ===
+        "APPROVER" &&
+      assignmentMatchesUser(
+        user,
+        assignment
       )
   )
 }
 
 
 // ======================================================
-// GESTIÓN
+// GESTIONAR / RESOLVER
 // ======================================================
 
 export function canManageRequest(
@@ -116,49 +141,56 @@ export function canManageRequest(
   request: RequestItem,
   assignments: ProcessAssignment[]
 ): boolean {
-  if (!user.active) return false
+  if (!user.active) {
+    return false
+  }
 
   return assignments.some(
     (assignment) =>
-      assignment.active &&
-      assignment.processCode === request.processCode &&
-      assignment.type === "MANAGER" &&
-      (
-        assignment.email === user.email ||
-        assignment.role === user.role
+      assignment.processCode ===
+        request.processCode &&
+      assignment.type ===
+        "MANAGER" &&
+      assignmentMatchesUser(
+        user,
+        assignment
       )
   )
 }
 
 
 // ======================================================
-// CONFIRMACIÓN DE RESOLUCIÓN
-// ======================================================
-//
-// Puede confirmar:
-// - solicitante
-// - jefatura del local del solicitante
-//
-// Más adelante esto podrá parametrizarse por proceso.
+// CONFIRMAR RESOLUCIÓN
 // ======================================================
 
 export function canConfirmResolution(
   user: UserScope,
   request: RequestItem
 ): boolean {
-  if (!user.active) return false
+  if (!user.active) {
+    return false
+  }
 
-  if (user.email === request.requesterEmail) {
+
+  // Solicitante
+  if (
+    request.requesterEmail ===
+    user.email
+  ) {
     return true
   }
 
+
+  // Jefatura de su local
   if (
-    user.role === "JEFATURA_LOCAL" &&
+    user.role ===
+      "JEFATURA_LOCAL" &&
     user.local &&
     user.local === request.local
   ) {
     return true
   }
+
 
   return false
 }
@@ -173,103 +205,111 @@ export function getRequestPermissions(
   request: RequestItem,
   assignments: ProcessAssignment[]
 ): RequestPermissions {
-  const canView = canViewRequest(
-    user,
-    request,
-    assignments
-  )
+  const canView =
+    canViewRequest(
+      user,
+      request,
+      assignments
+    )
 
-  const canApprove = canApproveRequest(
-    user,
-    request,
-    assignments
-  )
+  const canApprove =
+    canApproveRequest(
+      user,
+      request,
+      assignments
+    )
 
-  const canManage = canManageRequest(
-    user,
-    request,
-    assignments
-  )
+  const canManage =
+    canManageRequest(
+      user,
+      request,
+      assignments
+    )
 
-  const canConfirm = canConfirmResolution(
-    user,
-    request
-  )
+  const canConfirm =
+    canConfirmResolution(
+      user,
+      request
+    )
+
 
   return {
     canView,
-
     canApprove,
-
     canManage,
 
-    canConfirmResolution: canConfirm,
+    canConfirmResolution:
+      canConfirm,
 
-    // Estas acciones pertenecen al rol aprobador.
-    canRequestInformation: canApprove,
+    canRequestInformation:
+      canApprove,
 
-    canReject: canApprove,
+    canReject:
+      canApprove,
 
-    canApproveWithAdjustment: canApprove,
+    canApproveWithAdjustment:
+      canApprove,
   }
 }
 
 
 // ======================================================
-// VISIBILIDAD DE DETALLE DE LOCALES
+// ACCESO A BANDEJA DE APROBACIONES
 // ======================================================
-//
-// Esto prepara la lógica que definimos para ventas/metas:
-//
-// Vendedor:
-// - detalle de su local
-// - general del resto
-//
-// Jefatura Local:
-// - detalle de su local
-// - general del resto
-//
-// Jefatura Marca/Zonal:
-// - detalle según sus asociaciones
-//
-// Gerencia Ventas:
-// - detalle de todos
-//
-// Por ahora Marca/Zona quedan preparados para ampliar.
+
+export function canAccessApprovalInbox(
+  user: UserScope,
+  assignments: ProcessAssignment[]
+): boolean {
+  if (!user.active) {
+    return false
+  }
+
+  return assignments.some(
+    (assignment) =>
+      assignment.active &&
+      assignment.type ===
+        "APPROVER" &&
+      assignmentMatchesUser(
+        user,
+        assignment
+      )
+  )
+}
+
+
+// ======================================================
+// VISIBILIDAD DETALLE LOCAL
 // ======================================================
 
 export function canViewLocalDetail(
   user: UserScope,
   local: string
 ): boolean {
-  if (!user.active) return false
-
-  if (user.role === "GERENCIA_VENTAS") {
-    return true
+  if (!user.active) {
+    return false
   }
 
-  if (user.role === "GERENCIA_GENERAL") {
+  if (
+    user.role ===
+      "GERENCIA_VENTAS" ||
+    user.role ===
+      "GERENCIA_GENERAL"
+  ) {
     return true
   }
 
   if (
     user.role === "VENDEDOR" ||
-    user.role === "JEFATURA_LOCAL"
+    user.role ===
+      "JEFATURA_LOCAL"
   ) {
-    return Boolean(
-      user.local &&
+    return (
       user.local === local
     )
   }
 
-  // Más adelante se completará con
-  // asociaciones reales de marca y zona.
-  if (
-    user.role === "JEFATURA_MARCA" ||
-    user.role === "JEFATURA_ZONAL"
-  ) {
-    return false
-  }
-
+  // Marca y zonal se completarán
+  // cuando configuremos sus ámbitos.
   return false
 }
