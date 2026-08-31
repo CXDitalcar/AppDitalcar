@@ -383,14 +383,14 @@ export default function App() {
           />
 
 
-          {/* RUTA DESCONOCIDA */}
+          {/* FORMULARIOS */}
 
           <Route
-            path="*"
+            path="/formularios"
             element={
-              <Navigate
-                to="/"
-                replace
+           <Formularios
+                   currentUser={currentUser}
+
               />
             }
           />
