@@ -8,6 +8,10 @@ import {
   TriangleAlert,
 } from "lucide-react"
 
+import {
+  useNavigate,
+} from "react-router-dom"
+
 import "./Formularios.css"
 
 import {
@@ -39,6 +43,10 @@ type FormulariosProps = {
 export default function Formularios({
   currentUser,
 }: FormulariosProps) {
+  const navigate =
+    useNavigate()
+
+
   const formsToComplete =
     getFormsToComplete(
       currentUser
@@ -73,6 +81,15 @@ export default function Formularios({
           breach.executionId
         )
     )
+
+
+  function openExecution(
+    executionId: string
+  ) {
+    navigate(
+      `/formularios/${executionId}`
+    )
+  }
 
 
   return (
@@ -182,6 +199,9 @@ export default function Formularios({
                   }
                   currentUser={
                     currentUser
+                  }
+                  onViewExecution={
+                    openExecution
                   }
                 />
               )
@@ -440,6 +460,11 @@ export default function Formularios({
                         type="button"
                         className="tracking-view-btn"
                         title="Ver revisión"
+                        onClick={() =>
+                          openExecution(
+                            execution.id
+                          )
+                        }
                       >
                         <Eye
                           size={18}
@@ -494,9 +519,13 @@ export default function Formularios({
 function FormCard({
   form,
   currentUser,
+  onViewExecution,
 }: {
   form: MockFormDefinition
   currentUser: UserScope
+  onViewExecution: (
+    executionId: string
+  ) => void
 }) {
   const lastExecution =
     getLastExecution(
@@ -685,6 +714,11 @@ function FormCard({
           <button
             type="button"
             className="form-secondary-btn"
+            onClick={() =>
+              onViewExecution(
+                lastExecution.id
+              )
+            }
           >
             <Eye
               size={17}
@@ -857,11 +891,6 @@ function canViewExecution(
   currentUser: UserScope,
   execution: MockFormExecution
 ) {
-  // ------------------------------------------------------
-  // EXPERIENCIA DE CLIENTES
-  // TODA LA RED
-  // ------------------------------------------------------
-
   if (
     currentUser.role ===
     "EXPERIENCIA_CLIENTES"
@@ -869,11 +898,6 @@ function canViewExecution(
     return true
   }
 
-
-  // ------------------------------------------------------
-  // JEFATURA COMERCIAL Y CLIENTES
-  // TODA LA RED
-  // ------------------------------------------------------
 
   if (
     currentUser.role ===
@@ -883,11 +907,6 @@ function canViewExecution(
   }
 
 
-  // ------------------------------------------------------
-  // GERENCIA DE VENTAS
-  // TODA LA RED
-  // ------------------------------------------------------
-
   if (
     currentUser.role ===
     "GERENCIA_VENTAS"
@@ -895,11 +914,6 @@ function canViewExecution(
     return true
   }
 
-
-  // ------------------------------------------------------
-  // JEFATURA LOCAL
-  // SOLO SU LOCAL
-  // ------------------------------------------------------
 
   if (
     currentUser.role ===
@@ -915,11 +929,6 @@ function canViewExecution(
   }
 
 
-  // ------------------------------------------------------
-  // JEFATURA MARCA
-  // SOLO GEELY
-  // ------------------------------------------------------
-
   if (
     currentUser.role ===
     "JEFATURA_MARCA"
@@ -929,19 +938,6 @@ function canViewExecution(
     )
   }
 
-
-  // ------------------------------------------------------
-  // JEFATURA ZONAL
-  //
-  // TODOS SUS LOCALES
-  // EXCEPTO GEELY Y STELLANTIS
-  //
-  // En demo todavía no tenemos relación
-  // real Local ↔ Zona, por lo que aplicamos
-  // únicamente las exclusiones.
-  //
-  // Luego vendrá desde 01_Sucursales.
-  // ------------------------------------------------------
 
   if (
     currentUser.role ===
@@ -963,7 +959,7 @@ function canViewExecution(
 
 
 // ======================================================
-// ÚLTIMA EJECUCIÓN DE UN FORMULARIO
+// ÚLTIMA EJECUCIÓN
 // ======================================================
 
 function getLastExecution(
@@ -1004,9 +1000,9 @@ function getLastExecution(
 
 
 // ======================================================
-// IDENTIFICAR OPERACIÓN STELLANTIS
+// IDENTIFICAR STELLANTIS
 //
-// Temporal en demo.
+// Temporal.
 // Después vendrá desde 01_Sucursales.
 // ======================================================
 
@@ -1027,9 +1023,9 @@ function isStellantisLocal(
 
 
 // ======================================================
-// IDENTIFICAR OPERACIÓN GEELY
+// IDENTIFICAR GEELY
 //
-// Temporal en demo.
+// Temporal.
 // Después vendrá desde 01_Sucursales.
 // ======================================================
 
