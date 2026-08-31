@@ -22,11 +22,8 @@ import {
 } from "../services/graph"
 
 import {
-  getDemoRequests,
-} from "../services/demoStore"
-
-import {
   mockProcessAssignments,
+  mockRequests,
 } from "../data/mockData"
 
 import {
@@ -41,6 +38,10 @@ import type {
 import StatusBadge from "../components/StatusBadge"
 
 
+// ======================================================
+// UTILIDAD PARA LEER COLUMNAS SHAREPOINT
+// ======================================================
+
 function pick(
   fields: Record<string, any>,
   names: string[]
@@ -49,18 +50,20 @@ function pick(
     const name of names
   ) {
     if (
-      fields[name] !==
-        undefined &&
+      fields[name] !== undefined &&
       fields[name] !== null
     ) {
       return fields[name]
     }
   }
 
-
   return ""
 }
 
+
+// ======================================================
+// COMPONENTE
+// ======================================================
 
 export default function Solicitudes({
   branch,
@@ -80,13 +83,6 @@ export default function Solicitudes({
     setRows,
   ] =
     useState<Solicitud[]>([])
-
-
-  const [
-    demoRows,
-    setDemoRows,
-  ] =
-    useState<RequestItem[]>([])
 
 
   const [
@@ -112,45 +108,37 @@ export default function Solicitudes({
     useState("")
 
 
+  // ======================================================
+  // CARGAR SHAREPOINT
+  // ======================================================
+
   async function load() {
     setError("")
 
 
-    if (
-      demoMode
-    ) {
-      setDemoRows(
-        getDemoRequests()
-      )
-
-      setLoading(
-        false
-      )
-
+    if (demoMode) {
+      setLoading(false)
       return
     }
 
 
-    setLoading(
-      true
-    )
+    setLoading(true)
 
 
     try {
-      setRows(
+      const data =
         await getSolicitudes()
-      )
+
+      setRows(data)
     } catch (
-      e: any
+      errorValue: any
     ) {
       setError(
-        e?.message ||
-        "No fue posible cargar las solicitudes."
+        errorValue?.message ||
+          "No fue posible cargar las solicitudes."
       )
     } finally {
-      setLoading(
-        false
-      )
+      setLoading(false)
     }
   }
 
@@ -166,19 +154,19 @@ export default function Solicitudes({
 
 
   // ======================================================
-  // DEMO
+  // SOLICITUDES DEMO VISIBLES
   // ======================================================
 
   const visibleDemo =
     useMemo(
       () => {
-        const q =
+        const normalizedQuery =
           query
             .trim()
             .toLowerCase()
 
 
-        return demoRows
+        return mockRequests
           .filter(
             (request) =>
               canViewRequest(
@@ -188,13 +176,32 @@ export default function Solicitudes({
               )
           )
           .filter(
-            (request) =>
-              !q ||
-              `${request.id} ${request.processName} ${request.local} ${request.requesterName} ${request.status}`
-                .toLowerCase()
-                .includes(
-                  q
-                )
+            (request) => {
+              if (
+                !normalizedQuery
+              ) {
+                return true
+              }
+
+
+              const searchableText =
+                [
+                  request.id,
+                  request.processName,
+                  request.local,
+                  request.requesterName,
+                  request.currentResponsibleName ??
+                    "",
+                  request.status,
+                ]
+                  .join(" ")
+                  .toLowerCase()
+
+
+              return searchableText.includes(
+                normalizedQuery
+              )
+            }
           )
           .sort(
             (a, b) =>
@@ -207,7 +214,6 @@ export default function Solicitudes({
           )
       },
       [
-        demoRows,
         query,
         currentUser,
       ]
@@ -215,28 +221,28 @@ export default function Solicitudes({
 
 
   // ======================================================
-  // LIVE
+  // SHAREPOINT FILTRADO
   // ======================================================
 
   const filteredLive =
     useMemo(
       () => {
-        const q =
+        const normalizedQuery =
           query
-            .toLowerCase()
             .trim()
+            .toLowerCase()
 
 
         return rows.filter(
           (row) => {
-            const f =
+            const fields =
               row.fields
 
 
             const local =
               String(
                 pick(
-                  f,
+                  fields,
                   [
                     "Local",
                     "local",
@@ -250,7 +256,7 @@ export default function Solicitudes({
             const solicitud =
               String(
                 pick(
-                  f,
+                  fields,
                   [
                     "Solicitud",
                     "Title",
@@ -263,7 +269,7 @@ export default function Solicitudes({
             const estado =
               String(
                 pick(
-                  f,
+                  fields,
                   [
                     "EstadoFlujo",
                     "Estado",
@@ -276,7 +282,7 @@ export default function Solicitudes({
             const area =
               String(
                 pick(
-                  f,
+                  fields,
                   [
                     "_x00c1_rearesponsable",
                     "Area_x0020_responsable",
@@ -299,13 +305,16 @@ export default function Solicitudes({
                 )
 
 
-            const matchesQuery =
-              !q ||
+            const searchableText =
               `${solicitud} ${estado} ${area} ${local}`
                 .toLowerCase()
-                .includes(
-                  q
-                )
+
+
+            const matchesQuery =
+              !normalizedQuery ||
+              searchableText.includes(
+                normalizedQuery
+              )
 
 
             return (
@@ -322,6 +331,10 @@ export default function Solicitudes({
       ]
     )
 
+
+  // ======================================================
+  // VISTA
+  // ======================================================
 
   return (
     <div className="requests-page-pilot">
@@ -346,7 +359,7 @@ export default function Solicitudes({
 
           <p>
             {demoMode
-              ? "Piloto interactivo · flujo por rol y SLA"
+              ? "Piloto interactivo · solicitudes según rol y proceso."
               : "Fuente: SharePoint · Tablero General Solicitudes"}
           </p>
 
@@ -356,6 +369,7 @@ export default function Solicitudes({
         <div className="request-head-actions">
 
           <button
+            type="button"
             className="secondary-btn"
             onClick={
               load
@@ -400,13 +414,12 @@ export default function Solicitudes({
           value={
             query
           }
-          onChange={
-            (
-              event
-            ) =>
-              setQuery(
-                event.target.value
-              )
+          onChange={(
+            event
+          ) =>
+            setQuery(
+              event.target.value
+            )
           }
           placeholder="Buscar solicitud, local, proceso o estado..."
         />
@@ -415,7 +428,7 @@ export default function Solicitudes({
 
 
       {/* ==================================================
-          ESTADOS
+          CARGANDO
       ================================================== */}
 
       {loading && (
@@ -425,10 +438,16 @@ export default function Solicitudes({
       )}
 
 
+      {/* ==================================================
+          ERROR
+      ================================================== */}
+
       {error && (
         <div className="error-box">
 
-          <AlertCircle />
+          <AlertCircle
+            size={20}
+          />
 
 
           <div>
@@ -440,9 +459,7 @@ export default function Solicitudes({
 
 
             <span>
-              {
-                error
-              }
+              {error}
             </span>
 
           </div>
@@ -452,211 +469,36 @@ export default function Solicitudes({
 
 
       {/* ==================================================
-          DEMO
+          MODO DEMO
       ================================================== */}
 
       {demoMode ? (
-        <div className="requests-grid">
+        <>
 
-          {visibleDemo.map(
-            (request) => (
-              <button
-                className="request-card request-card-button"
-                key={
-                  request.id
-                }
-                onClick={() =>
-                  navigate(
-                    `/solicitudes/${request.id}`
-                  )
-                }
-              >
+          {visibleDemo.length >
+          0 ? (
+            <div className="requests-grid">
 
-                <div className="request-top">
-
-                  <PilotStatus
-                    value={
-                      request.status
-                    }
-                  />
-
-
-                  <span>
-                    #
-                    {
+              {visibleDemo.map(
+                (request) => (
+                  <button
+                    type="button"
+                    className="request-card request-card-button"
+                    key={
                       request.id
                     }
-                  </span>
-
-                </div>
-
-
-                <h3>
-                  {
-                    request.processName
-                  }
-                </h3>
-
-
-                <div className="request-meta">
-
-                  <span>
-                    {
-                      request.local
-                    }
-                  </span>
-
-
-                  <span>
-                    {
-                      request.requesterName
-                    }
-                  </span>
-
-
-                  <span>
-                    {
-                      request.currentResponsibleName ||
-                      "Por asignar"
-                    }
-                  </span>
-
-                </div>
-
-
-                {request.slaPausedReason && (
-                  <div className="request-paused">
-                    SLA pausado ·{" "}
-                    {
-                      request.slaPausedReason
-                    }
-                  </div>
-                )}
-
-
-                <div className="request-foot">
-
-                  <small>
-                    {new Date(
-                      request.createdAt
-                    ).toLocaleDateString(
-                      "es-CL"
-                    )}
-                  </small>
-
-                </div>
-
-              </button>
-            )
-          )}
-
-        </div>
-      ) : (
-        <div className="requests-grid">
-
-          {!loading &&
-            !error &&
-            filteredLive.map(
-              ({
-                id,
-                fields,
-              }) => {
-                const title =
-                  String(
-                    pick(
-                      fields,
-                      [
-                        "Solicitud",
-                        "Title",
-                        "Title0",
-                      ]
-                    )
-                  ) ||
-                  `Solicitud #${id}`
-
-
-                const status =
-                  String(
-                    pick(
-                      fields,
-                      [
-                        "EstadoFlujo",
-                        "Estado",
-                        "Status",
-                      ]
-                    )
-                  )
-
-
-                const area =
-                  String(
-                    pick(
-                      fields,
-                      [
-                        "_x00c1_rearesponsable",
-                        "Area_x0020_responsable",
-                        "Área responsable",
-                        "AreaResponsable",
-                      ]
-                    )
-                  )
-
-
-                const category =
-                  String(
-                    pick(
-                      fields,
-                      [
-                        "Categor_x00ed_as",
-                        "Categorias",
-                        "Categorías",
-                        "Categoria",
-                      ]
-                    )
-                  )
-
-
-                const local =
-                  String(
-                    pick(
-                      fields,
-                      [
-                        "Local",
-                        "local",
-                        "Sucursal",
-                        "Sucursal0",
-                      ]
-                    )
-                  )
-
-
-                const date =
-                  String(
-                    pick(
-                      fields,
-                      [
-                        "Fecha_x0020_solicitud",
-                        "FechaSolicitud",
-                        "Fecha solicitud",
-                        "Created",
-                      ]
-                    )
-                  )
-
-
-                return (
-                  <article
-                    className="request-card"
-                    key={
-                      id
+                    onClick={() =>
+                      navigate(
+                        `/solicitudes/${request.id}`
+                      )
                     }
                   >
 
                     <div className="request-top">
 
-                      <StatusBadge
+                      <PilotStatus
                         value={
-                          status
+                          request.status
                         }
                       />
 
@@ -664,7 +506,7 @@ export default function Solicitudes({
                       <span>
                         #
                         {
-                          id
+                          request.id
                         }
                       </span>
 
@@ -673,7 +515,7 @@ export default function Solicitudes({
 
                     <h3>
                       {
-                        title
+                        request.processName
                       }
                     </h3>
 
@@ -682,24 +524,22 @@ export default function Solicitudes({
 
                       <span>
                         {
-                          area ||
-                          "Área por asignar"
+                          request.local
                         }
                       </span>
 
 
                       <span>
                         {
-                          category ||
-                          "Sin categoría"
+                          request.requesterName
                         }
                       </span>
 
 
                       <span>
                         {
-                          local ||
-                          "Sin local"
+                          request.currentResponsibleName ??
+                          "Por asignar"
                         }
                       </span>
 
@@ -709,23 +549,225 @@ export default function Solicitudes({
                     <div className="request-foot">
 
                       <small>
-                        {date
-                          ? new Date(
-                              date
-                            ).toLocaleDateString(
-                              "es-CL"
-                            )
-                          : "Sin fecha"}
+                        {new Date(
+                          request.createdAt
+                        ).toLocaleDateString(
+                          "es-CL"
+                        )}
                       </small>
 
                     </div>
 
-                  </article>
+                  </button>
                 )
-              }
-            )}
+              )}
 
-        </div>
+            </div>
+          ) : (
+            <div className="empty">
+              No hay solicitudes
+              visibles para este perfil.
+            </div>
+          )}
+
+        </>
+      ) : (
+        <>
+
+          {/* ==================================================
+              SHAREPOINT
+          ================================================== */}
+
+          {!loading &&
+            !error && (
+            <>
+
+              {filteredLive.length >
+              0 ? (
+                <div className="requests-grid">
+
+                  {filteredLive.map(
+                    ({
+                      id,
+                      fields,
+                    }) => {
+                      const title =
+                        String(
+                          pick(
+                            fields,
+                            [
+                              "Solicitud",
+                              "Title",
+                              "Title0",
+                            ]
+                          )
+                        ) ||
+                        `Solicitud #${id}`
+
+
+                      const status =
+                        String(
+                          pick(
+                            fields,
+                            [
+                              "EstadoFlujo",
+                              "Estado",
+                              "Status",
+                            ]
+                          )
+                        )
+
+
+                      const area =
+                        String(
+                          pick(
+                            fields,
+                            [
+                              "_x00c1_rearesponsable",
+                              "Area_x0020_responsable",
+                              "Área responsable",
+                              "AreaResponsable",
+                            ]
+                          )
+                        )
+
+
+                      const category =
+                        String(
+                          pick(
+                            fields,
+                            [
+                              "Categor_x00ed_as",
+                              "Categorias",
+                              "Categorías",
+                              "Categoria",
+                            ]
+                          )
+                        )
+
+
+                      const local =
+                        String(
+                          pick(
+                            fields,
+                            [
+                              "Local",
+                              "local",
+                              "Sucursal",
+                              "Sucursal0",
+                            ]
+                          )
+                        )
+
+
+                      const date =
+                        String(
+                          pick(
+                            fields,
+                            [
+                              "Fecha_x0020_solicitud",
+                              "FechaSolicitud",
+                              "Fecha solicitud",
+                              "Created",
+                            ]
+                          )
+                        )
+
+
+                      return (
+                        <article
+                          className="request-card"
+                          key={
+                            id
+                          }
+                        >
+
+                          <div className="request-top">
+
+                            <StatusBadge
+                              value={
+                                status
+                              }
+                            />
+
+
+                            <span>
+                              #
+                              {
+                                id
+                              }
+                            </span>
+
+                          </div>
+
+
+                          <h3>
+                            {
+                              title
+                            }
+                          </h3>
+
+
+                          <div className="request-meta">
+
+                            <span>
+                              {
+                                area ||
+                                "Área por asignar"
+                              }
+                            </span>
+
+
+                            <span>
+                              {
+                                category ||
+                                "Sin categoría"
+                              }
+                            </span>
+
+
+                            <span>
+                              {
+                                local ||
+                                "Sin local"
+                              }
+                            </span>
+
+                          </div>
+
+
+                          <div className="request-foot">
+
+                            <small>
+                              {date
+                                ? new Date(
+                                    date
+                                  ).toLocaleDateString(
+                                    "es-CL"
+                                  )
+                                : "Sin fecha"}
+                            </small>
+
+                          </div>
+
+                        </article>
+                      )
+                    }
+                  )}
+
+                </div>
+              ) : (
+                <div className="empty">
+                  No encontramos
+                  solicitudes para este
+                  filtro.
+                </div>
+              )}
+
+            </>
+          )}
+
+        </>
       )}
 
     </div>
@@ -776,20 +818,25 @@ function PilotStatus({
   }
 
 
+  const className =
+    value ===
+    "RESUELTA"
+      ? "ok"
+      : value ===
+          "RECHAZADA"
+        ? "bad"
+        : value ===
+            "PENDIENTE_APROBACION"
+          ? "requested"
+          : value ===
+              "EN_GESTION"
+            ? "neutral"
+            : "neutral"
+
+
   return (
     <span
-      className={`status ${
-        value ===
-        "RESUELTA"
-          ? "ok"
-          : value ===
-              "RECHAZADA"
-            ? "bad"
-            : value ===
-                "PENDIENTE_APROBACION"
-              ? "requested"
-              : "neutral"
-      }`}
+      className={`status ${className}`}
     >
       {
         labels[value]
