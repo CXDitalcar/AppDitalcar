@@ -1,4 +1,8 @@
-import { useMemo, useState } from "react"
+import {
+  useMemo,
+  useState,
+  type ChangeEvent,
+} from "react"
 
 import {
   ArrowLeft,
@@ -22,12 +26,17 @@ import type {
   ProcessDefinition,
   ProcessFieldDefinition,
   RequestFamily,
-   UserScope,
+  UserScope,
 } from "../types"
 
 
-type FormValues = Record<string, string>
+type FormValues =
+  Record<string, string>
 
+
+// ======================================================
+// FAMILIAS
+// ======================================================
 
 const familyInfo: Record<
   RequestFamily,
@@ -40,54 +49,74 @@ const familyInfo: Record<
   UNIDADES: {
     label: "Unidades",
     description:
-      "Bonificaciones, pedidos, traslados, devoluciones y otras gestiones de unidades.",
+      "Bonificaciones, pedidos, traslados, patentes y otras gestiones asociadas a unidades.",
     icon: Package,
   },
 
-INSUMOS_SHOWROOM: {
-  label: "Insumos y Showroom",
-  description:
-    "Insumos, zonas de experiencia, mobiliario, equipamiento e instalaciones del local.",
-  icon: Layers3,
-},
+  INSUMOS_SHOWROOM: {
+    label: "Insumos y Showroom",
+    description:
+      "Insumos, zonas de experiencia, mobiliario, equipamiento e instalaciones del local.",
+    icon: Layers3,
   },
 
   COLABORADORES: {
     label: "Colaboradores",
     description:
-      "Credenciales, uniformes, accesos, sistemas, capacitación y otras necesidades del equipo.",
+      "Credenciales, pie de firma, uniformes, accesos y otras necesidades del equipo.",
     icon: Users,
   },
 
   OTROS: {
     label: "Otros",
     description:
-      "Solicitudes que aún no están incorporadas al catálogo de procesos.",
+      "Solicitudes que todavía no están incorporadas al catálogo de procesos.",
     icon: FileText,
   },
 }
 
+
+// ======================================================
+// COMPONENTE
+// ======================================================
 
 export default function NuevaSolicitud({
   currentUser,
 }: {
   currentUser: UserScope
 }) {
+  const [step, setStep] =
+    useState(1)
 
-  const [step, setStep] = useState(1)
+  const [
+    selectedFamily,
+    setSelectedFamily,
+  ] =
+    useState<RequestFamily | null>(
+      null
+    )
 
-  const [selectedFamily, setSelectedFamily] =
-    useState<RequestFamily | null>(null)
+  const [
+    selectedProcess,
+    setSelectedProcess,
+  ] =
+    useState<ProcessDefinition | null>(
+      null
+    )
 
-  const [selectedProcess, setSelectedProcess] =
-    useState<ProcessDefinition | null>(null)
+  const [values, setValues] =
+    useState<FormValues>({})
 
-  const [values, setValues] = useState<FormValues>({})
-
-  const [attachments, setAttachments] =
+  const [
+    attachments,
+    setAttachments,
+  ] =
     useState<File[]>([])
 
-  const [submitted, setSubmitted] =
+  const [
+    submitted,
+    setSubmitted,
+  ] =
     useState(false)
 
 
@@ -95,98 +124,139 @@ export default function NuevaSolicitud({
   // FAMILIAS VISIBLES SEGÚN ROL
   // ======================================================
 
-  const visibleFamilies = useMemo(() => {
-    const allFamilies = Object.keys(
-      familyInfo
-    ) as RequestFamily[]
+  const visibleFamilies =
+    useMemo(() => {
+      const allFamilies =
+        Object.keys(
+          familyInfo
+        ) as RequestFamily[]
 
-    // Regla definida:
-    // vendedores no ven Insumos y Administración.
-    if (currentUser.role === "VENDEDOR") {
-      return allFamilies.filter(
-        (family) =>
-          family !== "INSUMOS_SHOWROOM"
-      )
-    }
 
-    return allFamilies
-  }, [currentUser.role])
+      // Vendedores no ven
+      // Insumos y Showroom.
+      if (
+        currentUser.role ===
+        "VENDEDOR"
+      ) {
+        return allFamilies.filter(
+          (family) =>
+            family !==
+            "INSUMOS_SHOWROOM"
+        )
+      }
+
+
+      return allFamilies
+    }, [currentUser.role])
 
 
   // ======================================================
   // PROCESOS DISPONIBLES
   // ======================================================
 
-  const availableProcesses = useMemo(() => {
-    if (!selectedFamily) return []
+  const availableProcesses =
+    useMemo(() => {
+      if (!selectedFamily) {
+        return []
+      }
 
-    return mockProcesses
-      .filter(
-        (process) =>
-          process.active &&
-          process.family === selectedFamily &&
-          process.requesterRoles.includes(
-            currentUser.role
-          )
-      )
-      .sort((a, b) => a.order - b.order)
-  }, [
-    selectedFamily,
-    currentUser.role,
-  ])
+
+      return mockProcesses
+        .filter(
+          (process) =>
+            process.active &&
+            process.family ===
+              selectedFamily &&
+            process.requesterRoles.includes(
+              currentUser.role
+            )
+        )
+        .sort(
+          (a, b) =>
+            a.order - b.order
+        )
+    }, [
+      selectedFamily,
+      currentUser.role,
+    ])
 
 
   // ======================================================
   // CAMPOS DEL PROCESO
   // ======================================================
 
-  const processFields = useMemo(() => {
-    if (!selectedProcess) return []
+  const processFields =
+    useMemo(() => {
+      if (!selectedProcess) {
+        return []
+      }
 
-    return mockProcessFields
-      .filter(
-        (field) =>
-          field.active &&
-          field.processCode ===
-            selectedProcess.code
-      )
-      .sort((a, b) => a.order - b.order)
-  }, [selectedProcess])
+
+      return mockProcessFields
+        .filter(
+          (field) =>
+            field.active &&
+            field.processCode ===
+              selectedProcess.code
+        )
+        .sort(
+          (a, b) =>
+            a.order - b.order
+        )
+    }, [selectedProcess])
 
 
   // ======================================================
   // VALIDACIÓN
   // ======================================================
 
-  const formIsValid = processFields
-    .filter((field) => field.required)
-    .every(
-      (field) =>
-        values[field.id]?.trim()
-    )
+  const formIsValid =
+    processFields
+      .filter(
+        (field) =>
+          field.required
+      )
+      .every(
+        (field) =>
+          values[
+            field.id
+          ]?.trim()
+      )
 
 
   // ======================================================
-  // HELPERS
+  // ACTUALIZAR VALOR
   // ======================================================
 
   function updateValue(
     fieldId: string,
     value: string
   ) {
-    setValues((current) => ({
-      ...current,
-      [fieldId]: value,
-    }))
+    setValues(
+      (current) => ({
+        ...current,
+
+        [fieldId]:
+          value,
+      })
+    )
   }
 
+
+  // ======================================================
+  // SELECCIONAR FAMILIA
+  // ======================================================
 
   function selectFamily(
     family: RequestFamily
   ) {
-    setSelectedFamily(family)
+    setSelectedFamily(
+      family
+    )
 
-    setSelectedProcess(null)
+    setSelectedProcess(
+      null
+    )
 
     setValues({})
 
@@ -196,10 +266,16 @@ export default function NuevaSolicitud({
   }
 
 
+  // ======================================================
+  // SELECCIONAR PROCESO
+  // ======================================================
+
   function selectProcess(
     process: ProcessDefinition
   ) {
-    setSelectedProcess(process)
+    setSelectedProcess(
+      process
+    )
 
     setValues({})
 
@@ -209,44 +285,78 @@ export default function NuevaSolicitud({
   }
 
 
+  // ======================================================
+  // ARCHIVOS
+  // ======================================================
+
   function handleFiles(
-    event: React.ChangeEvent<HTMLInputElement>
+    event:
+      ChangeEvent<HTMLInputElement>
   ) {
-    const files = Array.from(
-      event.target.files ?? []
-    )
-
-    setAttachments((current) => [
-      ...current,
-      ...files,
-    ])
-  }
-
-
-  function removeAttachment(index: number) {
-    setAttachments((current) =>
-      current.filter(
-        (_, currentIndex) =>
-          currentIndex !== index
+    const files =
+      Array.from(
+        event.target.files ??
+          []
       )
+
+
+    setAttachments(
+      (current) => [
+        ...current,
+        ...files,
+      ]
+    )
+
+
+    // Permite volver a seleccionar
+    // el mismo archivo después.
+    event.target.value = ""
+  }
+
+
+  function removeAttachment(
+    index: number
+  ) {
+    setAttachments(
+      (current) =>
+        current.filter(
+          (
+            _,
+            currentIndex
+          ) =>
+            currentIndex !==
+            index
+        )
     )
   }
 
+
+  // ======================================================
+  // REINICIAR
+  // ======================================================
 
   function resetRequest() {
     setSubmitted(false)
 
     setStep(1)
 
-    setSelectedFamily(null)
+    setSelectedFamily(
+      null
+    )
 
-    setSelectedProcess(null)
+    setSelectedProcess(
+      null
+    )
 
     setValues({})
 
     setAttachments([])
   }
 
+
+  // ======================================================
+  // ENVIAR
+  // ======================================================
 
   function submitRequest() {
     if (
@@ -256,12 +366,13 @@ export default function NuevaSolicitud({
       return
     }
 
-    // ==================================================
+
+    // ================================================
     // TEMPORAL
     //
-    // Todavía no guardamos en SharePoint.
-    // En esta etapa solo simulamos el envío.
-    // ==================================================
+    // Todavía no guarda en SharePoint.
+    // En modo demo solo simulamos el envío.
+    // ================================================
 
     setSubmitted(true)
 
@@ -283,7 +394,9 @@ export default function NuevaSolicitud({
         <div className="request-success">
 
           <div className="request-success-icon">
-            <CheckCircle2 size={34} />
+            <CheckCircle2
+              size={34}
+            />
           </div>
 
 
@@ -299,9 +412,12 @@ export default function NuevaSolicitud({
 
           <p>
             <strong>
-              {selectedProcess.name}
+              {
+                selectedProcess.name
+              }
             </strong>{" "}
-            quedó registrada para revisión.
+            quedó registrada
+            para revisión.
           </p>
 
 
@@ -324,7 +440,10 @@ export default function NuevaSolicitud({
               </span>
 
               <strong>
-                {currentUser.local ?? "—"}
+                {
+                  currentUser.local ??
+                  "—"
+                }
               </strong>
             </div>
 
@@ -335,7 +454,10 @@ export default function NuevaSolicitud({
               </span>
 
               <strong>
-                Pendiente de aprobación
+                {selectedProcess
+                  .requiresApproval
+                  ? "Pendiente de aprobación"
+                  : "Recibida"}
               </strong>
             </div>
 
@@ -359,7 +481,9 @@ export default function NuevaSolicitud({
 
           <button
             className="primary-btn"
-            onClick={resetRequest}
+            onClick={
+              resetRequest
+            }
           >
             Crear otra solicitud
           </button>
@@ -370,6 +494,10 @@ export default function NuevaSolicitud({
     )
   }
 
+
+  // ======================================================
+  // VISTA
+  // ======================================================
 
   return (
     <div className="new-request-page">
@@ -384,14 +512,16 @@ export default function NuevaSolicitud({
           SOLICITUDES
         </div>
 
+
         <h1>
           Nueva solicitud
         </h1>
 
+
         <p>
           Selecciona qué necesitas.
-          La app identificará automáticamente
-          el proceso, responsable y SLA
+          La app identificará el
+          proceso, responsable y SLA
           correspondiente.
         </p>
 
@@ -511,8 +641,10 @@ export default function NuevaSolicitud({
               PASO 1
             </div>
 
+
             <h2>
-              ¿Qué necesitas solicitar?
+              ¿Qué necesitas
+              solicitar?
             </h2>
 
           </div>
@@ -523,33 +655,46 @@ export default function NuevaSolicitud({
             {visibleFamilies.map(
               (family) => {
                 const config =
-                  familyInfo[family]
+                  familyInfo[
+                    family
+                  ]
 
                 const Icon =
                   config.icon
 
+
                 return (
                   <button
-                    key={family}
+                    key={
+                      family
+                    }
                     className="request-family-card"
                     onClick={() =>
-                      selectFamily(family)
+                      selectFamily(
+                        family
+                      )
                     }
                   >
 
                     <div className="request-family-icon">
-                      <Icon size={25} />
+                      <Icon
+                        size={25}
+                      />
                     </div>
 
 
                     <div>
 
                       <h3>
-                        {config.label}
+                        {
+                          config.label
+                        }
                       </h3>
 
                       <p>
-                        {config.description}
+                        {
+                          config.description
+                        }
                       </p>
 
                     </div>
@@ -584,7 +729,9 @@ export default function NuevaSolicitud({
               setStep(1)
             }
           >
-            <ArrowLeft size={17} />
+            <ArrowLeft
+              size={17}
+            />
 
             Volver a familias
           </button>
@@ -596,54 +743,69 @@ export default function NuevaSolicitud({
               PASO 2
             </div>
 
+
             <h2>
               Selecciona la gestión
             </h2>
 
+
             <p>
-              {
-                selectedFamily
-                  ? familyInfo[
-                      selectedFamily
-                    ].label
-                  : ""
-              }
+              {selectedFamily
+                ? familyInfo[
+                    selectedFamily
+                  ].label
+                : ""}
             </p>
 
           </div>
 
 
-          {availableProcesses.length ? (
+          {availableProcesses.length >
+          0 ? (
             <div className="process-choice-list">
 
               {availableProcesses.map(
                 (process) => (
                   <button
-                    key={process.code}
+                    key={
+                      process.code
+                    }
                     className="process-choice-card"
                     onClick={() =>
-                      selectProcess(process)
+                      selectProcess(
+                        process
+                      )
                     }
                   >
 
                     <div>
 
                       <span className="process-code">
-                        {process.code}
+                        {
+                          process.code
+                        }
                       </span>
 
+
                       <h3>
-                        {process.name}
+                        {
+                          process.name
+                        }
                       </h3>
 
+
                       <p>
-                        {process.description}
+                        {
+                          process.description
+                        }
                       </p>
 
                     </div>
 
 
-                    <ArrowRight size={20} />
+                    <ArrowRight
+                      size={20}
+                    />
 
                   </button>
                 )
@@ -652,8 +814,9 @@ export default function NuevaSolicitud({
             </div>
           ) : (
             <div className="empty">
-              Todavía no hay procesos
-              configurados para esta familia.
+              Todavía no hay
+              procesos configurados
+              para esta familia.
             </div>
           )}
 
@@ -675,7 +838,9 @@ export default function NuevaSolicitud({
                 setStep(2)
               }
             >
-              <ArrowLeft size={17} />
+              <ArrowLeft
+                size={17}
+              />
 
               Volver a procesos
             </button>
@@ -683,9 +848,7 @@ export default function NuevaSolicitud({
 
             <div className="request-form-layout">
 
-              {/* ==========================================
-                  FORMULARIO
-              ========================================== */}
+              {/* FORMULARIO */}
 
               <div className="request-form-main">
 
@@ -695,14 +858,18 @@ export default function NuevaSolicitud({
                     PASO 3
                   </div>
 
+
                   <h2>
-                    {selectedProcess.name}
+                    {
+                      selectedProcess.name
+                    }
                   </h2>
 
+
                   <p>
-                    Completa los antecedentes
-                    necesarios para enviar
-                    la solicitud.
+                    Completa los
+                    antecedentes necesarios
+                    para enviar la solicitud.
                   </p>
 
                 </div>
@@ -713,8 +880,12 @@ export default function NuevaSolicitud({
                   {processFields.map(
                     (field) => (
                       <DynamicField
-                        key={field.id}
-                        field={field}
+                        key={
+                          field.id
+                        }
+                        field={
+                          field
+                        }
                         value={
                           values[
                             field.id
@@ -735,15 +906,16 @@ export default function NuevaSolicitud({
                 </div>
 
 
-                {/* ========================================
-                    ADJUNTOS
-                ======================================== */}
+                {/* ADJUNTOS */}
 
                 <div className="request-upload">
 
                   <div className="request-upload-head">
 
-                    <Paperclip size={19} />
+                    <Paperclip
+                      size={19}
+                    />
+
 
                     <div>
 
@@ -751,9 +923,12 @@ export default function NuevaSolicitud({
                         Adjuntos
                       </strong>
 
+
                       <span>
-                        Puedes agregar evidencia
-                        o documentos de respaldo.
+                        Puedes agregar
+                        evidencia o
+                        documentos de
+                        respaldo.
                       </span>
 
                     </div>
@@ -777,7 +952,8 @@ export default function NuevaSolicitud({
                   </label>
 
 
-                  {!!attachments.length && (
+                  {attachments.length >
+                    0 && (
                     <div className="upload-file-list">
 
                       {attachments.map(
@@ -794,9 +970,13 @@ export default function NuevaSolicitud({
                               size={16}
                             />
 
+
                             <span>
-                              {file.name}
+                              {
+                                file.name
+                              }
                             </span>
+
 
                             <button
                               type="button"
@@ -821,9 +1001,7 @@ export default function NuevaSolicitud({
               </div>
 
 
-              {/* ==========================================
-                  PANEL PROCESO / SLA
-              ========================================== */}
+              {/* PANEL PROCESO */}
 
               <aside className="request-process-summary">
 
@@ -831,8 +1009,11 @@ export default function NuevaSolicitud({
                   ANTES DE ENVIAR
                 </div>
 
+
                 <h3>
-                  {selectedProcess.name}
+                  {
+                    selectedProcess.name
+                  }
                 </h3>
 
 
@@ -843,7 +1024,9 @@ export default function NuevaSolicitud({
                   </span>
 
                   <strong>
-                    {currentUser.name}
+                    {
+                      currentUser.name
+                    }
                   </strong>
 
                 </div>
@@ -856,7 +1039,10 @@ export default function NuevaSolicitud({
                   </span>
 
                   <strong>
-                    {currentUser.local ?? "—"}
+                    {
+                      currentUser.local ??
+                      "—"
+                    }
                   </strong>
 
                 </div>
@@ -869,31 +1055,32 @@ export default function NuevaSolicitud({
                   </span>
 
                   <strong>
-                    {selectedProcess.code ===
-                    "UNI-BON-01"
-                      ? "Jefatura Comercial y Clientes"
-                      : "Según proceso"}
+                    {selectedProcess
+                      .requiresApproval
+                      ? "Según proceso"
+                      : "No requiere"}
                   </strong>
 
                 </div>
 
 
-                <div className="request-summary-row">
+                {selectedProcess
+                  .requiresApproval && (
+                  <div className="request-summary-row">
 
-                  <span>
-                    SLA aprobación
-                  </span>
+                    <span>
+                      SLA aprobación
+                    </span>
 
-                  <strong>
-                    {
-                      selectedProcess
+                    <strong>
+                      {selectedProcess
                         .approvalSLAHours
                         ? `${selectedProcess.approvalSLAHours} h`
-                        : "Por definir"
-                    }
-                  </strong>
+                        : "Por definir"}
+                    </strong>
 
-                </div>
+                  </div>
+                )}
 
 
                 {selectedProcess
@@ -905,12 +1092,10 @@ export default function NuevaSolicitud({
                     </span>
 
                     <strong>
-                      {
-                        selectedProcess
-                          .resolutionSLAHours
-                          ? `${selectedProcess.resolutionSLAHours} h`
-                          : "Por definir"
-                      }
+                      {selectedProcess
+                        .resolutionSLAHours
+                        ? `${selectedProcess.resolutionSLAHours} h`
+                        : "Por definir"}
                     </strong>
 
                   </div>
@@ -938,19 +1123,18 @@ export default function NuevaSolicitud({
                   className="process-manual-link"
                   type="button"
                 >
-                  <FileText size={17} />
+                  <FileText
+                    size={17}
+                  />
 
-                  Ver proceso, SLA y manual
+                  Ver proceso, SLA y
+                  manual
                 </button>
 
               </aside>
 
             </div>
 
-
-            {/* ============================================
-                ACCIONES
-            ============================================ */}
 
             <div className="request-actions">
 
@@ -1000,7 +1184,9 @@ export default function NuevaSolicitud({
                 setStep(3)
               }
             >
-              <ArrowLeft size={17} />
+              <ArrowLeft
+                size={17}
+              />
 
               Volver a editar
             </button>
@@ -1012,14 +1198,17 @@ export default function NuevaSolicitud({
                 PASO 4
               </div>
 
+
               <h2>
                 Revisa antes de enviar
               </h2>
 
+
               <p>
-                Confirma que la información
-                esté correcta antes de
-                registrar la solicitud.
+                Confirma que la
+                información esté correcta
+                antes de registrar la
+                solicitud.
               </p>
 
             </div>
@@ -1040,8 +1229,11 @@ export default function NuevaSolicitud({
                     }
                   </span>
 
+
                   <h3>
-                    {selectedProcess.name}
+                    {
+                      selectedProcess.name
+                    }
                   </h3>
 
                 </div>
@@ -1063,7 +1255,9 @@ export default function NuevaSolicitud({
                   </span>
 
                   <strong>
-                    {currentUser.name}
+                    {
+                      currentUser.name
+                    }
                   </strong>
 
                 </div>
@@ -1076,7 +1270,10 @@ export default function NuevaSolicitud({
                   </span>
 
                   <strong>
-                    {currentUser.local ?? "—"}
+                    {
+                      currentUser.local ??
+                      "—"
+                    }
                   </strong>
 
                 </div>
@@ -1085,13 +1282,18 @@ export default function NuevaSolicitud({
                 {processFields.map(
                   (field) => (
                     <div
-                      key={field.id}
+                      key={
+                        field.id
+                      }
                       className="request-review-field"
                     >
 
                       <span>
-                        {field.label}
+                        {
+                          field.label
+                        }
                       </span>
+
 
                       <strong>
                         {formatReviewValue(
@@ -1109,7 +1311,8 @@ export default function NuevaSolicitud({
               </div>
 
 
-              {!!attachments.length && (
+              {attachments.length >
+                0 && (
                 <div className="review-attachments">
 
                   <span>
@@ -1129,7 +1332,9 @@ export default function NuevaSolicitud({
                           size={15}
                         />
 
-                        {file.name}
+                        {
+                          file.name
+                        }
                       </div>
                     )
                   )}
@@ -1176,7 +1381,7 @@ export default function NuevaSolicitud({
 
 
 // ======================================================
-// COMPONENTE DE CAMPO DINÁMICO
+// CAMPO DINÁMICO
 // ======================================================
 
 function DynamicField({
@@ -1186,7 +1391,9 @@ function DynamicField({
 }: {
   field: ProcessFieldDefinition
   value: string
-  onChange: (value: string) => void
+  onChange: (
+    value: string
+  ) => void
 }) {
   return (
     <label className="dynamic-field">
@@ -1202,17 +1409,21 @@ function DynamicField({
       </span>
 
 
-      {field.type === "TEXTAREA" ? (
+      {field.type ===
+      "TEXTAREA" ? (
         <textarea
           value={value}
-          placeholder={field.placeholder}
+          placeholder={
+            field.placeholder
+          }
           onChange={(event) =>
             onChange(
               event.target.value
             )
           }
         />
-      ) : field.type === "SELECT" ? (
+      ) : field.type ===
+        "SELECT" ? (
         <select
           value={value}
           onChange={(event) =>
@@ -1230,8 +1441,12 @@ function DynamicField({
           {field.options?.map(
             (option) => (
               <option
-                key={option}
-                value={option}
+                key={
+                  option
+                }
+                value={
+                  option
+                }
               >
                 {option}
               </option>
@@ -1242,12 +1457,17 @@ function DynamicField({
       ) : (
         <input
           value={value}
-          placeholder={field.placeholder}
+          placeholder={
+            field.placeholder
+          }
           type={
-            field.type === "NUMBER" ||
-            field.type === "CURRENCY"
+            field.type ===
+              "NUMBER" ||
+            field.type ===
+              "CURRENCY"
               ? "number"
-              : field.type === "DATE"
+              : field.type ===
+                  "DATE"
                 ? "date"
                 : "text"
           }
@@ -1265,34 +1485,48 @@ function DynamicField({
 
 
 // ======================================================
-// FORMATO DE VALORES EN REVISIÓN
+// FORMATO DE REVISIÓN
 // ======================================================
 
 function formatReviewValue(
-  field: ProcessFieldDefinition,
+  field:
+    ProcessFieldDefinition,
   value?: string
 ) {
   if (!value) {
     return "—"
   }
 
-  if (field.type === "CURRENCY") {
+
+  if (
+    field.type ===
+    "CURRENCY"
+  ) {
     const number =
       Number(value)
 
+
     if (
-      !Number.isNaN(number)
+      !Number.isNaN(
+        number
+      )
     ) {
       return new Intl.NumberFormat(
         "es-CL",
         {
-          style: "currency",
-          currency: "CLP",
-          maximumFractionDigits: 0,
+          style:
+            "currency",
+
+          currency:
+            "CLP",
+
+          maximumFractionDigits:
+            0,
         }
       ).format(number)
     }
   }
+
 
   return value
 }
