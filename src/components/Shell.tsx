@@ -66,6 +66,15 @@ export default function Shell({
   branch,
   demoMode = false,
   onDemoLogout,
+  showApprovals = false,
+}: {
+  children: ReactNode
+  userName: string
+  branch: string
+  demoMode?: boolean
+  onDemoLogout?: () => void
+  showApprovals?: boolean
+}) {
 }: {
   children: ReactNode
   userName: string
