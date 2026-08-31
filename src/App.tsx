@@ -23,6 +23,7 @@ import Aprobaciones from "./pages/Aprobaciones"
 import SolicitudDetalle from "./pages/SolicitudDetalle"
 import Formularios from "./pages/Formularios"
 import FormularioDetalle from "./pages/FormularioDetalle"
+import PedidoInsumos from "./pages/PedidoInsumos"
 
 import { appConfig } from "./config"
 
@@ -297,12 +298,10 @@ export default function App() {
             path="/"
             element={
               <Home
-                userName={
-                  name
-                }
-                branch={
-                  currentBranch
-                }
+                userName={name}
+                branch={currentBranch}
+                currentUser={currentUser}
+                demoMode={Boolean(demoUser)}
               />
             }
           />
@@ -328,9 +327,8 @@ export default function App() {
             path="/mi-local"
             element={
               <MiLocal
-                branch={
-                  currentBranch
-                }
+                branch={currentBranch}
+                currentUser={currentUser}
               />
             }
           />
@@ -344,9 +342,9 @@ export default function App() {
             path="/solicitudes"
             element={
               <Solicitudes
-                branch={
-                  currentBranch
-                }
+                branch={currentBranch}
+                currentUser={currentUser}
+                demoMode={Boolean(demoUser)}
               />
             }
           />
@@ -406,6 +404,13 @@ export default function App() {
             }
           />
 
+
+          <Route
+            path="/insumos"
+            element={
+              <PedidoInsumos currentUser={currentUser} />
+            }
+          />
 
           {/* ==================================================
               FORMULARIOS
