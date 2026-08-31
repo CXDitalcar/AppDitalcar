@@ -22,6 +22,7 @@ import NuevaSolicitud from "./pages/NuevaSolicitud"
 import Aprobaciones from "./pages/Aprobaciones"
 import SolicitudDetalle from "./pages/SolicitudDetalle"
 import Formularios from "./pages/Formularios"
+import FormularioDetalle from "./pages/FormularioDetalle"
 
 import { appConfig } from "./config"
 
@@ -264,8 +265,15 @@ export default function App() {
     <BrowserRouter>
 
       <Shell
-        userName={name}
-        branch={currentBranch}
+        currentUser={
+          currentUser
+        }
+        userName={
+          name
+        }
+        branch={
+          currentBranch
+        }
         demoMode={Boolean(
           demoUser
         )}
@@ -281,13 +289,17 @@ export default function App() {
 
         <Routes>
 
-          {/* INICIO */}
+          {/* ==================================================
+              INICIO
+          ================================================== */}
 
           <Route
             path="/"
             element={
               <Home
-                userName={name}
+                userName={
+                  name
+                }
                 branch={
                   currentBranch
                 }
@@ -296,7 +308,9 @@ export default function App() {
           />
 
 
-          {/* ACADEMIA */}
+          {/* ==================================================
+              ACADEMIA
+          ================================================== */}
 
           <Route
             path="/academia"
@@ -306,7 +320,9 @@ export default function App() {
           />
 
 
-          {/* MI LOCAL */}
+          {/* ==================================================
+              MI LOCAL
+          ================================================== */}
 
           <Route
             path="/mi-local"
@@ -320,7 +336,9 @@ export default function App() {
           />
 
 
-          {/* MIS SOLICITUDES */}
+          {/* ==================================================
+              MIS SOLICITUDES
+          ================================================== */}
 
           <Route
             path="/solicitudes"
@@ -334,7 +352,9 @@ export default function App() {
           />
 
 
-          {/* NUEVA SOLICITUD */}
+          {/* ==================================================
+              NUEVA SOLICITUD
+          ================================================== */}
 
           <Route
             path="/solicitudes/nueva"
@@ -348,7 +368,9 @@ export default function App() {
           />
 
 
-          {/* APROBACIONES */}
+          {/* ==================================================
+              APROBACIONES
+          ================================================== */}
 
           <Route
             path="/aprobaciones"
@@ -369,7 +391,9 @@ export default function App() {
           />
 
 
-          {/* DETALLE DE SOLICITUD */}
+          {/* ==================================================
+              DETALLE DE SOLICITUD
+          ================================================== */}
 
           <Route
             path="/solicitudes/:requestId"
@@ -383,14 +407,33 @@ export default function App() {
           />
 
 
-          {/* FORMULARIOS */}
+          {/* ==================================================
+              FORMULARIOS
+          ================================================== */}
 
           <Route
             path="/formularios"
             element={
-           <Formularios
-                   currentUser={currentUser}
+              <Formularios
+                currentUser={
+                  currentUser
+                }
+              />
+            }
+          />
 
+
+          {/* ==================================================
+              DETALLE DE REVISIÓN
+          ================================================== */}
+
+          <Route
+            path="/formularios/:executionId"
+            element={
+              <FormularioDetalle
+                currentUser={
+                  currentUser
+                }
               />
             }
           />
