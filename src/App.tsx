@@ -21,6 +21,7 @@ import Solicitudes from "./pages/Solicitudes"
 import NuevaSolicitud from "./pages/NuevaSolicitud"
 import Aprobaciones from "./pages/Aprobaciones"
 import SolicitudDetalle from "./pages/SolicitudDetalle"
+import Formularios from "./pages/Formularios"
 
 import { appConfig } from "./config"
 
