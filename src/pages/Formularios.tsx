@@ -15,6 +15,7 @@ import {
   mockFormExecutions,
   mockForms,
   type MockFormDefinition,
+  type MockFormExecution,
 } from "../data/mockData"
 
 import type {
@@ -43,11 +44,35 @@ export default function Formularios({
       currentUser
     )
 
-  const canSeeNetworkTracking =
-    currentUser.role ===
-      "EXPERIENCIA_CLIENTES" ||
-    currentUser.role ===
-      "JEFATURA_COMERCIAL_CLIENTES"
+
+  const visibleExecutions =
+    getVisibleExecutions(
+      currentUser
+    )
+
+
+  const canSeeTracking =
+    canUserSeeTracking(
+      currentUser
+    )
+
+
+  const visibleExecutionIds =
+    new Set(
+      visibleExecutions.map(
+        (execution) =>
+          execution.id
+      )
+    )
+
+
+  const visibleBreaches =
+    mockFormBreaches.filter(
+      (breach) =>
+        visibleExecutionIds.has(
+          breach.executionId
+        )
+    )
 
 
   return (
@@ -74,8 +99,8 @@ export default function Formularios({
           <p>
             Realiza las revisiones
             que te corresponden y
-            consulta los últimos
-            resultados registrados.
+            consulta los resultados
+            disponibles según tu rol.
           </p>
 
         </div>
@@ -87,10 +112,13 @@ export default function Formularios({
             size={20}
           />
 
+
           <div>
+
             <span>
               Perfil actual
             </span>
+
 
             <strong>
               {
@@ -99,6 +127,7 @@ export default function Formularios({
                 )
               }
             </strong>
+
           </div>
 
         </div>
@@ -171,15 +200,15 @@ export default function Formularios({
 
               <strong>
                 No tienes formularios
-                pendientes para realizar
-                con este perfil.
+                para realizar con este
+                perfil.
               </strong>
 
 
               <span>
-                Las revisiones se
-                muestran según tu rol,
-                local y operación.
+                Las revisiones disponibles
+                dependen de tu rol y del
+                tipo de operación.
               </span>
 
             </div>
@@ -191,10 +220,10 @@ export default function Formularios({
 
 
       {/* ==================================================
-          SEGUIMIENTO DE RED
+          SEGUIMIENTO
       ================================================== */}
 
-      {canSeeNetworkTracking && (
+      {canSeeTracking && (
         <section className="forms-section">
 
           <div className="forms-section-head">
@@ -212,9 +241,11 @@ export default function Formularios({
 
 
               <p>
-                Vista general de las
-                últimas ejecuciones y
-                brechas registradas.
+                {
+                  getTrackingDescription(
+                    currentUser
+                  )
+                }
               </p>
 
             </div>
@@ -222,12 +253,16 @@ export default function Formularios({
           </div>
 
 
+          {/* ==================================================
+              INDICADORES
+          ================================================== */}
+
           <div className="forms-summary-grid">
 
             <SummaryCard
               label="Revisiones registradas"
               value={
-                mockFormExecutions.length
+                visibleExecutions.length
               }
               icon={
                 CheckCircle2
@@ -238,7 +273,7 @@ export default function Formularios({
             <SummaryCard
               label="Brechas abiertas"
               value={
-                mockFormBreaches.filter(
+                visibleBreaches.filter(
                   (breach) =>
                     breach.status ===
                     "NO_CUMPLE"
@@ -253,7 +288,7 @@ export default function Formularios({
             <SummaryCard
               label="Ya solicitadas"
               value={
-                mockFormBreaches.filter(
+                visibleBreaches.filter(
                   (breach) =>
                     Boolean(
                       breach.linkedRequestId
@@ -268,147 +303,181 @@ export default function Formularios({
           </div>
 
 
-          <div className="forms-tracking-card">
+          {/* ==================================================
+              REVISIONES
+          ================================================== */}
 
-            <div className="forms-tracking-head">
+          {visibleExecutions.length >
+          0 ? (
+            <div className="forms-tracking-card">
 
-              <span>
-                Formulario
-              </span>
+              <div className="forms-tracking-head">
 
-              <span>
-                Local
-              </span>
+                <span>
+                  Formulario
+                </span>
 
-              <span>
-                Última realización
-              </span>
+                <span>
+                  Local
+                </span>
 
-              <span>
-                Resultado
-              </span>
+                <span>
+                  Última realización
+                </span>
 
-              <span />
+                <span>
+                  Resultado
+                </span>
+
+                <span />
+
+              </div>
+
+
+              {visibleExecutions.map(
+                (execution) => {
+                  const form =
+                    mockForms.find(
+                      (item) =>
+                        item.code ===
+                        execution.formCode
+                    )
+
+
+                  if (!form) {
+                    return null
+                  }
+
+
+                  return (
+                    <div
+                      key={
+                        execution.id
+                      }
+                      className="forms-tracking-row"
+                    >
+
+                      <div>
+
+                        <strong>
+                          {
+                            form.name
+                          }
+                        </strong>
+
+
+                        <small>
+                          {
+                            frequencyLabel(
+                              form
+                            )
+                          }
+                        </small>
+
+                      </div>
+
+
+                      <div>
+
+                        <strong>
+                          {
+                            execution.local
+                          }
+                        </strong>
+
+                      </div>
+
+
+                      <div>
+
+                        <strong>
+                          {
+                            formatDateTime(
+                              execution.completedAt
+                            )
+                          }
+                        </strong>
+
+
+                        <small>
+                          {
+                            execution.completedByName
+                          }
+                        </small>
+
+                      </div>
+
+
+                      <div className="tracking-results">
+
+                        <span className="result-pill result-ok">
+                          {
+                            execution.compliant
+                          }{" "}
+                          Cumple
+                        </span>
+
+
+                        <span className="result-pill result-alert">
+                          {
+                            execution.nonCompliant
+                          }{" "}
+                          No cumple
+                        </span>
+
+
+                        <span className="result-pill result-requested">
+                          {
+                            execution.requested
+                          }{" "}
+                          Solicitado
+                        </span>
+
+                      </div>
+
+
+                      <button
+                        type="button"
+                        className="tracking-view-btn"
+                        title="Ver revisión"
+                      >
+                        <Eye
+                          size={18}
+                        />
+                      </button>
+
+                    </div>
+                  )
+                }
+              )}
 
             </div>
+          ) : (
+            <div className="forms-empty">
+
+              <ClipboardCheck
+                size={28}
+              />
 
 
-            {mockFormExecutions.map(
-              (execution) => {
-                const form =
-                  mockForms.find(
-                    (item) =>
-                      item.code ===
-                      execution.formCode
-                  )
+              <div>
+
+                <strong>
+                  Todavía no hay revisiones
+                  disponibles para tu ámbito.
+                </strong>
 
 
-                if (!form) {
-                  return null
-                }
+                <span>
+                  Cuando existan ejecuciones
+                  correspondientes a tus
+                  locales aparecerán aquí.
+                </span>
 
+              </div>
 
-                return (
-                  <div
-                    key={
-                      execution.id
-                    }
-                    className="forms-tracking-row"
-                  >
-
-                    <div>
-
-                      <strong>
-                        {
-                          form.name
-                        }
-                      </strong>
-
-                      <small>
-                        {
-                          frequencyLabel(
-                            form
-                          )
-                        }
-                      </small>
-
-                    </div>
-
-
-                    <div>
-
-                      <strong>
-                        {
-                          execution.local
-                        }
-                      </strong>
-
-                    </div>
-
-
-                    <div>
-
-                      <strong>
-                        {
-                          formatDateTime(
-                            execution.completedAt
-                          )
-                        }
-                      </strong>
-
-                      <small>
-                        {
-                          execution.completedByName
-                        }
-                      </small>
-
-                    </div>
-
-
-                    <div className="tracking-results">
-
-                      <span className="result-pill result-ok">
-                        {
-                          execution.compliant
-                        }{" "}
-                        Cumple
-                      </span>
-
-
-                      <span className="result-pill result-alert">
-                        {
-                          execution.nonCompliant
-                        }{" "}
-                        No cumple
-                      </span>
-
-
-                      <span className="result-pill result-requested">
-                        {
-                          execution.requested
-                        }{" "}
-                        Solicitado
-                      </span>
-
-                    </div>
-
-
-                    <button
-                      type="button"
-                      className="tracking-view-btn"
-                      title="Ver revisión"
-                    >
-                      <Eye
-                        size={18}
-                      />
-                    </button>
-
-                  </div>
-                )
-              }
-            )}
-
-          </div>
+            </div>
+          )}
 
         </section>
       )}
@@ -419,7 +488,7 @@ export default function Formularios({
 
 
 // ======================================================
-// TARJETA FORMULARIO
+// TARJETA DE FORMULARIO
 // ======================================================
 
 function FormCard({
@@ -483,6 +552,7 @@ function FormCard({
             size={14}
           />
 
+
           {
             frequencyLabel(
               form
@@ -497,17 +567,23 @@ function FormCard({
       <div className="form-card-body">
 
         <span className="form-code">
-          {form.code}
+          {
+            form.code
+          }
         </span>
 
 
         <h3>
-          {form.name}
+          {
+            form.name
+          }
         </h3>
 
 
         <p>
-          {form.description}
+          {
+            form.description
+          }
         </p>
 
       </div>
@@ -588,10 +664,14 @@ function FormCard({
 
 
           <span>
-            {pendingBreaches}{" "}
-            {pendingBreaches === 1
-              ? "brecha requiere"
-              : "brechas requieren"}{" "}
+            {
+              pendingBreaches
+            }{" "}
+            {
+              pendingBreaches === 1
+                ? "brecha requiere"
+                : "brechas requieren"
+            }{" "}
             seguimiento.
           </span>
 
@@ -664,11 +744,16 @@ function SummaryCard({
       <div>
 
         <strong>
-          {value}
+          {
+            value
+          }
         </strong>
 
+
         <span>
-          {label}
+          {
+            label
+          }
         </span>
 
       </div>
@@ -679,7 +764,7 @@ function SummaryCard({
 
 
 // ======================================================
-// FORMULARIOS DISPONIBLES POR ROL
+// FORMULARIOS QUE EL USUARIO PUEDE REALIZAR
 // ======================================================
 
 function getFormsToComplete(
@@ -718,7 +803,167 @@ function getFormsToComplete(
 
 
 // ======================================================
-// ÚLTIMA EJECUCIÓN
+// ¿PUEDE VER SEGUIMIENTO?
+// ======================================================
+
+function canUserSeeTracking(
+  currentUser: UserScope
+) {
+  return [
+    "JEFATURA_LOCAL",
+    "JEFATURA_MARCA",
+    "JEFATURA_ZONAL",
+    "GERENCIA_VENTAS",
+    "JEFATURA_COMERCIAL_CLIENTES",
+    "EXPERIENCIA_CLIENTES",
+  ].includes(
+    currentUser.role
+  )
+}
+
+
+// ======================================================
+// EJECUCIONES VISIBLES SEGÚN ROL
+// ======================================================
+
+function getVisibleExecutions(
+  currentUser: UserScope
+) {
+  return mockFormExecutions
+    .filter(
+      (execution) =>
+        canViewExecution(
+          currentUser,
+          execution
+        )
+    )
+    .sort(
+      (a, b) =>
+        new Date(
+          b.completedAt
+        ).getTime() -
+        new Date(
+          a.completedAt
+        ).getTime()
+    )
+}
+
+
+// ======================================================
+// REGLAS DE VISIBILIDAD
+// ======================================================
+
+function canViewExecution(
+  currentUser: UserScope,
+  execution: MockFormExecution
+) {
+  // ------------------------------------------------------
+  // EXPERIENCIA DE CLIENTES
+  // TODA LA RED
+  // ------------------------------------------------------
+
+  if (
+    currentUser.role ===
+    "EXPERIENCIA_CLIENTES"
+  ) {
+    return true
+  }
+
+
+  // ------------------------------------------------------
+  // JEFATURA COMERCIAL Y CLIENTES
+  // TODA LA RED
+  // ------------------------------------------------------
+
+  if (
+    currentUser.role ===
+    "JEFATURA_COMERCIAL_CLIENTES"
+  ) {
+    return true
+  }
+
+
+  // ------------------------------------------------------
+  // GERENCIA DE VENTAS
+  // TODA LA RED
+  // ------------------------------------------------------
+
+  if (
+    currentUser.role ===
+    "GERENCIA_VENTAS"
+  ) {
+    return true
+  }
+
+
+  // ------------------------------------------------------
+  // JEFATURA LOCAL
+  // SOLO SU LOCAL
+  // ------------------------------------------------------
+
+  if (
+    currentUser.role ===
+    "JEFATURA_LOCAL"
+  ) {
+    return (
+      Boolean(
+        currentUser.local
+      ) &&
+      execution.local ===
+        currentUser.local
+    )
+  }
+
+
+  // ------------------------------------------------------
+  // JEFATURA MARCA
+  // SOLO GEELY
+  // ------------------------------------------------------
+
+  if (
+    currentUser.role ===
+    "JEFATURA_MARCA"
+  ) {
+    return isGeelyLocal(
+      execution.local
+    )
+  }
+
+
+  // ------------------------------------------------------
+  // JEFATURA ZONAL
+  //
+  // TODOS SUS LOCALES
+  // EXCEPTO GEELY Y STELLANTIS
+  //
+  // En demo todavía no tenemos relación
+  // real Local ↔ Zona, por lo que aplicamos
+  // únicamente las exclusiones.
+  //
+  // Luego vendrá desde 01_Sucursales.
+  // ------------------------------------------------------
+
+  if (
+    currentUser.role ===
+    "JEFATURA_ZONAL"
+  ) {
+    return (
+      !isGeelyLocal(
+        execution.local
+      ) &&
+      !isStellantisLocal(
+        execution.local
+      )
+    )
+  }
+
+
+  return false
+}
+
+
+// ======================================================
+// ÚLTIMA EJECUCIÓN DE UN FORMULARIO
 // ======================================================
 
 function getLastExecution(
@@ -737,19 +982,10 @@ function getLastExecution(
           }
 
 
-          if (
-            currentUser.role ===
-              "JEFATURA_LOCAL" &&
-            currentUser.local
-          ) {
-            return (
-              execution.local ===
-              currentUser.local
-            )
-          }
-
-
-          return true
+          return canViewExecution(
+            currentUser,
+            execution
+          )
         }
       )
       .sort(
@@ -768,10 +1004,10 @@ function getLastExecution(
 
 
 // ======================================================
-// LOCAL STELLANTIS
+// IDENTIFICAR OPERACIÓN STELLANTIS
 //
-// Temporal para el modo demo.
-// Luego vendrá desde 01_Sucursales.
+// Temporal en demo.
+// Después vendrá desde 01_Sucursales.
 // ======================================================
 
 function isStellantisLocal(
@@ -791,7 +1027,64 @@ function isStellantisLocal(
 
 
 // ======================================================
-// TEXTOS
+// IDENTIFICAR OPERACIÓN GEELY
+//
+// Temporal en demo.
+// Después vendrá desde 01_Sucursales.
+// ======================================================
+
+function isGeelyLocal(
+  local?: string
+) {
+  if (!local) {
+    return false
+  }
+
+
+  return local
+    .toLowerCase()
+    .includes(
+      "geely"
+    )
+}
+
+
+// ======================================================
+// DESCRIPCIÓN DE SEGUIMIENTO
+// ======================================================
+
+function getTrackingDescription(
+  currentUser: UserScope
+) {
+  switch (
+    currentUser.role
+  ) {
+    case "JEFATURA_LOCAL":
+      return "Resultados y brechas correspondientes a tu local."
+
+    case "JEFATURA_MARCA":
+      return "Resultados y brechas correspondientes a la operación Geely."
+
+    case "JEFATURA_ZONAL":
+      return "Resultados de tus locales, excluyendo las operaciones Geely y Stellantis."
+
+    case "GERENCIA_VENTAS":
+      return "Vista general de revisiones y brechas de toda la red."
+
+    case "JEFATURA_COMERCIAL_CLIENTES":
+      return "Vista general de revisiones y brechas de toda la red."
+
+    case "EXPERIENCIA_CLIENTES":
+      return "Control de revisiones, cumplimiento y brechas de toda la red."
+
+    default:
+      return "Últimas revisiones disponibles."
+  }
+}
+
+
+// ======================================================
+// FRECUENCIA
 // ======================================================
 
 function frequencyLabel(
@@ -817,6 +1110,10 @@ function frequencyLabel(
 }
 
 
+// ======================================================
+// NOMBRE DEL ROL
+// ======================================================
+
 function formatRole(
   role: UserScope["role"]
 ) {
@@ -831,7 +1128,7 @@ function formatRole(
       "Jefatura Local",
 
     JEFATURA_MARCA:
-      "Jefatura Marca",
+      "Jefatura Marca · Geely",
 
     JEFATURA_ZONAL:
       "Jefatura Zonal",
