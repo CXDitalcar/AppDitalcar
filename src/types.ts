@@ -1,9 +1,12 @@
 // ======================================================
 // DITALCAR COLABORADORES
-// Tipos centrales de la aplicación
+// TIPOS GENERALES
 // ======================================================
 
-// ---------- ROLES ----------
+
+// ======================================================
+// ROLES
+// ======================================================
 
 export type UserRole =
   | "VENDEDOR"
@@ -17,12 +20,15 @@ export type UserRole =
   | "GERENCIA_ADMINISTRACION"
   | "GERENCIA_COMERCIAL"
   | "JEFATURA_MARKETING"
+  | "EXPERIENCIA_CLIENTES"
   | "ADMINISTRATIVO"
   | "EQUIPO_COMERCIAL"
   | "GERENCIA_GENERAL"
 
 
-// ---------- USUARIOS Y ÁMBITOS ----------
+// ======================================================
+// USUARIO Y ÁMBITO
+// ======================================================
 
 export type UserScope = {
   email: string
@@ -37,16 +43,20 @@ export type UserScope = {
 }
 
 
-// ---------- FAMILIAS DE SOLICITUD ----------
+// ======================================================
+// FAMILIAS DE SOLICITUD
+// ======================================================
 
 export type RequestFamily =
   | "UNIDADES"
-  | "INSUMOS_ADMINISTRACION"
+  | "INSUMOS_SHOWROOM"
   | "COLABORADORES"
   | "OTROS"
 
 
-// ---------- ESTADOS DE SOLICITUD ----------
+// ======================================================
+// ESTADOS DE SOLICITUD
+// ======================================================
 
 export type RequestStatus =
   | "RECIBIDA"
@@ -60,7 +70,9 @@ export type RequestStatus =
   | "RECHAZADA"
 
 
-// ---------- ESTADOS SLA ----------
+// ======================================================
+// ESTADOS SLA
+// ======================================================
 
 export type SLAStatus =
   | "NO_INICIADO"
@@ -71,7 +83,9 @@ export type SLAStatus =
   | "FINALIZADO"
 
 
-// ---------- TIPO DE CAMPO DINÁMICO ----------
+// ======================================================
+// TIPOS DE CAMPOS
+// ======================================================
 
 export type ProcessFieldType =
   | "TEXT"
@@ -84,162 +98,195 @@ export type ProcessFieldType =
   | "FILE"
 
 
-// ---------- CAMPOS DE CADA PROCESO ----------
+// ======================================================
+// DEFINICIÓN DE CAMPO DE PROCESO
+// ======================================================
 
 export type ProcessFieldDefinition = {
   id: string
+
   processCode: string
 
   label: string
+
   type: ProcessFieldType
 
   required: boolean
+
   adjustable: boolean
 
   order: number
 
   placeholder?: string
+
   options?: string[]
 
   active: boolean
 }
 
 
-// ---------- RESPONSABLES DE PROCESO ----------
+// ======================================================
+// ASIGNACIONES DE PROCESO
+// ======================================================
 
-export type ProcessResponsibilityType =
+export type ProcessAssignmentType =
   | "APPROVER"
   | "MANAGER"
+  | "VIEWER"
 
 
 export type ProcessAssignment = {
   id: string
+
   processCode: string
 
-  type: ProcessResponsibilityType
+  type: ProcessAssignmentType
 
   email?: string
+
   role?: UserRole
 
   local?: string
+
   zone?: string
+
   brand?: string
 
   active: boolean
 }
 
 
-// ---------- CONTROL INTERNO DE PROCESOS ----------
+// ======================================================
+// CHECKPOINTS INTERNOS
+// ======================================================
 
 export type InternalCheckpointDefinition = {
   id: string
+
   label: string
+
   order: number
 }
 
 
-// ---------- PROCESOS ----------
+export type InternalCheckpointValue = {
+  checkpointId: string
+
+  completed: boolean
+
+  completedAt?: string
+
+  completedByEmail?: string
+
+  completedByName?: string
+}
+
+
+// ======================================================
+// DEFINICIÓN DE PROCESO
+// ======================================================
 
 export type ProcessDefinition = {
   code: string
 
   family: RequestFamily
+
   name: string
+
   description: string
 
   active: boolean
+
   order: number
 
-  // Quién puede iniciar el proceso
   requesterRoles: UserRole[]
 
-  // Flujo
   requiresApproval: boolean
 
-  // Algunos procesos pueden saltarse "En gestión".
   hasManagementStage: boolean
 
-  // SLA vigentes del proceso.
-  // La solicitud guardará una copia al momento de crearse.
   approvalSLAHours?: number
+
   resolutionSLAHours?: number
 
-  // Tiempo para que solicitante/jefatura confirme resolución.
   confirmationHours: number
 
-  // Academia / documentación
   manualUrl?: string
+
   academyEnabled: boolean
 
-  // Controles privados de responsables del proceso.
-  // Ej.: Bonificación:
-  // "Solicitud realizada a marca" / "Factura recibida"
-  internalCheckpoints?: InternalCheckpointDefinition[]
+  internalCheckpoints?:
+    InternalCheckpointDefinition[]
 }
 
 
-// ---------- VALORES INGRESADOS EN UNA SOLICITUD ----------
+// ======================================================
+// VALORES DE SOLICITUD
+// ======================================================
 
 export type RequestFieldValue = {
   fieldId: string
-  label: string
 
   requestedValue: string
 
-  // Solo existe si hubo aprobación con ajuste.
   approvedValue?: string
-
-  adjustable: boolean
 }
 
 
-// ---------- ADJUNTOS ----------
+// ======================================================
+// ARCHIVOS
+// ======================================================
 
 export type RequestAttachment = {
   id: string
+
   requestId: string
 
   fileName: string
-  fileUrl: string
 
-  uploadedBy: string
+  fileUrl?: string
+
+  stage: string
+
+  uploadedByEmail: string
+
+  uploadedByName: string
+
   uploadedAt: string
-
-  stage:
-    | "SOLICITUD_INICIAL"
-    | "INFORMACION"
-    | "GESTION"
-    | "RESOLUCION"
 }
 
 
-// ---------- SEGUIMIENTO / HISTORIAL ----------
+// ======================================================
+// HISTORIAL / SEGUIMIENTO
+// ======================================================
 
 export type RequestTimelineType =
-  | "SOLICITUD_CREADA"
-  | "INFORMACION_REQUERIDA"
-  | "INFORMACION_ENVIADA"
-  | "APROBADA"
-  | "APROBADA_CON_AJUSTE"
-  | "RECHAZADA"
-  | "EN_GESTION"
-  | "RESUELTA_POR_CONFIRMAR"
-  | "CONFIRMACION_RESOLUCION"
-  | "NO_RESUELTA"
-  | "CIERRE_AUTOMATICO"
-  | "COMENTARIO"
-  | "ADJUNTO"
-  | "SISTEMA"
+  | "CREATED"
+  | "APPROVED"
+  | "APPROVED_WITH_ADJUSTMENT"
+  | "INFORMATION_REQUESTED"
+  | "INFORMATION_PROVIDED"
+  | "REJECTED"
+  | "MANAGEMENT"
+  | "RESOLUTION_REPORTED"
+  | "RESOLUTION_CONFIRMED"
+  | "NOT_RESOLVED"
+  | "REOPENED"
+  | "AUTO_CLOSED"
+  | "COMMENT"
+  | "INTERNAL_CHECKPOINT"
 
 
 export type RequestTimelineItem = {
   id: string
+
   requestId: string
 
   type: RequestTimelineType
 
+  authorEmail: string
+
   authorName: string
-  authorEmail?: string
 
   createdAt: string
 
@@ -247,85 +294,101 @@ export type RequestTimelineItem = {
 }
 
 
-// ---------- CONTROL INTERNO DE UNA SOLICITUD ----------
-
-export type InternalCheckpointValue = {
-  checkpointId: string
-  label: string
-
-  completed: boolean
-
-  completedAt?: string
-  completedBy?: string
-}
-
-
-// ---------- SOLICITUD ----------
+// ======================================================
+// SOLICITUD
+// ======================================================
 
 export type RequestItem = {
   id: string
 
   processCode: string
+
   processName: string
+
   family: RequestFamily
 
-  requesterName: string
   requesterEmail: string
-  local: string
 
-  createdAt: string
+  requesterName: string
+
+  requesterRole?: UserRole
+
+  local: string
 
   status: RequestStatus
 
-  currentResponsibleName?: string
   currentResponsibleEmail?: string
+
+  currentResponsibleName?: string
 
   fields: RequestFieldValue[]
 
-  // SLA congelados al crear la solicitud.
+  createdAt: string
+
+
+  // ------------------------------------------------------
+  // SLA APROBACIÓN
+  // ------------------------------------------------------
+
   approvalSLAHours?: number
-  resolutionSLAHours?: number
-  confirmationHours: number
 
-  // SLA aprobación
   approvalSLAStartedAt?: string
-  approvalSLAEndedAt?: string
 
-  // Si se pide información, el SLA se pausa.
-  approvalSLAPausedAt?: string
   approvalSLAPausedMinutes: number
 
-  // SLA resolución
+  approvalSLAPausedAt?: string
+
+
+  // ------------------------------------------------------
+  // SLA RESOLUCIÓN
+  // ------------------------------------------------------
+
+  resolutionSLAHours?: number
+
   resolutionSLAStartedAt?: string
-  resolutionSLAEndedAt?: string
 
-  // IMPORTANTE:
-  // Si vuelve a gestión por "No resuelto",
-  // este SLA NO se reinicia.
 
-  // Confirmación
-  resolutionConfirmationStartedAt?: string
+  // ------------------------------------------------------
+  // CONFIRMACIÓN
+  // ------------------------------------------------------
+
   resolutionConfirmationDeadline?: string
 
-  // Reapertura
-  reopened: boolean
-  reopenedCount: number
 
-  // Cierre automático después del plazo de confirmación
+  // ------------------------------------------------------
+  // REAPERTURA / CIERRE
+  // ------------------------------------------------------
+
+  reopened: boolean
+
   autoClosed: boolean
 
-  internalCheckpoints?: InternalCheckpointValue[]
+
+  // ------------------------------------------------------
+  // CONTROL INTERNO
+  // ------------------------------------------------------
+
+  internalCheckpoints:
+    InternalCheckpointValue[]
 }
 
 
-// ---------- PERMISOS SOBRE UNA SOLICITUD ----------
+// ======================================================
+// PERMISOS DE SOLICITUD
+// ======================================================
 
 export type RequestPermissions = {
   canView: boolean
+
   canApprove: boolean
+
   canManage: boolean
+
   canConfirmResolution: boolean
+
   canRequestInformation: boolean
+
   canReject: boolean
+
   canApproveWithAdjustment: boolean
 }
