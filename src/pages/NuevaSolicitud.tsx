@@ -2,87 +2,191 @@ import {
   useEffect,
   useMemo,
   useState,
-  type ChangeEvent,
+  type FormEvent,
 } from "react"
 
 import {
+  AlertCircle,
   ArrowLeft,
-  ArrowRight,
   CheckCircle2,
-  ClipboardCheck,
-  FileText,
-  Layers3,
-  Link2,
-  Package,
-  Paperclip,
-  Users,
+  ExternalLink,
+  Loader2,
+  Save,
 } from "lucide-react"
 
 import {
+  Link,
+  useNavigate,
   useSearchParams,
 } from "react-router-dom"
 
-import "./NuevaSolicitud.css"
-
 import {
-  mockFormBreaches,
-  mockFormExecutions,
-  mockForms,
-  mockProcessFields,
-  mockProcesses,
-} from "../data/mockData"
-
-import type {
-  ProcessDefinition,
-  ProcessFieldDefinition,
-  RequestFamily,
-  UserScope,
-} from "../types"
-
-
-type FormValues =
-  Record<string, string>
+  createSolicitud,
+  findActiveSolicitudByBreach,
+  getCurrentUser,
+} from "../services/graph"
 
 
 // ======================================================
-// FAMILIAS
+// TIPOS
 // ======================================================
 
-const familyInfo: Record<
-  RequestFamily,
+type NuevaSolicitudProps = {
+  branch?: string
+  currentUser?: any
+  demoMode?: boolean
+}
+
+
+type ProcessOption = {
+  code: string
+  name: string
+  family: string
+  area: string
+  section: string
+}
+
+
+// ======================================================
+// CATÁLOGO TEMPORAL
+//
+// OJO:
+// En una siguiente etapa esto se leerá desde 09_Procesos.
+// Por ahora nos permite probar escritura REAL sin depender
+// todavía de esa conexión.
+// ======================================================
+
+const processOptions: ProcessOption[] = [
   {
-    label: string
-    description: string
-    icon: typeof Package
-  }
-> = {
-  UNIDADES: {
-    label: "Unidades",
-    description:
-      "Bonificaciones, pedidos, traslados, patentes y otras gestiones asociadas a unidades.",
-    icon: Package,
+    code: "COL-CRE-01",
+    name: "Credencial",
+    family: "COLABORADORES",
+    area: "Experiencia de Clientes",
+    section: "Imagen del equipo",
   },
+  {
+    code: "COL-FIR-01",
+    name: "Pie de firma",
+    family: "COLABORADORES",
+    area: "Comercial / Marketing",
+    section: "Imagen del equipo",
+  },
+  {
+    code: "COL-ACC-01",
+    name: "Habilitación tecnológica",
+    family: "COLABORADORES",
+    area: "TI",
+    section: "Colaboradores",
+  },
+  {
+    code: "UNI-PAT-01",
+    name: "Patente definitiva vehículo",
+    family: "UNIDADES",
+    area: "Administración",
+    section: "Unidades",
+  },
+  {
+    code: "UNI-BON-01",
+    name: "Bonificación",
+    family: "UNIDADES",
+    area: "Operaciones Comerciales",
+    section: "Unidades",
+  },
+  {
+    code: "UNI-TRA-01",
+    name: "Traslado de unidad",
+    family: "UNIDADES",
+    area: "Operaciones Comerciales",
+    section: "Unidades",
+  },
+  {
+    code: "UNI-VUE-01",
+    name: "Vuelto de negocio",
+    family: "UNIDADES",
+    area: "Administración",
+    section: "Unidades",
+  },
+  {
+    code: "UNI-FAC-01",
+    name: "Facturación",
+    family: "UNIDADES",
+    area: "Administración",
+    section: "Unidades",
+  },
+  {
+    code: "UNI-USA-01",
+    name: "Toma de usados",
+    family: "UNIDADES",
+    area: "Administración",
+    section: "Unidades",
+  },
+  {
+    code: "INS-PED-01",
+    name: "Pedido de insumos",
+    family: "INSUMOS_SHOWROOM",
+    area: "Administración",
+    section: "Insumos",
+  },
+  {
+    code: "INS-ZEX-01",
+    name: "Zonas de experiencia",
+    family: "INSUMOS_SHOWROOM",
+    area: "Experiencia de Clientes",
+    section: "Zonas de experiencia",
+  },
+  {
+    code: "INS-MOB-01",
+    name: "Mobiliario y equipamiento",
+    family: "INSUMOS_SHOWROOM",
+    area: "Experiencia de Clientes",
+    section: "Sala de Ventas",
+  },
+  {
+    code: "INS-INT-01",
+    name: "Instalaciones y mantención",
+    family: "INSUMOS_SHOWROOM",
+    area: "Experiencia de Clientes",
+    section: "Sala de Ventas",
+  },
+]
 
-  INSUMOS_SHOWROOM: {
-    label: "Insumos y Showroom",
-    description:
-      "Insumos, zonas de experiencia, mobiliario, equipamiento e instalaciones del local.",
-    icon: Layers3,
-  },
 
-  COLABORADORES: {
-    label: "Colaboradores",
-    description:
-      "Credenciales, pie de firma, uniformes, accesos y otras necesidades del equipo.",
-    icon: Users,
-  },
+// ======================================================
+// HELPERS
+// ======================================================
 
-  OTROS: {
-    label: "Otros",
-    description:
-      "Solicitudes que todavía no están incorporadas al catálogo de procesos.",
-    icon: FileText,
-  },
+function getFallbackUserName(
+  currentUser: any
+) {
+  return (
+    currentUser?.name ??
+    currentUser?.displayName ??
+    currentUser?.userName ??
+    "Usuario Ditalcar"
+  )
+}
+
+
+function getFallbackUserEmail(
+  currentUser: any
+) {
+  return (
+    currentUser?.email ??
+    currentUser?.mail ??
+    currentUser?.userPrincipalName ??
+    ""
+  )
+}
+
+
+function getCurrentRole(
+  currentUser: any
+) {
+  return String(
+    currentUser?.role ??
+      currentUser?.rol ??
+      ""
+  ).toUpperCase()
 }
 
 
@@ -91,688 +195,615 @@ const familyInfo: Record<
 // ======================================================
 
 export default function NuevaSolicitud({
+  branch = "",
   currentUser,
-}: {
-  currentUser: UserScope
-}) {
+  demoMode = false,
+}: NuevaSolicitudProps) {
+  const navigate =
+    useNavigate()
+
   const [
     searchParams,
-  ] = useSearchParams()
+  ] =
+    useSearchParams()
 
+
+  // ====================================================
+  // ORIGEN DESDE FORMULARIOS / BRECHAS
+  // ====================================================
 
   const processFromUrl =
-    searchParams.get(
-      "process"
-    )
-
+    searchParams.get("process") ??
+    ""
 
   const breachFromUrl =
-    searchParams.get(
-      "breach"
+    searchParams.get("breach") ??
+    ""
+
+  const executionFromUrl =
+    searchParams.get("execution") ??
+    ""
+
+  const formFromUrl =
+    searchParams.get("form") ??
+    ""
+
+  const localFromUrl =
+    searchParams.get("local") ??
+    ""
+
+  const sectionFromUrl =
+    searchParams.get("section") ??
+    ""
+
+  const detailFromUrl =
+    searchParams.get("detail") ??
+    ""
+
+
+  // ====================================================
+  // ESTADO
+  // ====================================================
+
+  const [
+    processCode,
+    setProcessCode,
+  ] =
+    useState(
+      processFromUrl
     )
 
 
-  const [step, setStep] =
-    useState(1)
-
-
   const [
-    selectedFamily,
-    setSelectedFamily,
+    local,
+    setLocal,
   ] =
-    useState<RequestFamily | null>(
-      null
+    useState(
+      localFromUrl ||
+        branch ||
+        ""
     )
 
 
   const [
-    selectedProcess,
-    setSelectedProcess,
+    section,
+    setSection,
   ] =
-    useState<ProcessDefinition | null>(
-      null
+    useState(
+      sectionFromUrl
     )
 
 
-  const [values, setValues] =
-    useState<FormValues>({})
-
-
   const [
-    attachments,
-    setAttachments,
+    detail,
+    setDetail,
   ] =
-    useState<File[]>([])
+    useState(
+      detailFromUrl
+    )
 
 
   const [
-    submitted,
-    setSubmitted,
+    requesterName,
+    setRequesterName,
+  ] =
+    useState(
+      getFallbackUserName(
+        currentUser
+      )
+    )
+
+
+  const [
+    requesterEmail,
+    setRequesterEmail,
+  ] =
+    useState(
+      getFallbackUserEmail(
+        currentUser
+      )
+    )
+
+
+  const [
+    loadingUser,
+    setLoadingUser,
   ] =
     useState(false)
 
 
-  // ======================================================
-  // BRECHA DE ORIGEN
-  // ======================================================
+  const [
+    saving,
+    setSaving,
+  ] =
+    useState(false)
 
-  const sourceBreach =
+
+  const [
+    error,
+    setError,
+  ] =
+    useState("")
+
+
+  const [
+    successId,
+    setSuccessId,
+  ] =
+    useState("")
+
+
+  const [
+    duplicateId,
+    setDuplicateId,
+  ] =
+    useState("")
+
+
+  // ====================================================
+  // PROCESO SELECCIONADO
+  // ====================================================
+
+  const selectedProcess =
     useMemo(
       () =>
-        breachFromUrl
-          ? mockFormBreaches.find(
-              (breach) =>
-                breach.id ===
-                breachFromUrl
-            )
-          : undefined,
+        processOptions.find(
+          (process) =>
+            process.code ===
+            processCode
+        ),
       [
-        breachFromUrl,
+        processCode,
       ]
     )
 
 
-  const sourceExecution =
-    useMemo(
-      () =>
-        sourceBreach
-          ? mockFormExecutions.find(
-              (execution) =>
-                execution.id ===
-                sourceBreach.executionId
+  // ====================================================
+  // CARGAR DATOS DEL USUARIO REAL
+  // ====================================================
+
+  useEffect(
+    () => {
+      let active =
+        true
+
+
+      async function loadUser() {
+        setLoadingUser(
+          true
+        )
+
+
+        try {
+          const user =
+            await getCurrentUser()
+
+
+          if (!active) {
+            return
+          }
+
+
+          setRequesterName(
+            user.displayName ||
+              getFallbackUserName(
+                currentUser
+              )
+          )
+
+
+          setRequesterEmail(
+            user.mail ||
+              user.userPrincipalName ||
+              getFallbackUserEmail(
+                currentUser
+              )
+          )
+        } catch {
+          // No detenemos la pantalla.
+          // Puede estar usando modo demo.
+        } finally {
+          if (active) {
+            setLoadingUser(
+              false
             )
-          : undefined,
-      [
-        sourceBreach,
-      ]
-    )
+          }
+        }
+      }
 
 
-  const sourceForm =
-    useMemo(
-      () =>
-        sourceExecution
-          ? mockForms.find(
-              (form) =>
-                form.code ===
-                sourceExecution.formCode
+      loadUser()
+
+
+      return () => {
+        active =
+          false
+      }
+    },
+    [
+      currentUser,
+    ]
+  )
+
+
+  // ====================================================
+  // COMPLETAR SECCIÓN DESDE PROCESO
+  // ====================================================
+
+  useEffect(
+    () => {
+      if (
+        !selectedProcess
+      ) {
+        return
+      }
+
+
+      if (!section) {
+        setSection(
+          selectedProcess.section
+        )
+      }
+    },
+    [
+      selectedProcess,
+      section,
+    ]
+  )
+
+
+  // ====================================================
+  // BUSCAR DUPLICADO SI VIENE DE BRECHA
+  // ====================================================
+
+  useEffect(
+    () => {
+      let active =
+        true
+
+
+      async function checkDuplicate() {
+        if (
+          !breachFromUrl
+        ) {
+          return
+        }
+
+
+        try {
+          const existing =
+            await findActiveSolicitudByBreach(
+              breachFromUrl
             )
-          : undefined,
-      [
-        sourceExecution,
-      ]
-    )
 
 
-  const requestLocal =
-    sourceBreach?.local ??
-    currentUser.local ??
-    "—"
+          if (
+            active &&
+            existing
+          ) {
+            setDuplicateId(
+              existing.id
+            )
+          }
+        } catch {
+          // Si falla la comprobación,
+          // no bloqueamos la pantalla.
+        }
+      }
 
 
-  // ======================================================
-  // ABRIR AUTOMÁTICAMENTE DESDE BRECHA
-  // ======================================================
+      checkDuplicate()
 
-  useEffect(() => {
+
+      return () => {
+        active =
+          false
+      }
+    },
+    [
+      breachFromUrl,
+    ]
+  )
+
+
+  // ====================================================
+  // CREAR SOLICITUD REAL
+  // ====================================================
+
+  async function handleSubmit(
+    event:
+      FormEvent<HTMLFormElement>
+  ) {
+    event.preventDefault()
+
+
+    setError("")
+    setSuccessId("")
+
+
     if (
-      !processFromUrl ||
-      !sourceBreach
+      duplicateId
     ) {
-      return
-    }
-
-
-    const process =
-      mockProcesses.find(
-        (item) =>
-          item.code ===
-          processFromUrl &&
-          item.active
+      setError(
+        "Esta brecha ya tiene una solicitud activa."
       )
 
-
-    if (!process) {
       return
     }
 
 
-    setSelectedFamily(
-      process.family
+    if (
+      !selectedProcess
+    ) {
+      setError(
+        "Selecciona un tipo de solicitud."
+      )
+
+      return
+    }
+
+
+    if (
+      !local.trim()
+    ) {
+      setError(
+        "Debes indicar el local."
+      )
+
+      return
+    }
+
+
+    if (
+      !detail.trim()
+    ) {
+      setError(
+        "Describe qué necesitas solicitar."
+      )
+
+      return
+    }
+
+
+    setSaving(
+      true
     )
 
 
-    setSelectedProcess(
-      process
-    )
+    try {
+      const now =
+        new Date()
 
 
-    setStep(3)
+      const role =
+        getCurrentRole(
+          currentUser
+        )
 
 
-    setValues(
-      (current) => {
-        const nextValues = {
-          ...current,
-        }
+      // ==================================================
+      // REGLA INICIAL
+      //
+      // Si es vendedor, debe pasar primero por aprobación.
+      // Cuando conectemos 02_Usuarios buscaremos aquí
+      // automáticamente el email de su Jefatura Local.
+      //
+      // Los demás nacen RECIBIDA por ahora.
+      // ==================================================
+
+      const needsLocalApproval =
+        role ===
+        "VENDEDOR"
 
 
-        // ----------------------------------------------
-        // CREDENCIAL
-        // Precargamos el local desde la brecha.
-        // ----------------------------------------------
-
-        if (
-          process.code ===
-          "COL-CRE-01"
-        ) {
-          nextValues[
-            "CRE_LOCAL"
-          ] =
-            sourceBreach.local
-        }
+      const initialFlowStatus =
+        needsLocalApproval
+          ? "PENDIENTE_APROBACION"
+          : "RECIBIDA"
 
 
-        // ----------------------------------------------
-        // PIE DE FIRMA
-        // Precargamos el local/área.
-        // ----------------------------------------------
+      const created =
+        await createSolicitud({
+          title:
+            selectedProcess.name,
 
-        if (
-          process.code ===
-          "COL-FIR-01"
-        ) {
-          nextValues[
-            "FIR_LOCAL"
-          ] =
-            sourceBreach.local
-        }
+          areaResponsable:
+            selectedProcess.area,
+
+          categoria:
+            selectedProcess.family,
+
+          seccion:
+            section ||
+            selectedProcess.section,
+
+          solicitud:
+            detail.trim(),
+
+          fechaSolicitud:
+            now.toISOString(),
+
+          local:
+            local.trim(),
+
+          // Cuando nace desde una brecha,
+          // el estándar queda Solicitado.
+          estado:
+            breachFromUrl
+              ? "Solicitado"
+              : undefined,
+
+          procesoCodigo:
+            selectedProcess.code,
+
+          procesoVersion:
+            1,
+
+          solicitanteEmail:
+            requesterEmail,
+
+          solicitanteNombre:
+            requesterName,
+
+          estadoFlujo:
+            initialFlowStatus,
+
+          slaAprobacionSnapshot:
+            needsLocalApproval
+              ? 24
+              : undefined,
+
+          slaInicioAprobacion:
+            needsLocalApproval
+              ? now.toISOString()
+              : undefined,
+
+          slaPausaMinutos:
+            0,
+
+          confirmacionHorasSnapshot:
+            48,
+
+          reabierta:
+            false,
+
+          cierreAutomatico:
+            false,
+
+          origenFormularioCodigo:
+            formFromUrl ||
+            (
+              breachFromUrl
+                ? "FORMULARIO"
+                : "APP_MANUAL"
+            ),
+
+          origenEjecucionID:
+            executionFromUrl ||
+            undefined,
+
+          origenBrechaID:
+            breachFromUrl ||
+            undefined,
+        })
 
 
-        return nextValues
-      }
-    )
-  }, [
-    processFromUrl,
-    sourceBreach,
-  ])
-
-
-  // ======================================================
-  // FAMILIAS VISIBLES SEGÚN ROL
-  // ======================================================
-
-  const visibleFamilies =
-    useMemo(() => {
-      const allFamilies =
-        Object.keys(
-          familyInfo
-        ) as RequestFamily[]
+      setSuccessId(
+        created.id
+      )
+    } catch (
+      errorValue: any
+    ) {
+      const message =
+        errorValue?.message ??
+        "No fue posible crear la solicitud."
 
 
       if (
-        currentUser.role ===
-        "VENDEDOR"
+        message.includes(
+          "401"
+        ) ||
+        message.includes(
+          "403"
+        )
       ) {
-        return allFamilies.filter(
-          (family) =>
-            family !==
-            "INSUMOS_SHOWROOM"
+        setError(
+          "La app pudo llegar a SharePoint, pero Microsoft no autorizó la escritura. Para esta prueba entra con tu cuenta Microsoft y no solo con un usuario demo."
+        )
+      } else {
+        setError(
+          message
         )
       }
-
-
-      return allFamilies
-    }, [
-      currentUser.role,
-    ])
-
-
-  // ======================================================
-  // PROCESOS DISPONIBLES
-  // ======================================================
-
-  const availableProcesses =
-    useMemo(() => {
-      if (!selectedFamily) {
-        return []
-      }
-
-
-      return mockProcesses
-        .filter(
-          (process) =>
-            process.active &&
-            process.family ===
-              selectedFamily &&
-            process.requesterRoles.includes(
-              currentUser.role
-            )
-        )
-        .sort(
-          (a, b) =>
-            a.order -
-            b.order
-        )
-    }, [
-      selectedFamily,
-      currentUser.role,
-    ])
-
-
-  // ======================================================
-  // CAMPOS DEL PROCESO
-  // ======================================================
-
-  const processFields =
-    useMemo(() => {
-      if (!selectedProcess) {
-        return []
-      }
-
-
-      return mockProcessFields
-        .filter(
-          (field) =>
-            field.active &&
-            field.processCode ===
-              selectedProcess.code
-        )
-        .sort(
-          (a, b) =>
-            a.order -
-            b.order
-        )
-    }, [
-      selectedProcess,
-    ])
-
-
-  // ======================================================
-  // VALIDACIÓN
-  // ======================================================
-
-  const formIsValid =
-    processFields
-      .filter(
-        (field) =>
-          field.required
+    } finally {
+      setSaving(
+        false
       )
-      .every(
-        (field) =>
-          values[
-            field.id
-          ]?.trim()
-      )
-
-
-  // ======================================================
-  // ACTUALIZAR VALOR
-  // ======================================================
-
-  function updateValue(
-    fieldId: string,
-    value: string
-  ) {
-    setValues(
-      (current) => ({
-        ...current,
-
-        [fieldId]:
-          value,
-      })
-    )
-  }
-
-
-  // ======================================================
-  // SELECCIONAR FAMILIA
-  // ======================================================
-
-  function selectFamily(
-    family: RequestFamily
-  ) {
-    setSelectedFamily(
-      family
-    )
-
-    setSelectedProcess(
-      null
-    )
-
-    setValues({})
-
-    setAttachments([])
-
-    setStep(2)
-  }
-
-
-  // ======================================================
-  // SELECCIONAR PROCESO
-  // ======================================================
-
-  function selectProcess(
-    process: ProcessDefinition
-  ) {
-    setSelectedProcess(
-      process
-    )
-
-    setValues({})
-
-    setAttachments([])
-
-    setStep(3)
-  }
-
-
-  // ======================================================
-  // ARCHIVOS
-  // ======================================================
-
-  function handleFiles(
-    event:
-      ChangeEvent<HTMLInputElement>
-  ) {
-    const files =
-      Array.from(
-        event.target.files ??
-          []
-      )
-
-
-    setAttachments(
-      (current) => [
-        ...current,
-        ...files,
-      ]
-    )
-
-
-    event.target.value = ""
-  }
-
-
-  function removeAttachment(
-    index: number
-  ) {
-    setAttachments(
-      (current) =>
-        current.filter(
-          (
-            _,
-            currentIndex
-          ) =>
-            currentIndex !==
-            index
-        )
-    )
-  }
-
-
-  // ======================================================
-  // REINICIAR
-  // ======================================================
-
-  function resetRequest() {
-    setSubmitted(false)
-
-    setStep(1)
-
-    setSelectedFamily(
-      null
-    )
-
-    setSelectedProcess(
-      null
-    )
-
-    setValues({})
-
-    setAttachments([])
-  }
-
-
-  // ======================================================
-  // ENVIAR
-  // ======================================================
-
-  function submitRequest() {
-    if (
-      !selectedProcess ||
-      !formIsValid
-    ) {
-      return
     }
-
-
-    // ================================================
-    // DEMO
-    //
-    // Después guardaremos:
-    //
-    // ProcesoCodigo
-    // OrigenFormularioCodigo
-    // OrigenEjecucionID
-    // OrigenBrechaID
-    // Local
-    // Solicitante
-    // EstadoFlujo
-    //
-    // en Tablero General Solicitudes.
-    // ================================================
-
-    setSubmitted(true)
-
-    setStep(4)
   }
 
 
-  // ======================================================
-  // ENVÍO EXITOSO
-  // ======================================================
+  // ====================================================
+  // ÉXITO
+  // ====================================================
 
   if (
-    submitted &&
-    selectedProcess
+    successId
   ) {
     return (
-      <div className="new-request-page">
+      <div className="dc-new-request-page">
 
-        <div className="request-success">
+        <style>
+          {pageStyles}
+        </style>
 
-          <div className="request-success-icon">
+
+        <div className="dc-success-card">
+
+          <div className="dc-success-icon">
             <CheckCircle2
-              size={34}
+              size={36}
             />
           </div>
 
 
-          <div className="eyebrow">
-            SOLICITUD REGISTRADA
-          </div>
+          <span className="dc-eyebrow">
+            SOLICITUD CREADA
+          </span>
 
 
           <h1>
-            Tu solicitud fue enviada
+            Ya está en el tablero
           </h1>
 
 
           <p>
+            La solicitud fue registrada
+            correctamente en
             <strong>
-              {
-                selectedProcess.name
-              }
-            </strong>{" "}
-            quedó registrada
-            para revisión.
+              {" "}
+              Tablero General Solicitudes
+            </strong>
+            .
           </p>
 
 
-          <div className="request-success-info">
-
-            <div>
-              <span>
-                Solicitante
-              </span>
-
-              <strong>
-                {
-                  currentUser.name
-                }
-              </strong>
-            </div>
-
-
-            <div>
-              <span>
-                Local
-              </span>
-
-              <strong>
-                {
-                  requestLocal
-                }
-              </strong>
-            </div>
-
-
-            <div>
-              <span>
-                Estado inicial
-              </span>
-
-              <strong>
-                {selectedProcess
-                  .requiresApproval
-                  ? "Pendiente de aprobación"
-                  : "Recibida"}
-              </strong>
-            </div>
-
-
-            <div>
-              <span>
-                Confirmación
-              </span>
-
-              <strong>
-                {
-                  selectedProcess
-                    .confirmationHours
-                }{" "}
-                h
-              </strong>
-            </div>
-
+          <div className="dc-created-id">
+            Solicitud SharePoint
+            <strong>
+              #
+              {successId}
+            </strong>
           </div>
 
 
-          {sourceBreach && (
-            <div className="request-review">
+          <div className="dc-success-actions">
 
-              <div className="request-review-head">
-
-                <div>
-
-                  <span>
-                    ORIGEN
-                  </span>
-
-
-                  <h3>
-                    {
-                      sourceForm?.name ??
-                      "Formulario"
-                    }
-                  </h3>
-
-                </div>
+            <button
+              type="button"
+              className="dc-primary-button"
+              onClick={() =>
+                navigate(
+                  `/solicitudes/${successId}`
+                )
+              }
+            >
+              Ver solicitud
+            </button>
 
 
-                <span className="status requested">
-                  Desde brecha
-                </span>
+            <button
+              type="button"
+              className="dc-secondary-button"
+              onClick={() => {
+                setSuccessId("")
+                setDetail("")
+              }}
+            >
+              Crear otra
+            </button>
 
-              </div>
-
-
-              <div className="request-review-grid">
-
-                <div className="request-review-field">
-
-                  <span>
-                    Local
-                  </span>
-
-                  <strong>
-                    {
-                      sourceBreach.local
-                    }
-                  </strong>
-
-                </div>
-
-
-                <div className="request-review-field">
-
-                  <span>
-                    Sección
-                  </span>
-
-                  <strong>
-                    {
-                      sourceBreach.section
-                    }
-                  </strong>
-
-                </div>
-
-
-                <div className="request-review-field">
-
-                  <span>
-                    Brecha
-                  </span>
-
-                  <strong>
-                    {
-                      sourceBreach.question
-                    }
-                  </strong>
-
-                </div>
-
-
-                <div className="request-review-field">
-
-                  <span>
-                    Ejecución
-                  </span>
-
-                  <strong>
-                    {
-                      sourceBreach.executionId
-                    }
-                  </strong>
-
-                </div>
-
-              </div>
-
-            </div>
-          )}
-
-
-          <button
-            className="primary-btn"
-            onClick={
-              resetRequest
-            }
-          >
-            Crear otra solicitud
-          </button>
+          </div>
 
         </div>
 
@@ -781,1158 +812,571 @@ export default function NuevaSolicitud({
   }
 
 
-  // ======================================================
-  // VISTA
-  // ======================================================
+  // ====================================================
+  // PANTALLA
+  // ====================================================
 
   return (
-    <div className="new-request-page">
+    <div className="dc-new-request-page">
+
+      <style>
+        {pageStyles}
+      </style>
+
 
       {/* ==================================================
           CABECERA
       ================================================== */}
 
-      <div className="page-head">
+      <div className="dc-request-header">
 
-        <div className="eyebrow">
-          SOLICITUDES
-        </div>
+        <div>
 
-
-        <h1>
-          Nueva solicitud
-        </h1>
-
-
-        <p>
-          Selecciona qué necesitas.
-          La app identificará el
-          proceso, responsable y SLA
-          correspondiente.
-        </p>
-
-      </div>
-
-
-      {/* ==================================================
-          ORIGEN DESDE FORMULARIO
-      ================================================== */}
-
-      {sourceBreach && (
-        <div className="request-review">
-
-          <div className="request-review-head">
-
-            <div>
-
-              <span>
-                SOLICITUD DESDE BRECHA
-              </span>
-
-
-              <h3>
-                {
-                  sourceForm?.name ??
-                  "Revisión del local"
-                }
-              </h3>
-
-            </div>
-
-
-            <span className="status requested">
-              Precargada
-            </span>
-
-          </div>
-
-
-          <div className="request-review-grid">
-
-            <div className="request-review-field">
-
-              <span>
-                Local
-              </span>
-
-              <strong>
-                {
-                  sourceBreach.local
-                }
-              </strong>
-
-            </div>
-
-
-            <div className="request-review-field">
-
-              <span>
-                Sección
-              </span>
-
-              <strong>
-                {
-                  sourceBreach.section
-                }
-              </strong>
-
-            </div>
-
-
-            <div className="request-review-field">
-
-              <span>
-                Brecha detectada
-              </span>
-
-              <strong>
-                {
-                  sourceBreach.question
-                }
-              </strong>
-
-            </div>
-
-
-            <div className="request-review-field">
-
-              <span>
-                Proceso sugerido
-              </span>
-
-              <strong>
-                {
-                  selectedProcess?.name ??
-                  sourceBreach.mappedProcessCode ??
-                  "—"
-                }
-              </strong>
-
-            </div>
-
-          </div>
-
-        </div>
-      )}
-
-
-      {/* ==================================================
-          PASOS
-      ================================================== */}
-
-      <div className="request-stepper">
-
-        <div
-          className={`request-step ${
-            step >= 1
-              ? "active"
-              : ""
-          }`}
-        >
-          <span>
-            1
-          </span>
-
-          <div>
-            <strong>
-              Familia
-            </strong>
-
-            <small>
-              ¿Qué necesitas?
-            </small>
-          </div>
-        </div>
-
-
-        <div
-          className={`request-step ${
-            step >= 2
-              ? "active"
-              : ""
-          }`}
-        >
-          <span>
-            2
-          </span>
-
-          <div>
-            <strong>
-              Proceso
-            </strong>
-
-            <small>
-              Tipo de gestión
-            </small>
-          </div>
-        </div>
-
-
-        <div
-          className={`request-step ${
-            step >= 3
-              ? "active"
-              : ""
-          }`}
-        >
-          <span>
-            3
-          </span>
-
-          <div>
-            <strong>
-              Datos
-            </strong>
-
-            <small>
-              Completar solicitud
-            </small>
-          </div>
-        </div>
-
-
-        <div
-          className={`request-step ${
-            step >= 4
-              ? "active"
-              : ""
-          }`}
-        >
-          <span>
-            4
-          </span>
-
-          <div>
-            <strong>
-              Enviar
-            </strong>
-
-            <small>
-              Revisión final
-            </small>
-          </div>
-        </div>
-
-      </div>
-
-
-      {/* ==================================================
-          PASO 1 · FAMILIA
-      ================================================== */}
-
-      {step === 1 && (
-        <section className="request-section">
-
-          <div className="section-head">
-
-            <div className="eyebrow">
-              PASO 1
-            </div>
-
-
-            <h2>
-              ¿Qué necesitas
-              solicitar?
-            </h2>
-
-          </div>
-
-
-          <div className="request-family-grid">
-
-            {visibleFamilies.map(
-              (family) => {
-                const config =
-                  familyInfo[
-                    family
-                  ]
-
-                const Icon =
-                  config.icon
-
-
-                return (
-                  <button
-                    key={
-                      family
-                    }
-                    className="request-family-card"
-                    onClick={() =>
-                      selectFamily(
-                        family
-                      )
-                    }
-                  >
-
-                    <div className="request-family-icon">
-                      <Icon
-                        size={25}
-                      />
-                    </div>
-
-
-                    <div>
-
-                      <h3>
-                        {
-                          config.label
-                        }
-                      </h3>
-
-                      <p>
-                        {
-                          config.description
-                        }
-                      </p>
-
-                    </div>
-
-
-                    <ArrowRight
-                      className="family-arrow"
-                      size={20}
-                    />
-
-                  </button>
-                )
-              }
-            )}
-
-          </div>
-
-        </section>
-      )}
-
-
-      {/* ==================================================
-          PASO 2 · PROCESO
-      ================================================== */}
-
-      {step === 2 && (
-        <section className="request-section">
-
-          <button
-            className="back-btn"
-            onClick={() =>
-              setStep(1)
-            }
+          <Link
+            to="/solicitudes"
+            className="dc-back-link"
           >
             <ArrowLeft
               size={17}
             />
 
-            Volver a familias
-          </button>
+            Solicitudes
+          </Link>
 
 
-          <div className="section-head">
-
-            <div className="eyebrow">
-              PASO 2
-            </div>
+          <span className="dc-eyebrow">
+            NUEVA SOLICITUD
+          </span>
 
 
-            <h2>
-              Selecciona la gestión
-            </h2>
+          <h1>
+            Crear solicitud
+          </h1>
 
 
-            <p>
-              {selectedFamily
-                ? familyInfo[
-                    selectedFamily
-                  ].label
-                : ""}
-            </p>
+          <p>
+            Registra una gestión y
+            realiza seguimiento desde
+            Ditalcar Colaboradores.
+          </p>
 
+        </div>
+
+
+        <div className="dc-live-badge">
+          <span />
+          SHAREPOINT REAL
+        </div>
+
+      </div>
+
+
+      {/* ==================================================
+          AVISO DEMO
+      ================================================== */}
+
+      {demoMode && (
+        <div className="dc-info-box">
+
+          <AlertCircle
+            size={20}
+          />
+
+
+          <div>
+            <strong>
+              Estás viendo un usuario demo
+            </strong>
+
+            <span>
+              Puedes completar la solicitud.
+              Para comprobar la escritura
+              real en Microsoft Lists,
+              la sesión debe tener acceso
+              Graph a Ditalcar.
+            </span>
           </div>
 
-
-          {availableProcesses.length >
-          0 ? (
-            <div className="process-choice-list">
-
-              {availableProcesses.map(
-                (process) => (
-                  <button
-                    key={
-                      process.code
-                    }
-                    className="process-choice-card"
-                    onClick={() =>
-                      selectProcess(
-                        process
-                      )
-                    }
-                  >
-
-                    <div>
-
-                      <span className="process-code">
-                        {
-                          process.code
-                        }
-                      </span>
-
-
-                      <h3>
-                        {
-                          process.name
-                        }
-                      </h3>
-
-
-                      <p>
-                        {
-                          process.description
-                        }
-                      </p>
-
-                    </div>
-
-
-                    <ArrowRight
-                      size={20}
-                    />
-
-                  </button>
-                )
-              )}
-
-            </div>
-          ) : (
-            <div className="empty">
-              Todavía no hay
-              procesos configurados
-              para esta familia.
-            </div>
-          )}
-
-        </section>
+        </div>
       )}
 
 
       {/* ==================================================
-          PASO 3 · DATOS
+          DUPLICADO
       ================================================== */}
 
-      {step === 3 &&
-        selectedProcess && (
-          <section className="request-section">
-
-            {!sourceBreach && (
-              <button
-                className="back-btn"
-                onClick={() =>
-                  setStep(2)
-                }
-              >
-                <ArrowLeft
-                  size={17}
-                />
-
-                Volver a procesos
-              </button>
-            )}
-
-
-            <div className="request-form-layout">
-
-              <div className="request-form-main">
-
-                <div className="section-head">
-
-                  <div className="eyebrow">
-                    PASO 3
-                  </div>
-
-
-                  <h2>
-                    {
-                      selectedProcess.name
-                    }
-                  </h2>
-
-
-                  <p>
-                    Completa los
-                    antecedentes necesarios
-                    para enviar la solicitud.
-                  </p>
-
-                </div>
-
-
-                <div className="dynamic-form">
-
-                  {processFields.map(
-                    (field) => (
-                      <DynamicField
-                        key={
-                          field.id
-                        }
-                        field={
-                          field
-                        }
-                        value={
-                          values[
-                            field.id
-                          ] ?? ""
-                        }
-                        onChange={(
-                          value
-                        ) =>
-                          updateValue(
-                            field.id,
-                            value
-                          )
-                        }
-                      />
-                    )
-                  )}
-
-                </div>
-
-
-                {/* ADJUNTOS */}
-
-                <div className="request-upload">
-
-                  <div className="request-upload-head">
-
-                    <Paperclip
-                      size={19}
-                    />
-
-
-                    <div>
-
-                      <strong>
-                        Adjuntos
-                      </strong>
-
-
-                      <span>
-                        Puedes agregar
-                        evidencia o
-                        documentos de
-                        respaldo.
-                      </span>
-
-                    </div>
-
-                  </div>
-
-
-                  <label className="secondary-btn">
-
-                    Agregar archivo
-
-                    <input
-                      type="file"
-                      multiple
-                      hidden
-                      onChange={
-                        handleFiles
-                      }
-                    />
-
-                  </label>
-
-
-                  {attachments.length >
-                    0 && (
-                    <div className="upload-file-list">
-
-                      {attachments.map(
-                        (
-                          file,
-                          index
-                        ) => (
-                          <div
-                            key={`${file.name}-${index}`}
-                            className="upload-file"
-                          >
-
-                            <FileText
-                              size={16}
-                            />
-
-
-                            <span>
-                              {
-                                file.name
-                              }
-                            </span>
-
-
-                            <button
-                              type="button"
-                              onClick={() =>
-                                removeAttachment(
-                                  index
-                                )
-                              }
-                            >
-                              Quitar
-                            </button>
-
-                          </div>
-                        )
-                      )}
-
-                    </div>
-                  )}
-
-                </div>
-
-              </div>
-
-
-              {/* PANEL PROCESO */}
-
-              <aside className="request-process-summary">
-
-                <div className="eyebrow">
-                  ANTES DE ENVIAR
-                </div>
-
-
-                <h3>
-                  {
-                    selectedProcess.name
-                  }
-                </h3>
-
-
-                <div className="request-summary-row">
-
-                  <span>
-                    Solicitante
-                  </span>
-
-                  <strong>
-                    {
-                      currentUser.name
-                    }
-                  </strong>
-
-                </div>
-
-
-                <div className="request-summary-row">
-
-                  <span>
-                    Local
-                  </span>
-
-                  <strong>
-                    {
-                      requestLocal
-                    }
-                  </strong>
-
-                </div>
-
-
-                {sourceBreach && (
-                  <>
-
-                    <div className="request-summary-row">
-
-                      <span>
-                        Origen
-                      </span>
-
-                      <strong>
-                        {
-                          sourceForm?.name ??
-                          "Formulario"
-                        }
-                      </strong>
-
-                    </div>
-
-
-                    <div className="request-summary-row">
-
-                      <span>
-                        Brecha
-                      </span>
-
-                      <strong>
-                        {
-                          sourceBreach.section
-                        }
-                      </strong>
-
-                    </div>
-
-                  </>
-                )}
-
-
-                <div className="request-summary-row">
-
-                  <span>
-                    Aprobación
-                  </span>
-
-                  <strong>
-                    {selectedProcess
-                      .requiresApproval
-                      ? "Según proceso"
-                      : "No requiere"}
-                  </strong>
-
-                </div>
-
-
-                {selectedProcess
-                  .requiresApproval && (
-                  <div className="request-summary-row">
-
-                    <span>
-                      SLA aprobación
-                    </span>
-
-                    <strong>
-                      {selectedProcess
-                        .approvalSLAHours
-                        ? `${selectedProcess.approvalSLAHours} h`
-                        : "Por definir"}
-                    </strong>
-
-                  </div>
-                )}
-
-
-                {selectedProcess
-                  .hasManagementStage && (
-                  <div className="request-summary-row">
-
-                    <span>
-                      SLA resolución
-                    </span>
-
-                    <strong>
-                      {selectedProcess
-                        .resolutionSLAHours
-                        ? `${selectedProcess.resolutionSLAHours} h`
-                        : "Por definir"}
-                    </strong>
-
-                  </div>
-                )}
-
-
-                <div className="request-summary-row">
-
-                  <span>
-                    Confirmación
-                  </span>
-
-                  <strong>
-                    {
-                      selectedProcess
-                        .confirmationHours
-                    }{" "}
-                    h
-                  </strong>
-
-                </div>
-
-
-                <button
-                  className="process-manual-link"
-                  type="button"
-                >
-                  <FileText
-                    size={17}
-                  />
-
-                  Ver proceso, SLA y
-                  manual
-                </button>
-
-              </aside>
-
-            </div>
-
-
-            <div className="request-actions">
-
-              {!sourceBreach && (
-                <button
-                  className="secondary-btn"
-                  onClick={() =>
-                    setStep(2)
-                  }
-                >
-                  Atrás
-                </button>
-              )}
-
-
-              <button
-                className="primary-btn"
-                disabled={
-                  !formIsValid
-                }
-                onClick={() =>
-                  setStep(4)
-                }
-              >
-                Revisar solicitud
-
-                <ArrowRight
-                  size={17}
-                />
-              </button>
-
-            </div>
-
-          </section>
-        )}
+      {duplicateId && (
+        <div className="dc-duplicate-box">
+
+          <AlertCircle
+            size={21}
+          />
+
+
+          <div>
+            <strong>
+              Esta brecha ya fue solicitada
+            </strong>
+
+            <span>
+              Existe una solicitud activa
+              asociada a esta brecha.
+            </span>
+
+
+            <Link
+              to={`/solicitudes/${duplicateId}`}
+            >
+              Ver solicitud #
+              {duplicateId}
+              <ExternalLink
+                size={14}
+              />
+            </Link>
+          </div>
+
+        </div>
+      )}
 
 
       {/* ==================================================
-          PASO 4 · REVISIÓN
+          ORIGEN
       ================================================== */}
 
-      {step === 4 &&
-        selectedProcess && (
-          <section className="request-section">
+      {breachFromUrl && (
+        <div className="dc-origin-card">
 
-            <button
-              className="back-btn"
-              onClick={() =>
-                setStep(3)
-              }
-            >
-              <ArrowLeft
-                size={17}
-              />
+          <div>
+            <span className="dc-origin-label">
+              ORIGEN
+            </span>
 
-              Volver a editar
-            </button>
+            <strong>
+              Brecha detectada en formulario
+            </strong>
+          </div>
 
 
-            <div className="section-head">
+          <div className="dc-origin-tags">
 
-              <div className="eyebrow">
-                PASO 4
-              </div>
-
-
-              <h2>
-                Revisa antes de enviar
-              </h2>
-
-
-              <p>
-                Confirma que la
-                información esté correcta
-                antes de registrar la
-                solicitud.
-              </p>
-
-            </div>
-
-
-            <div className="request-review">
-
-              <div className="request-review-head">
-
-                <div>
-
-                  <span>
-                    {
-                      familyInfo[
-                        selectedProcess
-                          .family
-                      ].label
-                    }
-                  </span>
-
-
-                  <h3>
-                    {
-                      selectedProcess.name
-                    }
-                  </h3>
-
-                </div>
-
-
-                <span className="status requested">
-                  Nueva solicitud
-                </span>
-
-              </div>
-
-
-              <div className="request-review-grid">
-
-                <div className="request-review-field">
-
-                  <span>
-                    Solicitante
-                  </span>
-
-                  <strong>
-                    {
-                      currentUser.name
-                    }
-                  </strong>
-
-                </div>
-
-
-                <div className="request-review-field">
-
-                  <span>
-                    Local
-                  </span>
-
-                  <strong>
-                    {
-                      requestLocal
-                    }
-                  </strong>
-
-                </div>
-
-
-                {sourceBreach && (
-                  <>
-
-                    <div className="request-review-field">
-
-                      <span>
-                        Formulario origen
-                      </span>
-
-                      <strong>
-                        {
-                          sourceForm?.name ??
-                          "Formulario"
-                        }
-                      </strong>
-
-                    </div>
-
-
-                    <div className="request-review-field">
-
-                      <span>
-                        Brecha
-                      </span>
-
-                      <strong>
-                        {
-                          sourceBreach.question
-                        }
-                      </strong>
-
-                    </div>
-
-                  </>
-                )}
-
-
-                {processFields.map(
-                  (field) => (
-                    <div
-                      key={
-                        field.id
-                      }
-                      className="request-review-field"
-                    >
-
-                      <span>
-                        {
-                          field.label
-                        }
-                      </span>
-
-
-                      <strong>
-                        {formatReviewValue(
-                          field,
-                          values[
-                            field.id
-                          ]
-                        )}
-                      </strong>
-
-                    </div>
-                  )
-                )}
-
-              </div>
-
-
-              {attachments.length >
-                0 && (
-                <div className="review-attachments">
-
-                  <span>
-                    Adjuntos
-                  </span>
-
-
-                  {attachments.map(
-                    (
-                      file,
-                      index
-                    ) => (
-                      <div
-                        key={`${file.name}-${index}`}
-                      >
-                        <Paperclip
-                          size={15}
-                        />
-
-                        {
-                          file.name
-                        }
-                      </div>
-                    )
-                  )}
-
-                </div>
-              )}
-
-            </div>
-
-
-            {sourceBreach && (
-              <div className="request-review">
-
-                <div className="request-review-head">
-
-                  <div>
-
-                    <span>
-                      TRAZABILIDAD
-                    </span>
-
-
-                    <h3>
-                      Origen de la solicitud
-                    </h3>
-
-                  </div>
-
-
-                  <Link2
-                    size={18}
-                  />
-
-                </div>
-
-
-                <div className="request-review-grid">
-
-                  <div className="request-review-field">
-
-                    <span>
-                      Formulario
-                    </span>
-
-                    <strong>
-                      {
-                        sourceForm?.code ??
-                        sourceBreach.formCode
-                      }
-                    </strong>
-
-                  </div>
-
-
-                  <div className="request-review-field">
-
-                    <span>
-                      Ejecución
-                    </span>
-
-                    <strong>
-                      {
-                        sourceBreach.executionId
-                      }
-                    </strong>
-
-                  </div>
-
-
-                  <div className="request-review-field">
-
-                    <span>
-                      ID Brecha
-                    </span>
-
-                    <strong>
-                      {
-                        sourceBreach.id
-                      }
-                    </strong>
-
-                  </div>
-
-
-                  <div className="request-review-field">
-
-                    <span>
-                      Estado original
-                    </span>
-
-                    <strong>
-                      {
-                        sourceBreach.status ===
-                        "NO_CUMPLE"
-                          ? "No cumple"
-                          : "Solicitado"
-                      }
-                    </strong>
-
-                  </div>
-
-                </div>
-
-              </div>
+            {formFromUrl && (
+              <span>
+                {formFromUrl}
+              </span>
             )}
 
 
-            <div className="request-actions">
-
-              <button
-                className="secondary-btn"
-                onClick={() =>
-                  setStep(3)
-                }
-              >
-                Editar
-              </button>
+            {executionFromUrl && (
+              <span>
+                Ejecución:
+                {" "}
+                {executionFromUrl}
+              </span>
+            )}
 
 
-              <button
-                className="primary-btn"
-                onClick={
-                  submitRequest
-                }
-              >
-                Enviar solicitud
+            <span>
+              Brecha:
+              {" "}
+              {breachFromUrl}
+            </span>
 
-                <CheckCircle2
-                  size={17}
-                />
-              </button>
+          </div>
 
+        </div>
+      )}
+
+
+      {/* ==================================================
+          FORMULARIO
+      ================================================== */}
+
+      <form
+        className="dc-request-form"
+        onSubmit={
+          handleSubmit
+        }
+      >
+
+        <div className="dc-form-section">
+
+          <div className="dc-section-heading">
+
+            <span>
+              01
+            </span>
+
+
+            <div>
+              <h2>
+                ¿Qué necesitas?
+              </h2>
+
+              <p>
+                Selecciona el proceso
+                asociado a la solicitud.
+              </p>
             </div>
 
-          </section>
+          </div>
+
+
+          <label className="dc-field">
+
+            <span>
+              Tipo de solicitud
+            </span>
+
+
+            <select
+              value={
+                processCode
+              }
+              onChange={(
+                event
+              ) => {
+                setProcessCode(
+                  event.target.value
+                )
+
+                const process =
+                  processOptions.find(
+                    (item) =>
+                      item.code ===
+                      event.target.value
+                  )
+
+                if (process) {
+                  setSection(
+                    process.section
+                  )
+                }
+              }}
+              required
+            >
+              <option value="">
+                Selecciona una opción
+              </option>
+
+
+              {processOptions.map(
+                (process) => (
+                  <option
+                    key={
+                      process.code
+                    }
+                    value={
+                      process.code
+                    }
+                  >
+                    {process.name}
+                  </option>
+                )
+              )}
+
+            </select>
+
+          </label>
+
+
+          {selectedProcess && (
+            <div className="dc-process-summary">
+
+              <span>
+                {
+                  selectedProcess.family
+                }
+              </span>
+
+
+              <strong>
+                {
+                  selectedProcess.area
+                }
+              </strong>
+
+            </div>
+          )}
+
+        </div>
+
+
+        <div className="dc-form-section">
+
+          <div className="dc-section-heading">
+
+            <span>
+              02
+            </span>
+
+
+            <div>
+              <h2>
+                Ubicación
+              </h2>
+
+              <p>
+                Indica dónde se requiere
+                la gestión.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div className="dc-two-columns">
+
+            <label className="dc-field">
+
+              <span>
+                Local
+              </span>
+
+
+              <input
+                value={
+                  local
+                }
+                onChange={(
+                  event
+                ) =>
+                  setLocal(
+                    event.target.value
+                  )
+                }
+                placeholder="Ej. Vespucio"
+                required
+              />
+
+            </label>
+
+
+            <label className="dc-field">
+
+              <span>
+                Sección
+              </span>
+
+
+              <input
+                value={
+                  section
+                }
+                onChange={(
+                  event
+                ) =>
+                  setSection(
+                    event.target.value
+                  )
+                }
+                placeholder="Ej. Imagen del equipo"
+              />
+
+            </label>
+
+          </div>
+
+        </div>
+
+
+        <div className="dc-form-section">
+
+          <div className="dc-section-heading">
+
+            <span>
+              03
+            </span>
+
+
+            <div>
+              <h2>
+                Detalle
+              </h2>
+
+              <p>
+                Explica lo necesario
+                para que el responsable
+                pueda iniciar la gestión.
+              </p>
+            </div>
+
+          </div>
+
+
+          <label className="dc-field">
+
+            <span>
+              Solicitud
+            </span>
+
+
+            <textarea
+              value={
+                detail
+              }
+              onChange={(
+                event
+              ) =>
+                setDetail(
+                  event.target.value
+                )
+              }
+              placeholder="Describe claramente qué se necesita..."
+              rows={6}
+              required
+            />
+
+          </label>
+
+        </div>
+
+
+        <div className="dc-form-section">
+
+          <div className="dc-section-heading">
+
+            <span>
+              04
+            </span>
+
+
+            <div>
+              <h2>
+                Solicitante
+              </h2>
+
+              <p>
+                Estos datos se obtienen
+                desde la sesión Microsoft.
+              </p>
+            </div>
+
+          </div>
+
+
+          <div className="dc-two-columns">
+
+            <label className="dc-field">
+
+              <span>
+                Nombre
+              </span>
+
+
+              <input
+                value={
+                  requesterName
+                }
+                onChange={(
+                  event
+                ) =>
+                  setRequesterName(
+                    event.target.value
+                  )
+                }
+                disabled={
+                  loadingUser
+                }
+              />
+
+            </label>
+
+
+            <label className="dc-field">
+
+              <span>
+                Email
+              </span>
+
+
+              <input
+                value={
+                  requesterEmail
+                }
+                onChange={(
+                  event
+                ) =>
+                  setRequesterEmail(
+                    event.target.value
+                  )
+                }
+                disabled={
+                  loadingUser
+                }
+              />
+
+            </label>
+
+          </div>
+
+        </div>
+
+
+        {/* ==================================================
+            ERROR
+        ================================================== */}
+
+        {error && (
+          <div className="dc-error-box">
+
+            <AlertCircle
+              size={20}
+            />
+
+
+            <span>
+              {error}
+            </span>
+
+          </div>
         )}
+
+
+        {/* ==================================================
+            ACCIONES
+        ================================================== */}
+
+        <div className="dc-form-actions">
+
+          <Link
+            to="/solicitudes"
+            className="dc-secondary-button"
+          >
+            Cancelar
+          </Link>
+
+
+          <button
+            type="submit"
+            className="dc-primary-button"
+            disabled={
+              saving ||
+              Boolean(
+                duplicateId
+              )
+            }
+          >
+            {saving ? (
+              <>
+                <Loader2
+                  size={18}
+                  className="dc-spin"
+                />
+                Registrando…
+              </>
+            ) : (
+              <>
+                <Save
+                  size={18}
+                />
+                Crear solicitud
+              </>
+            )}
+          </button>
+
+        </div>
+
+      </form>
 
     </div>
   )
@@ -1940,152 +1384,479 @@ export default function NuevaSolicitud({
 
 
 // ======================================================
-// CAMPO DINÁMICO
+// ESTILOS AUTOCONTENIDOS
 // ======================================================
 
-function DynamicField({
-  field,
-  value,
-  onChange,
-}: {
-  field: ProcessFieldDefinition
-  value: string
-  onChange: (
-    value: string
-  ) => void
-}) {
-  return (
-    <label className="dynamic-field">
-
-      <span>
-        {field.label}
-
-        {field.required && (
-          <strong className="required-mark">
-            *
-          </strong>
-        )}
-      </span>
-
-
-      {field.type ===
-      "TEXTAREA" ? (
-        <textarea
-          value={value}
-          placeholder={
-            field.placeholder
-          }
-          onChange={(event) =>
-            onChange(
-              event.target.value
-            )
-          }
-        />
-      ) : field.type ===
-        "SELECT" ? (
-        <select
-          value={value}
-          onChange={(event) =>
-            onChange(
-              event.target.value
-            )
-          }
-        >
-
-          <option value="">
-            Seleccionar
-          </option>
-
-
-          {field.options?.map(
-            (option) => (
-              <option
-                key={
-                  option
-                }
-                value={
-                  option
-                }
-              >
-                {option}
-              </option>
-            )
-          )}
-
-        </select>
-      ) : (
-        <input
-          value={value}
-          placeholder={
-            field.placeholder
-          }
-          type={
-            field.type ===
-              "NUMBER" ||
-            field.type ===
-              "CURRENCY"
-              ? "number"
-              : field.type ===
-                  "DATE"
-                ? "date"
-                : "text"
-          }
-          onChange={(event) =>
-            onChange(
-              event.target.value
-            )
-          }
-        />
-      )}
-
-    </label>
-  )
-}
-
-
-// ======================================================
-// FORMATO DE REVISIÓN
-// ======================================================
-
-function formatReviewValue(
-  field:
-    ProcessFieldDefinition,
-  value?: string
-) {
-  if (!value) {
-    return "—"
+const pageStyles = `
+  .dc-new-request-page {
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 26px 60px;
+    color: #f7f7f8;
   }
 
+  .dc-request-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 24px;
+    margin-bottom: 24px;
+  }
 
-  if (
-    field.type ===
-    "CURRENCY"
-  ) {
-    const number =
-      Number(value)
+  .dc-back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #a9a9af;
+    text-decoration: none;
+    font-size: 13px;
+    margin-bottom: 20px;
+  }
 
+  .dc-back-link:hover {
+    color: #ffffff;
+  }
 
-    if (
-      !Number.isNaN(
-        number
-      )
-    ) {
-      return new Intl.NumberFormat(
-        "es-CL",
-        {
-          style:
-            "currency",
+  .dc-eyebrow {
+    display: block;
+    color: #ef3943;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    margin-bottom: 8px;
+  }
 
-          currency:
-            "CLP",
+  .dc-request-header h1,
+  .dc-success-card h1 {
+    margin: 0;
+    color: #ffffff;
+    font-size: clamp(30px, 4vw, 46px);
+    line-height: 1;
+    letter-spacing: -0.04em;
+  }
 
-          maximumFractionDigits:
-            0,
-        }
-      ).format(number)
+  .dc-request-header p,
+  .dc-success-card p {
+    color: #9999a2;
+    margin: 12px 0 0;
+    line-height: 1.5;
+  }
+
+  .dc-live-badge {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 9px 12px;
+    border: 1px solid rgba(73, 204, 119, 0.25);
+    border-radius: 999px;
+    color: #9be5b3;
+    background: rgba(73, 204, 119, 0.07);
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+  }
+
+  .dc-live-badge span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #49cc77;
+    box-shadow: 0 0 12px rgba(73, 204, 119, 0.8);
+  }
+
+  .dc-info-box,
+  .dc-duplicate-box,
+  .dc-error-box {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 15px 17px;
+    margin-bottom: 18px;
+    border-radius: 12px;
+  }
+
+  .dc-info-box {
+    border: 1px solid rgba(255, 183, 77, 0.25);
+    background: rgba(255, 183, 77, 0.07);
+    color: #efc57b;
+  }
+
+  .dc-duplicate-box {
+    border: 1px solid rgba(239, 57, 67, 0.35);
+    background: rgba(239, 57, 67, 0.08);
+    color: #ff9ca2;
+  }
+
+  .dc-error-box {
+    border: 1px solid rgba(239, 57, 67, 0.4);
+    background: rgba(239, 57, 67, 0.09);
+    color: #ffb0b5;
+  }
+
+  .dc-info-box div,
+  .dc-duplicate-box div {
+    display: grid;
+    gap: 4px;
+  }
+
+  .dc-info-box strong,
+  .dc-duplicate-box strong {
+    color: #ffffff;
+    font-size: 13px;
+  }
+
+  .dc-info-box span,
+  .dc-duplicate-box span {
+    font-size: 12px;
+    line-height: 1.45;
+  }
+
+  .dc-duplicate-box a {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-top: 5px;
+    color: #ffffff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .dc-origin-card {
+    display: flex;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 16px 18px;
+    margin-bottom: 18px;
+    border: 1px solid rgba(239, 57, 67, 0.2);
+    border-radius: 14px;
+    background:
+      linear-gradient(
+        110deg,
+        rgba(239, 57, 67, 0.10),
+        rgba(13, 13, 15, 0.92) 45%
+      );
+  }
+
+  .dc-origin-label {
+    display: block;
+    color: #ef3943;
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 0.13em;
+    margin-bottom: 5px;
+  }
+
+  .dc-origin-card strong {
+    font-size: 14px;
+  }
+
+  .dc-origin-tags {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 7px;
+  }
+
+  .dc-origin-tags span {
+    padding: 6px 9px;
+    border-radius: 8px;
+    background: #19191d;
+    border: 1px solid #29292f;
+    color: #b8b8bf;
+    font-size: 11px;
+  }
+
+  .dc-request-form {
+    display: grid;
+    gap: 14px;
+  }
+
+  .dc-form-section {
+    padding: 22px;
+    border: 1px solid #25252a;
+    border-radius: 16px;
+    background:
+      linear-gradient(
+        145deg,
+        rgba(24, 24, 28, 0.98),
+        rgba(12, 12, 14, 0.98)
+      );
+    box-shadow:
+      0 18px 50px rgba(0, 0, 0, 0.18);
+  }
+
+  .dc-section-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    margin-bottom: 18px;
+  }
+
+  .dc-section-heading > span {
+    flex: 0 0 auto;
+    width: 31px;
+    height: 31px;
+    display: grid;
+    place-items: center;
+    border-radius: 9px;
+    color: #ffffff;
+    background: #df2934;
+    font-size: 11px;
+    font-weight: 900;
+  }
+
+  .dc-section-heading h2 {
+    margin: 0;
+    color: #ffffff;
+    font-size: 17px;
+  }
+
+  .dc-section-heading p {
+    margin: 4px 0 0;
+    color: #85858f;
+    font-size: 12px;
+  }
+
+  .dc-two-columns {
+    display: grid;
+    grid-template-columns:
+      repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .dc-field {
+    display: grid;
+    gap: 7px;
+  }
+
+  .dc-field > span {
+    color: #b7b7bd;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .dc-field input,
+  .dc-field select,
+  .dc-field textarea {
+    width: 100%;
+    box-sizing: border-box;
+    border: 1px solid #313137;
+    border-radius: 10px;
+    outline: none;
+    padding: 12px 13px;
+    color: #ffffff;
+    background: #101012;
+    font: inherit;
+    font-size: 13px;
+    transition:
+      border-color 0.15s ease,
+      box-shadow 0.15s ease;
+  }
+
+  .dc-field textarea {
+    resize: vertical;
+    min-height: 120px;
+  }
+
+  .dc-field input:focus,
+  .dc-field select:focus,
+  .dc-field textarea:focus {
+    border-color: #df2934;
+    box-shadow:
+      0 0 0 3px
+      rgba(223, 41, 52, 0.10);
+  }
+
+  .dc-field input:disabled {
+    opacity: 0.72;
+  }
+
+  .dc-process-summary {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .dc-process-summary span,
+  .dc-process-summary strong {
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 10px;
+  }
+
+  .dc-process-summary span {
+    color: #ff8d94;
+    border: 1px solid rgba(239, 57, 67, 0.25);
+    background: rgba(239, 57, 67, 0.08);
+  }
+
+  .dc-process-summary strong {
+    color: #c8c8cf;
+    border: 1px solid #2d2d32;
+    background: #161619;
+  }
+
+  .dc-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 10px;
+    padding-top: 8px;
+  }
+
+  .dc-primary-button,
+  .dc-secondary-button {
+    min-height: 43px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 10px;
+    padding: 0 17px;
+    font: inherit;
+    font-size: 12px;
+    font-weight: 800;
+    text-decoration: none;
+    cursor: pointer;
+  }
+
+  .dc-primary-button {
+    border: 1px solid #ef3943;
+    background:
+      linear-gradient(
+        135deg,
+        #ee3943,
+        #b30f19
+      );
+    color: #ffffff;
+    box-shadow:
+      0 8px 28px
+      rgba(223, 41, 52, 0.20);
+  }
+
+  .dc-primary-button:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+
+  .dc-primary-button:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+
+  .dc-secondary-button {
+    border: 1px solid #303036;
+    background: #17171a;
+    color: #d0d0d5;
+  }
+
+  .dc-success-card {
+    max-width: 620px;
+    margin: 80px auto 0;
+    padding: 42px;
+    text-align: center;
+    border: 1px solid #29292e;
+    border-radius: 20px;
+    background:
+      radial-gradient(
+        circle at top,
+        rgba(73, 204, 119, 0.10),
+        transparent 45%
+      ),
+      #111114;
+  }
+
+  .dc-success-icon {
+    width: 70px;
+    height: 70px;
+    margin: 0 auto 18px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    color: #67d68a;
+    background: rgba(73, 204, 119, 0.10);
+    border: 1px solid rgba(73, 204, 119, 0.22);
+  }
+
+  .dc-created-id {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 330px;
+    margin: 24px auto;
+    padding: 13px 15px;
+    border: 1px solid #2b2b30;
+    border-radius: 10px;
+    color: #91919a;
+    background: #0c0c0e;
+    font-size: 12px;
+  }
+
+  .dc-created-id strong {
+    color: #ffffff;
+    font-size: 16px;
+  }
+
+  .dc-success-actions {
+    display: flex;
+    justify-content: center;
+    gap: 9px;
+  }
+
+  .dc-spin {
+    animation:
+      dc-spin 0.8s linear infinite;
+  }
+
+  @keyframes dc-spin {
+    to {
+      transform:
+        rotate(360deg);
     }
   }
 
+  @media (
+    max-width: 720px
+  ) {
+    .dc-new-request-page {
+      padding:
+        20px 15px 45px;
+    }
 
-  return value
-}
+    .dc-request-header {
+      align-items:
+        flex-start;
+      flex-direction:
+        column;
+    }
+
+    .dc-two-columns {
+      grid-template-columns:
+        1fr;
+    }
+
+    .dc-origin-card {
+      flex-direction:
+        column;
+    }
+
+    .dc-origin-tags {
+      justify-content:
+        flex-start;
+    }
+
+    .dc-form-actions,
+    .dc-success-actions {
+      flex-direction:
+        column-reverse;
+    }
+
+    .dc-form-actions > *,
+    .dc-success-actions > * {
+      width: 100%;
+      box-sizing:
+        border-box;
+    }
+  }
+`
