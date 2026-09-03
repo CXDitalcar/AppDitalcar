@@ -26,11 +26,11 @@ import {
 
 import "./SolicitudDetalle.css"
 
+import { requestAssignments } from "../data/requestConfig"
 import {
-  mockProcessAssignments,
-  mockProcessFields,
-  mockProcesses,
-} from "../data/mockData"
+  getFieldDefinition,
+  getRequestProcess,
+} from "../services/requestCatalog"
 
 import {
   appendDemoTimeline,
@@ -169,27 +169,24 @@ function RequestDetailContent({
   const [historyVersion, setHistoryVersion] =
     useState(0)
 
-  const process = mockProcesses.find(
-    (item) =>
-      item.code === request.processCode
-  )
+  const process = getRequestProcess(request.processCode)
 
   const canView = canViewRequest(
     currentUser,
     request,
-    mockProcessAssignments
+    requestAssignments
   )
 
   const canApprove = canApproveRequest(
     currentUser,
     request,
-    mockProcessAssignments
+    requestAssignments
   )
 
   const canManage = canManageRequest(
     currentUser,
     request,
-    mockProcessAssignments
+    requestAssignments
   )
 
   const canConfirm = canConfirmResolution(
@@ -211,9 +208,9 @@ function RequestDetailContent({
       request.fields.map(
         (field) => {
           const definition =
-            mockProcessFields.find(
-              (item) =>
-                item.id === field.fieldId
+            getFieldDefinition(
+              field.fieldId,
+              request.processCode
             )
 
           return {
@@ -223,6 +220,8 @@ function RequestDetailContent({
               field.fieldId,
             type:
               definition?.type,
+            isAmount:
+              definition?.isAmount,
           }
         }
       ),
@@ -236,9 +235,9 @@ function RequestDetailContent({
       request.fields
         .map((field) => {
           const definition =
-            mockProcessFields.find(
-              (item) =>
-                item.id === field.fieldId
+            getFieldDefinition(
+              field.fieldId,
+              request.processCode
             )
 
           if (
@@ -359,14 +358,15 @@ function RequestDetailContent({
     const nextFields = request.fields.map(
       (field) => {
         const definition =
-          mockProcessFields.find(
-            (item) =>
-              item.id === field.fieldId
+          getFieldDefinition(
+            field.fieldId,
+            request.processCode
           )
 
         if (
+          !process?.allowsAmountAdjustment ||
           !definition ||
-          definition.type !== "CURRENCY"
+          (definition.type !== "CURRENCY" && !definition.isAmount)
         ) {
           return field
         }
@@ -480,6 +480,8 @@ function RequestDetailContent({
           request.currentResponsibleEmail,
         returnResponsibleName:
           request.currentResponsibleName,
+        returnResponsibleLabel:
+          request.currentResponsibleLabel,
         approvalSLAPausedAt:
           request.status ===
           "PENDIENTE_APROBACION"
@@ -557,6 +559,8 @@ function RequestDetailContent({
           request.returnResponsibleEmail,
         currentResponsibleName:
           request.returnResponsibleName,
+        currentResponsibleLabel:
+          request.returnResponsibleLabel,
         approvalSLAPausedAt:
           undefined,
         approvalSLAPausedMinutes:
@@ -576,6 +580,8 @@ function RequestDetailContent({
         returnResponsibleEmail:
           undefined,
         returnResponsibleName:
+          undefined,
+        returnResponsibleLabel:
           undefined,
       },
       "INFORMATION_PROVIDED",
@@ -603,6 +609,8 @@ function RequestDetailContent({
           currentUser.email,
         managementOwnerName:
           currentUser.name,
+        managementOwnerLabel:
+          request.currentResponsibleLabel,
         currentResponsibleEmail:
           currentUser.email,
         currentResponsibleName:
@@ -693,6 +701,9 @@ function RequestDetailContent({
         currentResponsibleName:
           request.managementOwnerName ??
           request.currentResponsibleName,
+        currentResponsibleLabel:
+          request.managementOwnerLabel ??
+          request.currentResponsibleLabel,
       },
       "NOT_RESOLVED",
       "No resuelto",
@@ -896,7 +907,7 @@ function RequestDetailContent({
                   </strong>
 
                   {field.approvedValue &&
-                    field.type === "CURRENCY" && (
+                    (field.type === "CURRENCY" || field.isAmount) && (
                     <small>
                       Monto aprobado: {" "}
                       {formatCurrency(
