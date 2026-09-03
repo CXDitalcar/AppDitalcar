@@ -7,20 +7,18 @@ import type {
 
 
 // ======================================================
-// ROLES CON VISIBILIDAD AMPLIA
+// VISIBILIDAD AMPLIA
+// Gerencia General queda fuera del módulo de solicitudes.
 // ======================================================
 
-const managementRoles: UserScope["role"][] = [
+const broadVisibilityRoles: UserScope["role"][] = [
   "GERENCIA_VENTAS",
   "GERENCIA_COMERCIAL",
   "GERENCIA_ADMINISTRACION",
-  "GERENCIA_GENERAL",
+  "JEFATURA_COMERCIAL_CLIENTES",
+  "EXPERIENCIA_CLIENTES",
 ]
 
-
-// ======================================================
-// REVISAR SI UNA ASIGNACIÓN APLICA AL USUARIO
-// ======================================================
 
 function assignmentMatchesUser(
   user: UserScope,
@@ -32,7 +30,8 @@ function assignmentMatchesUser(
 
   if (
     assignment.email &&
-    assignment.email === user.email
+    assignment.email.toLowerCase() ===
+      user.email.toLowerCase()
   ) {
     return true
   }
@@ -45,6 +44,32 @@ function assignmentMatchesUser(
   }
 
   return false
+}
+
+
+function isGeelyLocal(local: string) {
+  return local
+    .toLowerCase()
+    .includes("geely")
+}
+
+
+function isStellantisLocal(local: string) {
+  return local
+    .toLowerCase()
+    .includes("stellantis")
+}
+
+
+function isExactCurrentResponsible(
+  user: UserScope,
+  request: RequestItem
+) {
+  return Boolean(
+    request.currentResponsibleEmail &&
+    request.currentResponsibleEmail.toLowerCase() ===
+      user.email.toLowerCase()
+  )
 }
 
 
@@ -61,38 +86,70 @@ export function canViewRequest(
     return false
   }
 
-
-  // Solicitante
+  // Fuera del flujo de solicitudes.
   if (
-    request.requesterEmail ===
-    user.email
+    user.role ===
+    "GERENCIA_GENERAL"
+  ) {
+    return false
+  }
+
+  if (
+    request.requesterEmail.toLowerCase() ===
+    user.email.toLowerCase()
   ) {
     return true
   }
 
-
-  // Jefatura local
   if (
     user.role ===
       "JEFATURA_LOCAL" &&
-    user.local &&
-    user.local === request.local
+    user.local ===
+      request.local
   ) {
     return true
   }
 
-
-  // Gerencias con visión amplia
   if (
-    managementRoles.includes(
+    isExactCurrentResponsible(
+      user,
+      request
+    )
+  ) {
+    return true
+  }
+
+  if (
+    broadVisibilityRoles.includes(
       user.role
     )
   ) {
     return true
   }
 
+  if (
+    user.role ===
+    "JEFATURA_MARCA"
+  ) {
+    return isGeelyLocal(
+      request.local
+    )
+  }
 
-  // Responsable del proceso
+  if (
+    user.role ===
+    "JEFATURA_ZONAL"
+  ) {
+    return (
+      !isGeelyLocal(
+        request.local
+      ) &&
+      !isStellantisLocal(
+        request.local
+      )
+    )
+  }
+
   return assignments.some(
     (assignment) =>
       assignment.processCode ===
@@ -106,7 +163,7 @@ export function canViewRequest(
 
 
 // ======================================================
-// APROBAR SOLICITUD
+// APROBAR
 // ======================================================
 
 export function canApproveRequest(
@@ -114,9 +171,82 @@ export function canApproveRequest(
   request: RequestItem,
   assignments: ProcessAssignment[]
 ): boolean {
-  if (!user.active) {
+  if (
+    !user.active ||
+    request.status !==
+      "PENDIENTE_APROBACION"
+  ) {
     return false
   }
+
+  if (
+    user.role ===
+    "GERENCIA_GENERAL"
+  ) {
+    return false
+  }
+
+  // Seguridad adicional: nadie se aprueba a sí mismo.
+  if (
+    request.requesterEmail.toLowerCase() ===
+    user.email.toLowerCase()
+  ) {
+    return false
+  }
+
+  // ----------------------------------------------------
+  // REVISIÓN LOCAL / FALLBACK DE VENDEDOR
+  // El workflow deja el email del aprobador exacto.
+  // Puede ser Jefatura Local, Marca o Zonal.
+  // ----------------------------------------------------
+
+  if (
+    request.approvalContext ===
+    "JEFATURA_LOCAL"
+  ) {
+    if (
+      isExactCurrentResponsible(
+        user,
+        request
+      )
+    ) {
+      return [
+        "JEFATURA_LOCAL",
+        "JEFATURA_MARCA",
+        "JEFATURA_ZONAL",
+      ].includes(
+        user.role
+      )
+    }
+
+    // Compatibilidad con solicitudes demo antiguas.
+    return (
+      user.role ===
+        "JEFATURA_LOCAL" &&
+      Boolean(user.local) &&
+      user.local ===
+        request.local
+    )
+  }
+
+  // ----------------------------------------------------
+  // APROBACIÓN ADICIONAL DE PRESUPUESTO
+  // ----------------------------------------------------
+
+  if (
+    request.approvalContext ===
+    "PRESUPUESTO_COMERCIAL"
+  ) {
+    return (
+      user.role ===
+      "GERENCIA_COMERCIAL"
+    )
+  }
+
+  // ----------------------------------------------------
+  // APROBACIÓN CONFIGURADA POR PROCESO
+  // Fuente actual: mock equivalente a 11_AsignacionesProceso.
+  // ----------------------------------------------------
 
   return assignments.some(
     (assignment) =>
@@ -133,7 +263,7 @@ export function canApproveRequest(
 
 
 // ======================================================
-// GESTIONAR / RESOLVER
+// GESTIONAR
 // ======================================================
 
 export function canManageRequest(
@@ -142,6 +272,13 @@ export function canManageRequest(
   assignments: ProcessAssignment[]
 ): boolean {
   if (!user.active) {
+    return false
+  }
+
+  if (
+    user.role ===
+    "GERENCIA_GENERAL"
+  ) {
     return false
   }
 
@@ -171,33 +308,32 @@ export function canConfirmResolution(
     return false
   }
 
-
-  // Solicitante
-  if (
-    request.requesterEmail ===
-    user.email
-  ) {
-    return true
-  }
-
-
-  // Jefatura de su local
   if (
     user.role ===
-      "JEFATURA_LOCAL" &&
-    user.local &&
-    user.local === request.local
+    "GERENCIA_GENERAL"
+  ) {
+    return false
+  }
+
+  if (
+    request.requesterEmail.toLowerCase() ===
+    user.email.toLowerCase()
   ) {
     return true
   }
 
-
-  return false
+  return (
+    user.role ===
+      "JEFATURA_LOCAL" &&
+    Boolean(user.local) &&
+    user.local ===
+      request.local
+  )
 }
 
 
 // ======================================================
-// PERMISOS COMPLETOS
+// PERMISOS CONSOLIDADOS
 // ======================================================
 
 export function getRequestPermissions(
@@ -232,21 +368,17 @@ export function getRequestPermissions(
       request
     )
 
-
   return {
     canView,
     canApprove,
     canManage,
-
     canConfirmResolution:
       canConfirm,
-
     canRequestInformation:
-      canApprove,
-
+      canApprove ||
+      canManage,
     canReject:
       canApprove,
-
     canApproveWithAdjustment:
       canApprove,
   }
@@ -254,7 +386,7 @@ export function getRequestPermissions(
 
 
 // ======================================================
-// ACCESO A BANDEJA DE APROBACIONES
+// ACCESO A BANDEJA
 // ======================================================
 
 export function canAccessApprovalInbox(
@@ -265,11 +397,35 @@ export function canAccessApprovalInbox(
     return false
   }
 
+  if (
+    user.role ===
+    "GERENCIA_GENERAL"
+  ) {
+    return false
+  }
+
+  if (
+    [
+      "JEFATURA_LOCAL",
+      "JEFATURA_MARCA",
+      "JEFATURA_ZONAL",
+      "GERENCIA_COMERCIAL",
+    ].includes(
+      user.role
+    )
+  ) {
+    return true
+  }
+
   return assignments.some(
     (assignment) =>
       assignment.active &&
-      assignment.type ===
-        "APPROVER" &&
+      (
+        assignment.type ===
+          "APPROVER" ||
+        assignment.type ===
+          "MANAGER"
+      ) &&
       assignmentMatchesUser(
         user,
         assignment
@@ -279,7 +435,7 @@ export function canAccessApprovalInbox(
 
 
 // ======================================================
-// VISIBILIDAD DETALLE LOCAL
+// DETALLE POR LOCAL
 // ======================================================
 
 export function canViewLocalDetail(
@@ -292,24 +448,54 @@ export function canViewLocalDetail(
 
   if (
     user.role ===
+    "GERENCIA_GENERAL"
+  ) {
+    return false
+  }
+
+  if (
+    user.role ===
       "GERENCIA_VENTAS" ||
     user.role ===
-      "GERENCIA_GENERAL"
+      "GERENCIA_COMERCIAL" ||
+    user.role ===
+      "JEFATURA_COMERCIAL_CLIENTES" ||
+    user.role ===
+      "EXPERIENCIA_CLIENTES"
   ) {
     return true
   }
 
   if (
-    user.role === "VENDEDOR" ||
+    user.role ===
+      "VENDEDOR" ||
     user.role ===
       "JEFATURA_LOCAL"
   ) {
     return (
-      user.local === local
+      user.local ===
+      local
     )
   }
 
-  // Marca y zonal se completarán
-  // cuando configuremos sus ámbitos.
+  if (
+    user.role ===
+    "JEFATURA_MARCA"
+  ) {
+    return isGeelyLocal(
+      local
+    )
+  }
+
+  if (
+    user.role ===
+    "JEFATURA_ZONAL"
+  ) {
+    return (
+      !isGeelyLocal(local) &&
+      !isStellantisLocal(local)
+    )
+  }
+
   return false
 }
