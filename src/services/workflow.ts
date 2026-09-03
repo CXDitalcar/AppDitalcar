@@ -1,9 +1,11 @@
+import { mockUsers } from "../data/mockData"
 import {
-  mockProcessAssignments,
-  mockProcesses,
-  mockUsers,
-} from "../data/mockData"
-
+  getAssignmentVisibleLabel,
+  getKnownPersonName,
+  getPrimaryAssignment,
+  getRequestProcess,
+  isDemoUser,
+} from "./requestCatalog"
 import type {
   ProcessAssignment,
   RequestItem,
@@ -11,26 +13,8 @@ import type {
   UserScope,
 } from "../types"
 
-
-// ======================================================
-// CONFIGURACIÓN DEL MOTOR DE APROBACIONES
-// ======================================================
-
 const LOCAL_APPROVAL_HOURS = 24
 const MANAGER_ACCEPTANCE_HOURS = 24
-
-// Credencial y Pie de firma NO requieren revisión local,
-// incluso cuando las crea un vendedor.
-// Más adelante esta regla puede venir desde 09_Procesos.
-const LOCAL_REVIEW_EXEMPT_PROCESSES = new Set([
-  "COL-CRE-01",
-  "COL-FIR-01",
-])
-
-
-// ======================================================
-// ETIQUETAS DE CARGO
-// ======================================================
 
 export function roleLabel(role: UserRole) {
   const labels: Record<UserRole, string> = {
@@ -54,91 +38,35 @@ export function roleLabel(role: UserRole) {
   return labels[role]
 }
 
-
-// ======================================================
-// 11_ASIGNACIONESPROCESO · CAPA DE CONFIGURACIÓN
-//
-// Hoy lee mockProcessAssignments para el demo.
-// Cuando Microsoft quede habilitado, esta misma capa
-// podrá recibir los registros reales de la List 11.
-// ======================================================
-
-export function getProcessAssignments(
-  processCode: string
-) {
-  return mockProcessAssignments.filter(
-    (assignment) =>
-      assignment.active &&
-      assignment.processCode === processCode
-  )
-}
-
-
-export function getProcessApprover(
-  processCode: string
-) {
-  return getProcessAssignments(processCode).find(
-    (assignment) =>
-      assignment.type === "APPROVER"
-  )
-}
-
-
-export function getProcessManager(
-  processCode: string
-) {
-  return getProcessAssignments(processCode).find(
-    (assignment) =>
-      assignment.type === "MANAGER"
-  )
-}
-
-
-// ======================================================
-// RESOLVER ASIGNACIÓN
-//
-// Si la asignación es por rol, antes de que alguien
-// "tome" la solicitud mostramos el CARGO, no una persona.
-// Si la asignación es por email, sí existe un responsable
-// individual desde el inicio.
-// ======================================================
-
-function assignmentPerson(
-  assignment?: ProcessAssignment
-) {
+function assignmentPerson(assignment?: ProcessAssignment) {
   if (!assignment) {
     return {
       email: undefined,
       name: "Por asignar",
+      label: "Por asignar",
     }
   }
+
+  const label = getAssignmentVisibleLabel(assignment)
 
   if (assignment.email) {
-    const user = mockUsers.find(
-      (item) =>
-        item.email.toLowerCase() ===
-        assignment.email?.toLowerCase()
-    )
-
     return {
       email: assignment.email,
-      name: user?.name ?? assignment.email,
-    }
-  }
-
-  if (assignment.role) {
-    return {
-      email: undefined,
-      name: roleLabel(assignment.role),
+      name:
+        getKnownPersonName(assignment.email) ??
+        label,
+      label,
     }
   }
 
   return {
     email: undefined,
-    name: "Por asignar",
+    name: assignment.role
+      ? roleLabel(assignment.role)
+      : label,
+    label,
   }
 }
-
 
 function assignmentWouldSelfApprove(
   user: UserScope,
@@ -148,377 +76,233 @@ function assignmentWouldSelfApprove(
 
   if (
     assignment.email &&
-    assignment.email.toLowerCase() ===
-      user.email.toLowerCase()
+    assignment.email.toLowerCase() === user.email.toLowerCase()
   ) {
     return true
   }
 
-  return Boolean(
-    assignment.role &&
+  if (
+    !assignment.email &&
     assignment.role === user.role
-  )
+  ) {
+    return true
+  }
+
+  // En demo permitimos simular el cargo, pero tampoco debe
+  // generarse una autoaprobación del mismo perfil demo.
+  if (
+    isDemoUser(user) &&
+    assignment.role === user.role
+  ) {
+    return true
+  }
+
+  return false
 }
-
-
-// ======================================================
-// ¿REQUIERE REVISIÓN LOCAL?
-//
-// Regla acordada por ahora:
-// - Solo las solicitudes creadas por VENDEDORES pueden
-//   requerir revisión local.
-// - Credencial y Pie de firma nunca la requieren.
-// - Jefaturas, roles multilocal/marca/red y gerencias
-//   no vuelven hacia atrás a una revisión local.
-// ======================================================
 
 export function requiresLocalReview(
   user: UserScope,
   processCode: string
 ) {
-  if (user.role !== "VENDEDOR") {
-    return false
+  const process = getRequestProcess(processCode)
+  if (!process) return user.role === "VENDEDOR"
+
+  if (process.localReviewRule === "NUNCA") return false
+  if (process.localReviewRule === "SOLO_VENDEDOR") {
+    return user.role === "VENDEDOR"
   }
 
-  return !LOCAL_REVIEW_EXEMPT_PROCESSES.has(
-    processCode
-  )
+  // SIEMPRE no obliga a una persona a aprobarse a sí misma.
+  if (user.role === "JEFATURA_LOCAL") return false
+
+  return true
 }
 
-
-// ======================================================
-// APROBADOR DE VENDEDOR CUANDO REQUIERE REVISIÓN LOCAL
-//
-// 1. Jefatura Local del local.
-// 2. Si no existe y es Geely -> Jefatura de Marca.
-// 3. Si no existe -> Jefatura Zonal.
-//
-// Por ahora esta regla alternativa se aplica SOLO a
-// solicitudes de vendedores, tal como acordamos.
-// ======================================================
-
-function getSellerLocalReviewer(
-  local: string
-) {
-  const normalizedLocal =
-    local.trim().toLowerCase()
+function getSellerLocalReviewer(local: string) {
+  const normalizedLocal = local.trim().toLowerCase()
 
   const localHead = mockUsers.find(
     (item) =>
       item.active &&
       item.role === "JEFATURA_LOCAL" &&
-      item.local?.trim().toLowerCase() ===
-        normalizedLocal
+      item.local?.trim().toLowerCase() === normalizedLocal
   )
 
   if (localHead) {
     return {
       email: localHead.email,
       name: localHead.name,
-      role: localHead.role,
+      label: "Jefatura Local",
     }
   }
 
-  const isGeely =
-    normalizedLocal.includes("geely")
-
-  if (isGeely) {
+  if (normalizedLocal.includes("geely")) {
     const brandHead = mockUsers.find(
-      (item) =>
-        item.active &&
-        item.role === "JEFATURA_MARCA"
+      (item) => item.active && item.role === "JEFATURA_MARCA"
     )
 
     if (brandHead) {
       return {
         email: brandHead.email,
         name: brandHead.name,
-        role: brandHead.role,
+        label: "Jefatura de Marca",
       }
     }
   }
 
   const zoneHead = mockUsers.find(
-    (item) =>
-      item.active &&
-      item.role === "JEFATURA_ZONAL"
+    (item) => item.active && item.role === "JEFATURA_ZONAL"
   )
 
   if (zoneHead) {
     return {
       email: zoneHead.email,
       name: zoneHead.name,
-      role: zoneHead.role,
+      label: "Jefatura Zonal",
     }
   }
 
   return {
     email: undefined,
     name: "Jefatura correspondiente",
-    role: undefined,
+    label: "Jefatura correspondiente",
   }
 }
 
-
-// ======================================================
-// ENVIAR AL GESTOR DEL PROCESO
-// ======================================================
-
-function routeToManager(
-  processCode: string
-) {
+function routeToManager(processCode: string) {
   const manager = assignmentPerson(
-    getProcessManager(processCode)
+    getPrimaryAssignment(processCode, "MANAGER")
   )
 
   return {
     status: "RECIBIDA" as const,
     approvalContext: undefined,
-    acceptanceSLAHours:
-      MANAGER_ACCEPTANCE_HOURS,
-    acceptanceSLAStartedAt:
-      new Date().toISOString(),
-    currentResponsibleEmail:
-      manager.email,
-    currentResponsibleName:
-      manager.name,
+    acceptanceSLAHours: MANAGER_ACCEPTANCE_HOURS,
+    acceptanceSLAStartedAt: new Date().toISOString(),
+    currentResponsibleEmail: manager.email,
+    currentResponsibleName: manager.name,
+    currentResponsibleLabel: manager.label,
   }
 }
-
-
-// ======================================================
-// ENVIAR A APROBACIÓN DEL PROCESO
-// ======================================================
 
 function routeToProcessApproval(
   user: UserScope,
   processCode: string
 ) {
-  const process = mockProcesses.find(
-    (item) =>
-      item.code === processCode
-  )
+  const approver = getPrimaryAssignment(processCode, "APPROVER")
 
-  const approver =
-    getProcessApprover(processCode)
-
-  // Nadie debe aprobarse a sí mismo.
-  if (
-    approver &&
-    assignmentWouldSelfApprove(
-      user,
-      approver
-    )
-  ) {
-    return routeToManager(
-      processCode
-    )
+  if (!approver) {
+    return routeToManager(processCode)
   }
 
-  if (
-    approver ||
-    process?.requiresApproval
-  ) {
-    const person =
-      assignmentPerson(approver)
-
-    return {
-      status:
-        "PENDIENTE_APROBACION" as const,
-      approvalContext:
-        "PROCESO" as const,
-      approvalSLAHours:
-        process?.approvalSLAHours,
-      approvalSLAStartedAt:
-        new Date().toISOString(),
-      currentResponsibleEmail:
-        person.email,
-      currentResponsibleName:
-        person.name,
-    }
+  if (assignmentWouldSelfApprove(user, approver)) {
+    return routeToManager(processCode)
   }
 
-  return routeToManager(
-    processCode
-  )
+  const person = assignmentPerson(approver)
+
+  return {
+    status: "PENDIENTE_APROBACION" as const,
+    approvalContext: "PROCESO" as const,
+    approvalSLAStartedAt: new Date().toISOString(),
+    currentResponsibleEmail: person.email,
+    currentResponsibleName: person.name,
+    currentResponsibleLabel: person.label,
+  }
 }
-
-
-// ======================================================
-// RUTA INICIAL
-// ======================================================
 
 export function initialRequestRouting(
   user: UserScope,
   processCode: string,
   local: string
 ) {
-  // ----------------------------------------------------
-  // VENDEDOR + PROCESO CON REVISIÓN LOCAL
-  // ----------------------------------------------------
+  if (local && requiresLocalReview(user, processCode)) {
+    const reviewer = getSellerLocalReviewer(local)
 
-  if (
-    local &&
-    requiresLocalReview(
-      user,
-      processCode
-    )
-  ) {
-    const reviewer =
-      getSellerLocalReviewer(local)
+    // Protección adicional: nadie se envía una aprobación a sí mismo.
+    if (
+      reviewer.email &&
+      reviewer.email.toLowerCase() === user.email.toLowerCase()
+    ) {
+      return routeToProcessApproval(user, processCode)
+    }
 
     return {
-      status:
-        "PENDIENTE_APROBACION" as const,
-      approvalContext:
-        "JEFATURA_LOCAL" as const,
-      approvalSLAHours:
-        LOCAL_APPROVAL_HOURS,
-      approvalSLAStartedAt:
-        new Date().toISOString(),
-      currentResponsibleEmail:
-        reviewer.email,
-      currentResponsibleName:
-        reviewer.name,
+      status: "PENDIENTE_APROBACION" as const,
+      approvalContext: "JEFATURA_LOCAL" as const,
+      approvalSLAHours: LOCAL_APPROVAL_HOURS,
+      approvalSLAStartedAt: new Date().toISOString(),
+      currentResponsibleEmail: reviewer.email,
+      currentResponsibleName: reviewer.name,
+      currentResponsibleLabel: reviewer.label,
     }
   }
 
-  // ----------------------------------------------------
-  // SIN REVISIÓN LOCAL
-  // Credencial/Pie de firma y cualquier cargo superior
-  // ----------------------------------------------------
-
-  return routeToProcessApproval(
-    user,
-    processCode
-  )
+  return routeToProcessApproval(user, processCode)
 }
 
-
-// ======================================================
-// DESPUÉS DE UNA APROBACIÓN
-// ======================================================
-
-export function routeAfterApproval(
-  request: RequestItem
-) {
-  // ----------------------------------------------------
-  // APROBACIÓN ADICIONAL / PRESUPUESTO
-  // vuelve al gestor que ya tenía la solicitud.
-  // ----------------------------------------------------
-
-  if (
-    request.approvalContext ===
-    "PRESUPUESTO_COMERCIAL"
-  ) {
-    const pausedMinutes =
-      request.resolutionSLAPausedAt
-        ? Math.max(
-            0,
-            Math.round(
-              (
-                Date.now() -
-                new Date(
-                  request.resolutionSLAPausedAt
-                ).getTime()
-              ) /
-                60000
-            )
+export function routeAfterApproval(request: RequestItem) {
+  if (request.approvalContext === "PRESUPUESTO_COMERCIAL") {
+    const pausedMinutes = request.resolutionSLAPausedAt
+      ? Math.max(
+          0,
+          Math.round(
+            (Date.now() -
+              new Date(request.resolutionSLAPausedAt).getTime()) /
+              60000
           )
-        : 0
+        )
+      : 0
 
     return {
-      status:
-        "EN_GESTION" as const,
-      approvalContext:
-        undefined,
-      currentResponsibleEmail:
-        request.managementOwnerEmail,
+      status: "EN_GESTION" as const,
+      approvalContext: undefined,
+      currentResponsibleEmail: request.managementOwnerEmail,
       currentResponsibleName:
-        request.managementOwnerName ??
-        "Responsable de gestión",
-      resolutionSLAPausedAt:
-        undefined,
+        request.managementOwnerName ?? "Responsable de gestión",
+      currentResponsibleLabel:
+        request.managementOwnerLabel ?? "Responsable de gestión",
+      resolutionSLAPausedAt: undefined,
       resolutionSLAPausedMinutes:
-        (
-          request.resolutionSLAPausedMinutes ??
-          0
-        ) + pausedMinutes,
-      slaPausedReason:
-        undefined,
+        (request.resolutionSLAPausedMinutes ?? 0) + pausedMinutes,
+      slaPausedReason: undefined,
     }
   }
 
-  // ----------------------------------------------------
-  // DESPUÉS DE REVISIÓN LOCAL DE VENDEDOR:
-  // si el proceso tiene aprobación propia, va a ella.
-  // ----------------------------------------------------
-
-  if (
-    request.approvalContext ===
-    "JEFATURA_LOCAL"
-  ) {
+  if (request.approvalContext === "JEFATURA_LOCAL") {
     const requester: UserScope = {
       email: request.requesterEmail,
       name: request.requesterName,
-      role:
-        request.requesterRole ??
-        "VENDEDOR",
+      role: request.requesterRole ?? "VENDEDOR",
       local: request.local,
       active: true,
     }
 
-    return routeToProcessApproval(
-      requester,
-      request.processCode
-    )
+    return routeToProcessApproval(requester, request.processCode)
   }
 
-  // ----------------------------------------------------
-  // DESPUÉS DE APROBACIÓN PROPIA DEL PROCESO:
-  // llega al área gestora.
-  // ----------------------------------------------------
-
-  return routeToManager(
-    request.processCode
-  )
+  return routeToManager(request.processCode)
 }
 
-
-// ======================================================
-// SOLICITAR APROBACIÓN ADICIONAL EN GESTIÓN
-// ======================================================
-
-export function budgetApprovalRouting(
-  request: RequestItem
-) {
+export function budgetApprovalRouting(request: RequestItem) {
   const approver = mockUsers.find(
-    (item) =>
-      item.active &&
-      item.role ===
-        "GERENCIA_COMERCIAL"
+    (item) => item.active && item.role === "GERENCIA_COMERCIAL"
   )
 
   return {
-    status:
-      "PENDIENTE_APROBACION" as const,
-    approvalContext:
-      "PRESUPUESTO_COMERCIAL" as const,
-    currentResponsibleEmail:
-      approver?.email,
-    currentResponsibleName:
-      approver?.name ??
-      "Gerencia Comercial",
+    status: "PENDIENTE_APROBACION" as const,
+    approvalContext: "PRESUPUESTO_COMERCIAL" as const,
+    currentResponsibleEmail: approver?.email,
+    currentResponsibleName: approver?.name ?? "Gerencia Comercial",
+    currentResponsibleLabel: "Gerencia Comercial",
     managementOwnerEmail:
-      request.managementOwnerEmail ??
-      request.currentResponsibleEmail,
+      request.managementOwnerEmail ?? request.currentResponsibleEmail,
     managementOwnerName:
-      request.managementOwnerName ??
-      request.currentResponsibleName,
+      request.managementOwnerName ?? request.currentResponsibleName,
+    managementOwnerLabel:
+      request.managementOwnerLabel ?? request.currentResponsibleLabel,
     resolutionSLAPausedAt:
-      request.resolutionSLAPausedAt ??
-      new Date().toISOString(),
-    slaPausedReason:
-      "Esperando aprobación",
+      request.resolutionSLAPausedAt ?? new Date().toISOString(),
+    slaPausedReason: "Esperando aprobación",
   }
 }
