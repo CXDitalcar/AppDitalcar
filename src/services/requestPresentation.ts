@@ -1,7 +1,6 @@
-import {
-  mockUsers,
-} from "../data/mockData"
-
+import { mockUsers } from "../data/mockData"
+import { requestAssignments } from "../data/requestConfig"
+import { getKnownPersonName } from "./requestCatalog"
 import type {
   RequestItem,
   RequestStatus,
@@ -9,322 +8,158 @@ import type {
   UserScope,
 } from "../types"
 
+const exactManagerRoles: UserRole[] = [
+  "JEFATURA_ADMINISTRACION",
+  "JEFATURA_COMERCIAL_CLIENTES",
+  "JEFATURA_OPERACIONES_COMERCIALES",
+  "JEFATURA_MARKETING",
+  "JEFATURA_ZONAL",
+  "JEFATURA_MARCA",
+  "GERENCIA_ADMINISTRACION",
+  "GERENCIA_COMERCIAL",
+  "GERENCIA_VENTAS",
+]
 
-// ======================================================
-// ROLES QUE PUEDEN VER A LA PERSONA EXACTA
-// QUE ESTÁ GESTIONANDO
-// ======================================================
-
-const exactManagerRoles:
-  UserRole[] = [
-    "JEFATURA_ADMINISTRACION",
-
-    "JEFATURA_COMERCIAL_CLIENTES",
-    "JEFATURA_OPERACIONES_COMERCIALES",
-    "JEFATURA_MARKETING",
-
-    "JEFATURA_ZONAL",
-    "JEFATURA_MARCA",
-
-    "GERENCIA_ADMINISTRACION",
-    "GERENCIA_COMERCIAL",
-    "GERENCIA_VENTAS",
-  ]
-
-
-// ======================================================
-// NOMBRE VISIBLE DE CARGOS
-// ======================================================
-
-export function roleLabel(
-  role?: UserRole
-) {
-  const labels:
-    Partial<
-      Record<
-        UserRole,
-        string
-      >
-    > = {
-      VENDEDOR:
-        "Vendedor",
-
-      JEFATURA_LOCAL:
-        "Jefatura Local",
-
-      JEFATURA_MARCA:
-        "Jefatura de Marca",
-
-      JEFATURA_ZONAL:
-        "Jefatura Zonal",
-
-      GERENCIA_VENTAS:
-        "Gerencia de Ventas",
-
-      JEFATURA_COMERCIAL_CLIENTES:
-        "Jefatura Comercial y Clientes",
-
-      JEFATURA_OPERACIONES_COMERCIALES:
-        "Jefatura Operaciones Comerciales",
-
-      JEFATURA_ADMINISTRACION:
-        "Jefatura Administración",
-
-      GERENCIA_ADMINISTRACION:
-        "Gerencia Administración",
-
-      GERENCIA_COMERCIAL:
-        "Gerencia Comercial",
-
-      JEFATURA_MARKETING:
-        "Jefatura Marketing",
-
-      EXPERIENCIA_CLIENTES:
-        "Experiencia de Clientes",
-
-      ADMINISTRATIVO:
-        "Administración",
-
-      EQUIPO_COMERCIAL:
-        "Equipo Comercial",
-    }
-
-
-  return role
-    ? labels[role] ??
-        "Responsable"
-    : "Responsable"
-}
-
-
-// ======================================================
-// PUEDE VER NOMBRE REAL DEL GESTOR
-// ======================================================
-
-export function canSeeExactManager(
-  user: UserScope
-) {
-  return exactManagerRoles.includes(
-    user.role
-  )
-}
-
-
-// ======================================================
-// BUSCAR ROL POR EMAIL
-// ======================================================
-
-function roleFromEmail(
-  email?: string
-) {
-  if (!email) {
-    return undefined
+export function roleLabel(role?: UserRole) {
+  const labels: Partial<Record<UserRole, string>> = {
+    VENDEDOR: "Vendedor",
+    JEFATURA_LOCAL: "Jefatura Local",
+    JEFATURA_MARCA: "Jefatura de Marca",
+    JEFATURA_ZONAL: "Jefatura Zonal",
+    GERENCIA_VENTAS: "Gerencia de Ventas",
+    JEFATURA_COMERCIAL_CLIENTES: "Jefatura Comercial y Clientes",
+    JEFATURA_OPERACIONES_COMERCIALES: "Jefatura Operaciones Comerciales",
+    JEFATURA_ADMINISTRACION: "Jefatura Administración",
+    GERENCIA_ADMINISTRACION: "Gerencia Administración",
+    GERENCIA_COMERCIAL: "Gerencia Comercial",
+    JEFATURA_MARKETING: "Jefatura Marketing",
+    EXPERIENCIA_CLIENTES: "Experiencia de Clientes",
+    ADMINISTRATIVO: "Administración",
+    EQUIPO_COMERCIAL: "Equipo Comercial",
   }
 
+  return role ? labels[role] ?? "Responsable" : "Responsable"
+}
 
+export function canSeeExactManager(user: UserScope) {
+  return exactManagerRoles.includes(user.role)
+}
+
+function roleFromEmail(email?: string) {
+  if (!email) return undefined
   return mockUsers.find(
-    (item) =>
-      item.email.toLowerCase() ===
-      email.toLowerCase()
+    (item) => item.email.toLowerCase() === email.toLowerCase()
   )?.role
 }
 
-
-// ======================================================
-// RESPONSABLE VISIBLE SEGÚN PERFIL
-// ======================================================
+function assignmentLabelFromEmail(email?: string) {
+  if (!email) return undefined
+  const assignment = requestAssignments.find(
+    (item) =>
+      item.email?.toLowerCase() === email.toLowerCase() &&
+      item.active
+  )
+  return assignment?.label ?? assignment?.areaFunctional
+}
 
 export function responsibleLabel(
   user: UserScope,
   request: RequestItem
 ) {
-  // ----------------------------------------------------
-  // JEFATURAS / GERENCIAS:
-  // pueden ver persona exacta + cargo
-  // ----------------------------------------------------
-
-  if (
-    canSeeExactManager(
-      user
-    ) &&
-    request.currentResponsibleName
-  ) {
-    const role =
-      roleFromEmail(
-        request.currentResponsibleEmail
-      )
-
-
-    return role
-      ? `${request.currentResponsibleName} · ${roleLabel(
-          role
-        )}`
-      : request.currentResponsibleName
+  if (request.approvalContext === "JEFATURA_LOCAL") {
+    if (canSeeExactManager(user) && request.currentResponsibleName) {
+      return `${request.currentResponsibleName} · ${
+        request.currentResponsibleLabel ?? "Jefatura Local"
+      }`
+    }
+    return request.currentResponsibleLabel ?? "Jefatura Local"
   }
 
-
-  // ----------------------------------------------------
-  // RESTO DE USUARIOS:
-  // solo cargo / área
-  // ----------------------------------------------------
-
-  if (
-    request.approvalContext ===
-    "JEFATURA_LOCAL"
-  ) {
-    return "Jefatura Local"
-  }
-
-
-  if (
-    request.approvalContext ===
-    "PRESUPUESTO_COMERCIAL"
-  ) {
+  if (request.approvalContext === "PRESUPUESTO_COMERCIAL") {
+    if (canSeeExactManager(user) && request.currentResponsibleName) {
+      return `${request.currentResponsibleName} · Gerencia Comercial`
+    }
     return "Gerencia Comercial"
   }
 
+  const visibleLabel =
+    request.currentResponsibleLabel ??
+    assignmentLabelFromEmail(request.currentResponsibleEmail) ??
+    roleLabel(roleFromEmail(request.currentResponsibleEmail))
 
-  const role =
-    roleFromEmail(
-      request.currentResponsibleEmail
-    )
+  if (canSeeExactManager(user) && request.currentResponsibleName) {
+    const exactName =
+      getKnownPersonName(request.currentResponsibleEmail) ??
+      request.currentResponsibleName
 
+    if (
+      visibleLabel &&
+      exactName.toLowerCase() !== visibleLabel.toLowerCase()
+    ) {
+      return `${exactName} · ${visibleLabel}`
+    }
 
-  if (role) {
-    return roleLabel(
-      role
-    )
+    return exactName
   }
 
-
-  return (
-    request.currentResponsibleName ??
-    "Por asignar"
-  )
+  return visibleLabel || "Por asignar"
 }
-
-
-// ======================================================
-// AUTOR DEL HISTORIAL
-// ======================================================
 
 export function actorLabel(
   user: UserScope,
   email: string,
   name: string
 ) {
-  const role =
-    roleFromEmail(
-      email
-    )
+  const role = roleFromEmail(email)
+  const visibleLabel =
+    assignmentLabelFromEmail(email) ?? roleLabel(role)
 
-
-  if (
-    canSeeExactManager(
-      user
-    )
-  ) {
-    return role
-      ? `${name} · ${roleLabel(
-          role
-        )}`
-      : name
+  if (canSeeExactManager(user)) {
+    const exactName = getKnownPersonName(email) ?? name
+    return visibleLabel && exactName !== visibleLabel
+      ? `${exactName} · ${visibleLabel}`
+      : exactName
   }
 
-
-  return roleLabel(
-    role
-  )
+  return visibleLabel
 }
-
-
-// ======================================================
-// ESTADOS VISIBLES
-// ======================================================
 
 export function visibleStatusLabel(
-  request: Pick<
-    RequestItem,
-    | "status"
-    | "approvalContext"
-  >
+  request: Pick<RequestItem, "status" | "approvalContext">
 ) {
   if (
-    request.status ===
-      "PENDIENTE_APROBACION" &&
-    request.approvalContext ===
-      "JEFATURA_LOCAL"
+    request.status === "PENDIENTE_APROBACION" &&
+    request.approvalContext === "JEFATURA_LOCAL"
   ) {
     return "Revisión local"
   }
 
+  const labels: Record<RequestStatus, string> = {
+    RECIBIDA: "Ingresada",
+    INFORMACION_REQUERIDA: "Falta información",
+    PENDIENTE_APROBACION: "Por aprobar",
+    APROBADA: "Ingresada",
+    APROBADA_CON_AJUSTE: "Ingresada",
+    EN_GESTION: "En gestión",
+    RESUELTA_POR_CONFIRMAR: "Por confirmar",
+    RESUELTA: "Resuelta",
+    RECHAZADA: "Rechazada",
+  }
 
-  const labels:
-    Record<
-      RequestStatus,
-      string
-    > = {
-      RECIBIDA:
-        "Ingresada",
-
-      INFORMACION_REQUERIDA:
-        "Falta información",
-
-      PENDIENTE_APROBACION:
-        "Por aprobar",
-
-      APROBADA:
-        "Ingresada",
-
-      APROBADA_CON_AJUSTE:
-        "Ingresada",
-
-      EN_GESTION:
-        "En gestión",
-
-      RESUELTA_POR_CONFIRMAR:
-        "Por confirmar",
-
-      RESUELTA:
-        "Resuelta",
-
-      RECHAZADA:
-        "Rechazada",
-    }
-
-
-  return labels[
-    request.status
-  ]
+  return labels[request.status]
 }
 
-
-// ======================================================
-// ETAPA VISIBLE
-// ======================================================
-
-export function stageLabel(
-  request: RequestItem
-) {
+export function stageLabel(request: RequestItem) {
   if (
-    request.status ===
-      "PENDIENTE_APROBACION" &&
-    request.approvalContext ===
-      "JEFATURA_LOCAL"
+    request.status === "PENDIENTE_APROBACION" &&
+    request.approvalContext === "JEFATURA_LOCAL"
   ) {
     return "Revisión local"
   }
 
-
-  if (
-    request.status ===
-    "PENDIENTE_APROBACION"
-  ) {
+  if (request.status === "PENDIENTE_APROBACION") {
     return "Por aprobar"
   }
 
-
-  return visibleStatusLabel(
-    request
-  )
+  return visibleStatusLabel(request)
 }
