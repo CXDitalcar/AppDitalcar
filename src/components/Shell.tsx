@@ -6,6 +6,7 @@ import {
 import {
   BadgeCheck,
   BookOpen,
+  BookOpenCheck,
   Building2,
   ClipboardCheck,
   ClipboardList,
@@ -72,6 +73,12 @@ const mainNavigation: NavigationItem[] = [
     label: "Academia",
     to: "/academia",
     icon: BookOpen,
+  },
+
+  {
+    label: "Playbooks de Venta",
+    to: "/playbooks-venta",
+    icon: BookOpenCheck,
   },
 
   {
@@ -283,7 +290,7 @@ export default function Shell({
 
 
                   <span className="app-sidebar-link-text">
-                    Aprobaciones
+                    Gestión
                   </span>
 
                 </NavLink>
