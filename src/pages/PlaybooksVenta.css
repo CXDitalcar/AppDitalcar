@@ -1,0 +1,765 @@
+.playbooks-page {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+  padding-bottom: 54px;
+}
+
+.playbooks-hero,
+.playbooks-journey-panel,
+.playbooks-consulta-panel,
+.playbooks-workspace,
+.playbooks-outcome-panel {
+  border: 1px solid rgba(255,255,255,.07);
+  background:
+    radial-gradient(circle at 82% 0%, rgba(227,23,47,.09), transparent 30%),
+    linear-gradient(145deg, rgba(18,18,21,.98), rgba(8,8,10,.98));
+  box-shadow: 0 20px 60px rgba(0,0,0,.18);
+}
+
+.playbooks-hero {
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  justify-content: space-between;
+  gap: 34px;
+  align-items: flex-end;
+  padding: 36px;
+  border-radius: 22px;
+}
+
+.playbooks-hero::after {
+  content: "";
+  position: absolute;
+  right: -8%;
+  top: 32%;
+  width: 52%;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(227,23,47,.55), transparent);
+  transform: rotate(-9deg);
+  box-shadow: 0 0 28px rgba(227,23,47,.45);
+}
+
+.playbooks-hero-copy {
+  position: relative;
+  z-index: 1;
+  max-width: 820px;
+}
+
+.playbooks-kicker {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  color: #ef3347;
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: .15em;
+}
+
+.playbooks-pilot {
+  padding: 5px 8px;
+  border: 1px solid rgba(227,23,47,.22);
+  border-radius: 999px;
+  background: rgba(227,23,47,.08);
+  color: #ff8a98;
+  letter-spacing: .08em;
+}
+
+.playbooks-hero h1 {
+  margin: 0;
+  max-width: 830px;
+  color: #fff;
+  font-size: clamp(34px, 4.5vw, 62px);
+  line-height: .98;
+  letter-spacing: -.045em;
+}
+
+.playbooks-hero h1 em {
+  color: #ef3347;
+  font-style: normal;
+}
+
+.playbooks-hero p {
+  max-width: 760px;
+  margin: 18px 0 0;
+  color: #9d9da5;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.playbooks-route-selector {
+  position: relative;
+  z-index: 2;
+  min-width: 286px;
+}
+
+.playbooks-route-selector > span {
+  display: block;
+  margin-bottom: 8px;
+  color: #6f6f77;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .14em;
+}
+
+.playbooks-segmented-control {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  padding: 4px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 13px;
+  background: rgba(0,0,0,.35);
+}
+
+.playbooks-segmented-control button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 43px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: #7e7e86;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.playbooks-segmented-control button.active {
+  background: linear-gradient(135deg, #ed2b3f, #a80c1c);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(227,23,47,.18);
+}
+
+.playbooks-journey-panel,
+.playbooks-consulta-panel,
+.playbooks-workspace {
+  padding: 28px;
+  border-radius: 20px;
+}
+
+.playbooks-section-heading,
+.playbooks-workspace-head,
+.playbooks-consulta-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-end;
+}
+
+.playbooks-section-heading h2,
+.playbooks-consulta-heading h2,
+.playbooks-workspace-head h2,
+.playbooks-outcome-panel h2 {
+  margin: 4px 0 0;
+  color: #fff;
+  font-size: 24px;
+  letter-spacing: -.025em;
+}
+
+.playbooks-route-chip {
+  padding: 8px 11px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,.035);
+  color: #babac0;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.playbooks-journey {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0,1fr));
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.playbooks-journey-line {
+  position: absolute;
+  left: 7%;
+  right: 7%;
+  top: 25px;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(227,23,47,.6), rgba(255,255,255,.10), rgba(227,23,47,.5));
+  z-index: 0;
+}
+
+.playbooks-stage {
+  position: relative;
+  z-index: 1;
+  min-height: 210px;
+  padding: 17px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 15px;
+  background: linear-gradient(145deg, rgba(20,20,23,.96), rgba(10,10,12,.96));
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  transition: .18s ease;
+}
+
+.playbooks-stage:not(:disabled):hover {
+  transform: translateY(-2px);
+  border-color: rgba(227,23,47,.24);
+}
+
+.playbooks-stage.selected {
+  border-color: rgba(227,23,47,.42);
+  background:
+    radial-gradient(circle at 85% 5%, rgba(227,23,47,.14), transparent 32%),
+    linear-gradient(145deg, rgba(26,18,21,.98), rgba(10,10,12,.98));
+  box-shadow: inset 0 0 0 1px rgba(227,23,47,.06), 0 12px 32px rgba(0,0,0,.2);
+}
+
+.playbooks-stage.outcome {
+  cursor: default;
+  opacity: .94;
+}
+
+.playbooks-stage-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 22px;
+  color: #ef3347;
+}
+
+.playbooks-stage-number {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(227,23,47,.24);
+  border-radius: 12px;
+  background: #0c0c0e;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.playbooks-stage-journey {
+  display: block;
+  margin-bottom: 6px;
+  color: #ef596b;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: .09em;
+  text-transform: uppercase;
+}
+
+.playbooks-stage strong {
+  display: block;
+  color: #fff;
+  font-size: 15px;
+}
+
+.playbooks-stage p {
+  min-height: 49px;
+  margin: 9px 0 14px;
+  color: #86868e;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.playbooks-stage-link,
+.playbooks-stage-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #c8c8ce;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.playbooks-stage-result {
+  color: #ef596b;
+}
+
+.playbooks-claims-rail {
+  display: grid;
+  grid-template-columns: auto minmax(190px, .9fr) minmax(260px, 1.2fr) auto;
+  align-items: center;
+  gap: 15px;
+  width: 100%;
+  margin-top: 14px;
+  padding: 13px 16px;
+  border: 1px solid rgba(227,23,47,.24);
+  border-radius: 13px;
+  background: linear-gradient(90deg, rgba(227,23,47,.14), rgba(227,23,47,.045) 48%, rgba(0,0,0,.14));
+  color: #fff;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.playbooks-claims-rail.active {
+  border-color: rgba(227,23,47,.58);
+  box-shadow: 0 0 28px rgba(227,23,47,.1);
+}
+
+.playbooks-claims-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #c91429;
+}
+
+.playbooks-claims-rail small {
+  display: block;
+  margin-bottom: 3px;
+  color: #ee7684;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.playbooks-claims-rail strong {
+  font-size: 12px;
+}
+
+.playbooks-claims-moments {
+  color: #8d8d95;
+  font-size: 10px;
+  text-align: right;
+}
+
+.playbooks-consulta-panel {
+  border-color: rgba(227,23,47,.12);
+}
+
+.playbooks-consulta-heading {
+  align-items: center;
+}
+
+.playbooks-consulta-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #ef3347;
+}
+
+.playbooks-consulta-heading p {
+  max-width: 650px;
+  margin: 0;
+  color: #85858d;
+  font-size: 11px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.playbooks-consulta-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0,1fr));
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.playbooks-consulta-item {
+  min-height: 103px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 12px;
+  background: #0d0d0f;
+}
+
+.playbooks-consulta-item > span {
+  display: grid;
+  place-items: center;
+  width: 29px;
+  height: 29px;
+  border-radius: 8px;
+  background: rgba(227,23,47,.14);
+  color: #f13b50;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.playbooks-consulta-item p {
+  margin: 10px 0 0;
+  color: #b1b1b7;
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.playbooks-workspace-head {
+  align-items: flex-start;
+}
+
+.playbooks-workspace-head p {
+  max-width: 750px;
+  margin: 8px 0 0;
+  color: #8f8f97;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.playbooks-workspace-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.playbooks-workspace-badges span {
+  padding: 7px 9px;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 999px;
+  background: rgba(255,255,255,.035);
+  color: #b7b7bd;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.playbooks-workspace-badges .danger,
+.playbooks-workspace-badges .consulta {
+  border-color: rgba(227,23,47,.22);
+  background: rgba(227,23,47,.08);
+  color: #ef7080;
+}
+
+.playbooks-route-differences {
+  display: grid;
+  grid-template-columns: 240px minmax(0,1fr);
+  gap: 20px;
+  align-items: center;
+  margin-top: 22px;
+  padding: 14px 16px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 14px;
+  background: rgba(255,255,255,.022);
+}
+
+.playbooks-differences-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #ef3347;
+}
+
+.playbooks-differences-title span {
+  display: block;
+  color: #686870;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .1em;
+}
+
+.playbooks-differences-title strong {
+  color: #fff;
+  font-size: 11px;
+}
+
+.playbooks-difference-list {
+  display: grid;
+  gap: 7px;
+}
+
+.playbooks-difference-list div {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  color: #a5a5ac;
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.playbooks-difference-list svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+  color: #ef3347;
+}
+
+.playbooks-detail-layout {
+  display: grid;
+  grid-template-columns: 260px minmax(0,1fr);
+  gap: 16px;
+  margin-top: 18px;
+}
+
+.playbooks-section-nav {
+  display: grid;
+  gap: 5px;
+  align-content: start;
+  padding: 13px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 14px;
+  background: #0b0b0d;
+}
+
+.playbooks-section-nav-title {
+  padding: 5px 7px 10px;
+  color: #5f5f66;
+  font-size: 8px;
+  font-weight: 900;
+  letter-spacing: .12em;
+}
+
+.playbooks-section-nav button {
+  display: grid;
+  grid-template-columns: 29px 1fr auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 38px;
+  padding: 5px 8px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: transparent;
+  color: #7e7e86;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.playbooks-section-nav button > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: rgba(255,255,255,.04);
+  font-size: 8px;
+  font-weight: 900;
+}
+
+.playbooks-section-nav button strong {
+  font-size: 10px;
+}
+
+.playbooks-section-nav button.active {
+  border-color: rgba(227,23,47,.18);
+  background: linear-gradient(90deg, rgba(227,23,47,.12), rgba(227,23,47,.025));
+  color: #fff;
+}
+
+.playbooks-section-nav button.active > span {
+  background: #d51a31;
+  color: #fff;
+}
+
+.playbooks-content-card {
+  min-height: 390px;
+  padding: 24px;
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 16px;
+  background:
+    radial-gradient(circle at 88% 7%, rgba(227,23,47,.08), transparent 30%),
+    #0d0d0f;
+}
+
+.playbooks-content-head {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.playbooks-content-number {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid rgba(227,23,47,.24);
+  border-radius: 13px;
+  background: rgba(227,23,47,.08);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.playbooks-content-head h3 {
+  margin: 3px 0 0;
+  color: #fff;
+  font-size: 20px;
+}
+
+.playbooks-known-content {
+  margin-top: 22px;
+  padding: 20px;
+  border-left: 2px solid #df2239;
+  background: rgba(227,23,47,.035);
+}
+
+.playbooks-known-content p {
+  margin: 0;
+  color: #d1d1d5;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.playbooks-placeholder {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  margin-top: 22px;
+  padding: 22px;
+  border: 1px dashed rgba(255,255,255,.12);
+  border-radius: 13px;
+  color: #ef3347;
+  background: rgba(255,255,255,.015);
+}
+
+.playbooks-placeholder strong {
+  display: block;
+  color: #d7d7db;
+  font-size: 12px;
+}
+
+.playbooks-placeholder p {
+  max-width: 680px;
+  margin: 6px 0 0;
+  color: #77777f;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.playbooks-content-footer {
+  display: flex;
+  gap: 12px;
+  margin-top: 26px;
+}
+
+.playbooks-content-footer > div {
+  min-width: 150px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,.055);
+  border-radius: 10px;
+  background: rgba(255,255,255,.02);
+}
+
+.playbooks-content-footer span {
+  display: block;
+  color: #64646c;
+  font-size: 8px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.playbooks-content-footer strong {
+  display: block;
+  margin-top: 4px;
+  color: #c7c7cd;
+  font-size: 10px;
+}
+
+.playbooks-outcome-panel {
+  display: flex;
+  gap: 17px;
+  align-items: center;
+  padding: 24px 28px;
+  border-radius: 18px;
+  background:
+    linear-gradient(90deg, rgba(227,23,47,.10), transparent 40%),
+    #0c0c0e;
+}
+
+.playbooks-outcome-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 52px;
+  height: 52px;
+  border: 1px solid rgba(227,23,47,.25);
+  border-radius: 15px;
+  background: rgba(227,23,47,.09);
+  color: #ef3347;
+}
+
+.playbooks-outcome-panel p {
+  max-width: 900px;
+  margin: 7px 0 0;
+  color: #85858d;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+@media (max-width: 1180px) {
+  .playbooks-journey {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+
+  .playbooks-journey-line {
+    display: none;
+  }
+
+  .playbooks-consulta-grid {
+    grid-template-columns: repeat(4, minmax(0,1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  .playbooks-hero,
+  .playbooks-section-heading,
+  .playbooks-workspace-head,
+  .playbooks-consulta-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .playbooks-route-selector {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .playbooks-claims-rail {
+    grid-template-columns: auto 1fr auto;
+  }
+
+  .playbooks-claims-moments {
+    display: none;
+  }
+
+  .playbooks-consulta-heading p {
+    text-align: left;
+  }
+
+  .playbooks-route-differences,
+  .playbooks-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .playbooks-section-nav {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+
+  .playbooks-section-nav-title {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .playbooks-hero,
+  .playbooks-journey-panel,
+  .playbooks-consulta-panel,
+  .playbooks-workspace {
+    padding: 19px;
+    border-radius: 16px;
+  }
+
+  .playbooks-journey,
+  .playbooks-consulta-grid,
+  .playbooks-section-nav {
+    grid-template-columns: 1fr;
+  }
+
+  .playbooks-stage {
+    min-height: 0;
+  }
+
+  .playbooks-content-footer {
+    flex-direction: column;
+  }
+
+  .playbooks-content-footer > div {
+    min-width: 0;
+  }
+}
