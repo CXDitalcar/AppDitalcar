@@ -1143,23 +1143,20 @@ export default function NuevaSolicitud({
             selectedProcess
               .resolutionSLAHours,
 
-          confirmacionHorasSnapshot:
-            selectedProcess
-              .confirmationHours,
+      slaResolucionSnapshot:
+  selectedProcess
+    .resolutionSLAHours,
 
-          slaInicioAprobacion:
-            routing
-              .approvalSLAStartedAt,
 
-          slaPausaMinutos:
-            0,
+slaInicioAprobacion:
+  routing
+    .approvalSLAStartedAt,
 
-          confirmacionHorasSnapshot:
-            selectedProcess
-              .confirmationHours,
+slaPausaMinutos:
+  0,
 
-          reabierta:
-            false,
+reabierta:
+  false,
 
           cierreAutomatico:
             false,
