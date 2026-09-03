@@ -19,13 +19,24 @@ export type UserRole =
   | "EQUIPO_COMERCIAL"
   | "GERENCIA_GENERAL"
 
+export type UserScopeLevel =
+  | "LOCAL"
+  | "MULTILOCAL"
+  | "MARCA"
+  | "ZONA"
+  | "RED"
+
 export type UserScope = {
   email: string
   name: string
   role: UserRole
   local?: string
+  localPrincipal?: string
+  assignedLocals?: string[]
+  scope?: UserScopeLevel
   zone?: string
   brands?: string[]
+  areaFunctional?: string
   active: boolean
 }
 
@@ -33,6 +44,7 @@ export type RequestFamily =
   | "UNIDADES"
   | "INSUMOS_SHOWROOM"
   | "COLABORADORES"
+  | "COMERCIAL"
   | "OTROS"
 
 export type RequestStatus =
@@ -60,6 +72,43 @@ export type SLAStatus =
   | "PAUSADO"
   | "FINALIZADO"
 
+export type ProcessFormMode =
+  | "DINAMICO"
+  | "INSUMOS_CLASICO"
+  | "INSUMOS_2_0"
+
+export type LocalReviewRule =
+  | "NUNCA"
+  | "SOLO_VENDEDOR"
+  | "SIEMPRE"
+
+export type ProcessConfig = {
+  code: string
+  name: string
+  family: RequestFamily
+  description: string
+  formMode: ProcessFormMode
+  requesterRoles: UserRole[]
+  localReviewRule: LocalReviewRule
+  localRule?: string
+  allowsAmountAdjustment: boolean
+  allowsAttachments: boolean
+  requiresAttachment: boolean
+  manualRequest: boolean
+  fromBreach: boolean
+  areaLabel?: string
+  approvalRule?: string
+  slaReviewCode?: string
+  slaAcceptanceCode?: string
+  slaResolutionCode?: string
+  slaConfirmationCode?: string
+  confirmationHours: number
+  version: number
+  order: number
+  active: boolean
+  notes?: string
+}
+
 export type ProcessFieldType =
   | "TEXT"
   | "TEXTAREA"
@@ -69,34 +118,70 @@ export type ProcessFieldType =
   | "SELECT"
   | "BOOLEAN"
   | "FILE"
+  | "PHONE"
+  | "EMAIL"
+  | "VIN"
+  | "LOCAL_SELECT"
+  | "CALCULATED_CURRENCY"
+  | "INTERNAL_NUMBER"
+  | "INTERNAL_TEXT"
+  | "CATALOG_ITEM"
 
 export type ProcessFieldDefinition = {
   id: string
   processCode: string
+  key?: string
   label: string
   type: ProcessFieldType
   required: boolean
   adjustable: boolean
   order: number
   placeholder?: string
+  help?: string
   options?: string[]
+  source?: string
+  readOnly?: boolean
+  visibleBeforeSubmit?: boolean
+  visibleAfterSubmit?: boolean
+  visibleManager?: boolean
+  isAmount?: boolean
+  group?: string
+  repeatable?: boolean
+  validation?: string
+  unit?: string
+  formula?: string
+  snapshot?: boolean
+  historical?: boolean
+  allowPostComment?: boolean
   active: boolean
+  notes?: string
 }
 
-export type ProcessAssignmentType = "APPROVER" | "MANAGER" | "VIEWER"
+export type ProcessAssignmentType =
+  | "APPROVER"
+  | "MANAGER"
+  | "VIEWER"
 
 export type ProcessAssignment = {
   id: string
   processCode: string
   type: ProcessAssignmentType
+  mode?: "ROL" | "EMAIL"
   email?: string
   role?: UserRole
   local?: string
   zone?: string
   brand?: string
+  areaFunctional?: string
+  label?: string
+  scope?: string
+  condition?: string
+  priority?: number
+  isPrincipal?: boolean
   active: boolean
 }
 
+// Compatibilidad con módulos anteriores del piloto.
 export type InternalCheckpointDefinition = {
   id: string
   label: string
@@ -186,6 +271,7 @@ export type RequestItem = {
   status: RequestStatus
   currentResponsibleEmail?: string
   currentResponsibleName?: string
+  currentResponsibleLabel?: string
   fields: RequestFieldValue[]
   createdAt: string
 
@@ -208,9 +294,11 @@ export type RequestItem = {
   returnStatusAfterInfo?: RequestStatus
   returnResponsibleEmail?: string
   returnResponsibleName?: string
+  returnResponsibleLabel?: string
 
   managementOwnerEmail?: string
   managementOwnerName?: string
+  managementOwnerLabel?: string
 
   resolutionConfirmationDeadline?: string
   reopened: boolean
