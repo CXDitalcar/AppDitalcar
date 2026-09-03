@@ -16,6 +16,7 @@ import DemoLogin from "./components/DemoLogin"
 
 import Home from "./pages/Home"
 import Academia from "./pages/Academia"
+import PlaybooksVenta from "./pages/PlaybooksVenta"
 import MiLocal from "./pages/MiLocal"
 import Solicitudes from "./pages/Solicitudes"
 import NuevaSolicitud from "./pages/NuevaSolicitud"
@@ -315,6 +316,18 @@ export default function App() {
             path="/academia"
             element={
               <Academia />
+            }
+          />
+
+
+          {/* ==================================================
+              PLAYBOOKS DE VENTA
+          ================================================== */}
+
+          <Route
+            path="/playbooks-venta"
+            element={
+              <PlaybooksVenta />
             }
           />
 
