@@ -1,459 +1,1197 @@
 import {
+  useMemo,
+  useState,
+} from "react"
+
+import {
+  AlertTriangle,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  Filter,
+  Inbox,
+  Search,
+} from "lucide-react"
+
+import {
+  useNavigate,
+} from "react-router-dom"
+
+import "./Aprobaciones.css"
+
+import {
   mockProcessAssignments,
-  mockProcesses,
-  mockUsers,
 } from "../data/mockData"
 
+import {
+  getDemoRequests,
+} from "../services/demoStore"
+
+import {
+  canApproveRequest,
+  canManageRequest,
+  canViewRequest,
+} from "../services/permissions"
+
+import {
+  responsibleLabel,
+  visibleStatusLabel,
+} from "../services/requestPresentation"
+
 import type {
-  ProcessAssignment,
   RequestItem,
   UserScope,
 } from "../types"
 
 
-const LOCAL_APPROVAL_HOURS =
-  24
+type ManagementView =
+  | "NUEVAS"
+  | "POR_APROBAR"
+  | "EN_GESTION"
+  | "FALTA_INFO"
+  | "POR_CONFIRMAR"
+  | "SLA"
+  | "TODAS"
 
 
-const MANAGER_ACCEPTANCE_HOURS =
-  24
+function Aprobaciones({
+  currentUser,
+}: {
+  currentUser: UserScope
+}) {
+  const navigate =
+    useNavigate()
 
-
-// ======================================================
-// PERSONA ASIGNADA
-// ======================================================
-
-function assignmentPerson(
-  assignment?:
-    ProcessAssignment
-) {
-  if (!assignment) {
-    return {
-      email:
-        undefined,
-
-      name:
-        "Por asignar",
-    }
-  }
-
-
-  if (
-    assignment.email
-  ) {
-    const user =
-      mockUsers.find(
-        (item) =>
-          item.email.toLowerCase() ===
-          assignment.email?.toLowerCase()
-      )
-
-
-    return {
-      email:
-        assignment.email,
-
-      name:
-        user?.name ??
-        assignment.email,
-    }
-  }
-
-
-  if (
-    assignment.role
-  ) {
-    const user =
-      mockUsers.find(
-        (item) =>
-          item.role ===
-          assignment.role
-      )
-
-
-    return {
-      email:
-        user?.email,
-
-      name:
-        user?.name ??
-        "Responsable del proceso",
-    }
-  }
-
-
-  return {
-    email:
-      undefined,
-
-    name:
-      "Por asignar",
-  }
-}
-
-
-// ======================================================
-// APROBADOR DEL PROCESO
-// ======================================================
-
-export function getProcessApprover(
-  processCode: string
-) {
-  return mockProcessAssignments.find(
-    (assignment) =>
-      assignment.active &&
-      assignment.processCode ===
-        processCode &&
-      assignment.type ===
-        "APPROVER"
-  )
-}
-
-
-// ======================================================
-// GESTOR DEL PROCESO
-// ======================================================
-
-export function getProcessManager(
-  processCode: string
-) {
-  return mockProcessAssignments.find(
-    (assignment) =>
-      assignment.active &&
-      assignment.processCode ===
-        processCode &&
-      assignment.type ===
-        "MANAGER"
-  )
-}
-
-
-// ======================================================
-// RUTA INICIAL
-// ======================================================
-
-export function initialRequestRouting(
-  user: UserScope,
-  processCode: string,
-  local: string
-) {
-  const process =
-    mockProcesses.find(
-      (item) =>
-        item.code ===
-        processCode
+  const [
+    view,
+    setView,
+  ] =
+    useState<ManagementView>(
+      "NUEVAS"
     )
 
+  const [
+    search,
+    setSearch,
+  ] =
+    useState("")
 
-  // ----------------------------------------------------
-  // SI NO CREA JEFATURA LOCAL:
-  // PRIMERO REVISIÓN LOCAL
-  // ----------------------------------------------------
-
-  if (
-    user.role !==
-      "JEFATURA_LOCAL" &&
-    local
-  ) {
-    const localHead =
-      mockUsers.find(
-        (item) =>
-          item.role ===
-            "JEFATURA_LOCAL" &&
-          item.local ===
-            local
-      )
-
-
-    return {
-      status:
-        "PENDIENTE_APROBACION" as const,
-
-      approvalContext:
-        "JEFATURA_LOCAL" as const,
-
-      approvalSLAHours:
-        LOCAL_APPROVAL_HOURS,
-
-      approvalSLAStartedAt:
-        new Date().toISOString(),
-
-      currentResponsibleEmail:
-        localHead?.email,
-
-      currentResponsibleName:
-        localHead?.name ??
-        "Jefatura Local",
-    }
-  }
-
-
-  // ----------------------------------------------------
-  // APROBACIÓN ESPECÍFICA DEL PROCESO
-  // ----------------------------------------------------
-
-  const approver =
-    getProcessApprover(
-      processCode
+  const [
+    localFilter,
+    setLocalFilter,
+  ] =
+    useState(
+      "TODOS"
     )
 
-
-  if (
-    approver ||
-    process?.requiresApproval
-  ) {
-    const person =
-      assignmentPerson(
-        approver
-      )
-
-
-    return {
-      status:
-        "PENDIENTE_APROBACION" as const,
-
-      approvalContext:
-        "PROCESO" as const,
-
-      approvalSLAHours:
-        process?.approvalSLAHours,
-
-      approvalSLAStartedAt:
-        new Date().toISOString(),
-
-      currentResponsibleEmail:
-        person.email,
-
-      currentResponsibleName:
-        person.name,
-    }
-  }
-
-
-  // ----------------------------------------------------
-  // INGRESA DIRECTAMENTE AL ÁREA
-  // ----------------------------------------------------
-
-  const manager =
-    assignmentPerson(
-      getProcessManager(
-        processCode
-      )
+  const [
+    processFilter,
+    setProcessFilter,
+  ] =
+    useState(
+      "TODOS"
     )
 
-
-  return {
-    status:
-      "RECIBIDA" as const,
-
-    acceptanceSLAHours:
-      MANAGER_ACCEPTANCE_HOURS,
-
-    acceptanceSLAStartedAt:
-      new Date().toISOString(),
-
-    currentResponsibleEmail:
-      manager.email,
-
-    currentResponsibleName:
-      manager.name,
-  }
-}
+  const requests =
+    getDemoRequests()
 
 
-// ======================================================
-// DESPUÉS DE APROBAR
-// ======================================================
+  // ======================================================
+  // SOLICITUDES ACCESIBLES
+  // ======================================================
 
-export function routeAfterApproval(
-  request: RequestItem
-) {
-  // ----------------------------------------------------
-  // APROBACIÓN DE PRESUPUESTO
-  // VUELVE AL GESTOR ORIGINAL
-  // ----------------------------------------------------
+  const accessible =
+    useMemo(
+      () =>
+        requests.filter(
+          (request) => {
+            if (
+              !canViewRequest(
+                currentUser,
+                request,
+                mockProcessAssignments
+              )
+            ) {
+              return false
+            }
 
-  if (
-    request.approvalContext ===
-    "PRESUPUESTO_COMERCIAL"
-  ) {
-    const pausedMinutes =
-      request.resolutionSLAPausedAt
-        ? Math.max(
-            0,
-            Math.round(
+            return (
+              canApproveRequest(
+                currentUser,
+                request,
+                mockProcessAssignments
+              ) ||
+              canManageRequest(
+                currentUser,
+                request,
+                mockProcessAssignments
+              ) ||
               (
-                Date.now() -
-                new Date(
-                  request.resolutionSLAPausedAt
-                ).getTime()
-              ) /
-                60000
+                request.status ===
+                  "RESUELTA_POR_CONFIRMAR" &&
+                (
+                  request.requesterEmail ===
+                    currentUser.email ||
+                  (
+                    currentUser.role ===
+                      "JEFATURA_LOCAL" &&
+                    currentUser.local ===
+                      request.local
+                  )
+                )
+              )
+            )
+          }
+        ),
+      [
+        currentUser,
+        requests,
+      ]
+    )
+
+
+  // ======================================================
+  // KPI
+  // ======================================================
+
+  const metrics =
+    useMemo(
+      () => ({
+        nuevas:
+          accessible.filter(
+            (request) =>
+              request.status ===
+              "RECIBIDA"
+          ).length,
+
+        aprobar:
+          accessible.filter(
+            (request) =>
+              request.status ===
+              "PENDIENTE_APROBACION"
+          ).length,
+
+        gestion:
+          accessible.filter(
+            (request) =>
+              request.status ===
+              "EN_GESTION"
+          ).length,
+
+        info:
+          accessible.filter(
+            (request) =>
+              request.status ===
+              "INFORMACION_REQUERIDA"
+          ).length,
+
+        confirmar:
+          accessible.filter(
+            (request) =>
+              request.status ===
+              "RESUELTA_POR_CONFIRMAR"
+          ).length,
+
+        sla:
+          accessible.filter(
+            (request) =>
+              [
+                "warning",
+                "danger",
+              ].includes(
+                getSLA(
+                  request
+                ).tone
+              )
+          ).length,
+      }),
+      [
+        accessible,
+      ]
+    )
+
+
+  const locals =
+    useMemo(
+      () =>
+        Array.from(
+          new Set(
+            accessible.map(
+              (request) =>
+                request.local
             )
           )
-        : 0
+        ).sort(),
+      [
+        accessible,
+      ]
+    )
 
 
+  const processes =
+    useMemo(
+      () =>
+        Array.from(
+          new Set(
+            accessible.map(
+              (request) =>
+                request.processName
+            )
+          )
+        ).sort(),
+      [
+        accessible,
+      ]
+    )
+
+
+  // ======================================================
+  // FILTRADO
+  // ======================================================
+
+  const filtered =
+    useMemo(
+      () => {
+        const query =
+          search
+            .trim()
+            .toLowerCase()
+
+        return accessible
+          .filter(
+            (request) => {
+              if (
+                view ===
+                  "NUEVAS" &&
+                request.status !==
+                  "RECIBIDA"
+              ) {
+                return false
+              }
+
+              if (
+                view ===
+                  "POR_APROBAR" &&
+                request.status !==
+                  "PENDIENTE_APROBACION"
+              ) {
+                return false
+              }
+
+              if (
+                view ===
+                  "EN_GESTION" &&
+                request.status !==
+                  "EN_GESTION"
+              ) {
+                return false
+              }
+
+              if (
+                view ===
+                  "FALTA_INFO" &&
+                request.status !==
+                  "INFORMACION_REQUERIDA"
+              ) {
+                return false
+              }
+
+              if (
+                view ===
+                  "POR_CONFIRMAR" &&
+                request.status !==
+                  "RESUELTA_POR_CONFIRMAR"
+              ) {
+                return false
+              }
+
+              if (
+                view ===
+                  "SLA" &&
+                ![
+                  "warning",
+                  "danger",
+                ].includes(
+                  getSLA(
+                    request
+                  ).tone
+                )
+              ) {
+                return false
+              }
+
+              if (
+                localFilter !==
+                  "TODOS" &&
+                request.local !==
+                  localFilter
+              ) {
+                return false
+              }
+
+              if (
+                processFilter !==
+                  "TODOS" &&
+                request.processName !==
+                  processFilter
+              ) {
+                return false
+              }
+
+              if (
+                query &&
+                !`${request.id} ${request.processName} ${request.local} ${request.requesterName}`
+                  .toLowerCase()
+                  .includes(
+                    query
+                  )
+              ) {
+                return false
+              }
+
+              return true
+            }
+          )
+          .sort(
+            (
+              a,
+              b
+            ) =>
+              getSLA(
+                a
+              ).priority -
+                getSLA(
+                  b
+                ).priority ||
+              new Date(
+                a.createdAt
+              ).getTime() -
+                new Date(
+                  b.createdAt
+                ).getTime()
+          )
+      },
+      [
+        accessible,
+        view,
+        search,
+        localFilter,
+        processFilter,
+      ]
+    )
+
+
+  return (
+    <div className="approvals-page">
+
+      <div className="page-head inline">
+
+        <div>
+
+          <div className="eyebrow">
+            SOLICITUDES
+          </div>
+
+          <h1>
+            Bandeja de gestión
+          </h1>
+
+          <p>
+            Nuevas, aprobaciones,
+            gestiones, información
+            pendiente y SLA en una
+            sola vista.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div className="approval-metrics">
+
+        <Metric
+          label="Nuevas"
+          value={
+            metrics.nuevas
+          }
+          icon={
+            Inbox
+          }
+          active={
+            view ===
+            "NUEVAS"
+          }
+          onClick={() =>
+            setView(
+              "NUEVAS"
+            )
+          }
+        />
+
+        <Metric
+          label="Por aprobar"
+          value={
+            metrics.aprobar
+          }
+          icon={
+            Clock3
+          }
+          active={
+            view ===
+            "POR_APROBAR"
+          }
+          onClick={() =>
+            setView(
+              "POR_APROBAR"
+            )
+          }
+        />
+
+        <Metric
+          label="En gestión"
+          value={
+            metrics.gestion
+          }
+          icon={
+            Clock3
+          }
+          active={
+            view ===
+            "EN_GESTION"
+          }
+          onClick={() =>
+            setView(
+              "EN_GESTION"
+            )
+          }
+        />
+
+        <Metric
+          label="Falta información"
+          value={
+            metrics.info
+          }
+          icon={
+            AlertTriangle
+          }
+          active={
+            view ===
+            "FALTA_INFO"
+          }
+          onClick={() =>
+            setView(
+              "FALTA_INFO"
+            )
+          }
+        />
+
+        <Metric
+          label="Por confirmar"
+          value={
+            metrics.confirmar
+          }
+          icon={
+            CheckCircle2
+          }
+          active={
+            view ===
+            "POR_CONFIRMAR"
+          }
+          onClick={() =>
+            setView(
+              "POR_CONFIRMAR"
+            )
+          }
+        />
+
+        <Metric
+          label="Por vencer / vencidas"
+          value={
+            metrics.sla
+          }
+          icon={
+            AlertTriangle
+          }
+          tone="danger"
+          active={
+            view ===
+            "SLA"
+          }
+          onClick={() =>
+            setView(
+              "SLA"
+            )
+          }
+        />
+
+      </div>
+
+
+      <div className="approval-tabs">
+
+        {(
+          [
+            "NUEVAS",
+            "POR_APROBAR",
+            "EN_GESTION",
+            "FALTA_INFO",
+            "POR_CONFIRMAR",
+            "SLA",
+            "TODAS",
+          ] as ManagementView[]
+        ).map(
+          (item) => (
+            <button
+              key={
+                item
+              }
+              className={
+                view === item
+                  ? "approval-tab active"
+                  : "approval-tab"
+              }
+              onClick={() =>
+                setView(
+                  item
+                )
+              }
+            >
+              {tabLabel(
+                item
+              )}
+            </button>
+          )
+        )}
+
+      </div>
+
+
+      <div className="approval-toolbar">
+
+        <div className="approval-search">
+
+          <Search
+            size={17}
+          />
+
+          <input
+            value={
+              search
+            }
+            onChange={(
+              event
+            ) =>
+              setSearch(
+                event.target.value
+              )
+            }
+            placeholder="Buscar solicitud, local o solicitante..."
+          />
+
+        </div>
+
+
+        <div className="approval-filter-icon">
+          <Filter
+            size={16}
+          />
+        </div>
+
+
+        <select
+          value={
+            localFilter
+          }
+          onChange={(
+            event
+          ) =>
+            setLocalFilter(
+              event.target.value
+            )
+          }
+        >
+          <option value="TODOS">
+            Todos los locales
+          </option>
+
+          {locals.map(
+            (local) => (
+              <option
+                key={
+                  local
+                }
+                value={
+                  local
+                }
+              >
+                {local}
+              </option>
+            )
+          )}
+        </select>
+
+
+        <select
+          value={
+            processFilter
+          }
+          onChange={(
+            event
+          ) =>
+            setProcessFilter(
+              event.target.value
+            )
+          }
+        >
+          <option value="TODOS">
+            Todos los procesos
+          </option>
+
+          {processes.map(
+            (process) => (
+              <option
+                key={
+                  process
+                }
+                value={
+                  process
+                }
+              >
+                {process}
+              </option>
+            )
+          )}
+        </select>
+
+      </div>
+
+
+      <div className="approval-table-wrap">
+
+        <table className="approval-table">
+
+          <thead>
+
+            <tr>
+
+              <th>
+                Solicitud
+              </th>
+
+              <th>
+                Local
+              </th>
+
+              <th>
+                Solicitante
+              </th>
+
+              <th>
+                Ingresada
+              </th>
+
+              <th>
+                Responsable
+              </th>
+
+              <th>
+                SLA
+              </th>
+
+              <th>
+                Estado
+              </th>
+
+              <th />
+
+            </tr>
+
+          </thead>
+
+
+          <tbody>
+
+            {filtered.map(
+              (
+                request
+              ) => (
+                <tr
+                  key={
+                    request.id
+                  }
+                  role="button"
+                  tabIndex={0}
+                  onClick={() =>
+                    navigate(
+                      `/solicitudes/${request.id}`
+                    )
+                  }
+                  onKeyDown={(
+                    event
+                  ) => {
+                    if (
+                      event.key ===
+                      "Enter"
+                    ) {
+                      navigate(
+                        `/solicitudes/${request.id}`
+                      )
+                    }
+                  }}
+                >
+
+                  <td>
+
+                    <div className="approval-request-main">
+
+                      <strong>
+                        {
+                          request.processName
+                        }
+                      </strong>
+
+                      <span>
+                        {
+                          request.id
+                        }
+                      </span>
+
+                    </div>
+
+                  </td>
+
+
+                  <td>
+                    {
+                      request.local
+                    }
+                  </td>
+
+
+                  <td>
+                    {
+                      request.requesterName
+                    }
+                  </td>
+
+
+                  <td>
+                    {new Date(
+                      request.createdAt
+                    ).toLocaleDateString(
+                      "es-CL"
+                    )}
+                  </td>
+
+
+                  <td>
+                    {responsibleLabel(
+                      currentUser,
+                      request
+                    )}
+                  </td>
+
+
+                  <td>
+
+                    <span
+                      className={`sla-badge sla-${
+                        getSLA(
+                          request
+                        ).tone
+                      }`}
+                    >
+                      {
+                        getSLA(
+                          request
+                        ).label
+                      }
+                    </span>
+
+                  </td>
+
+
+                  <td>
+
+                    <span className="status neutral">
+                      {visibleStatusLabel(
+                        request
+                      )}
+                    </span>
+
+                  </td>
+
+
+                  <td className="approval-row-arrow">
+
+                    <ChevronRight
+                      size={17}
+                    />
+
+                  </td>
+
+                </tr>
+              )
+            )}
+
+          </tbody>
+
+        </table>
+
+
+        {!filtered.length && (
+          <div className="approval-empty">
+
+            <CheckCircle2
+              size={28}
+            />
+
+            <strong>
+              Sin pendientes en esta vista
+            </strong>
+
+            <span>
+              Cambia de pestaña o filtros
+              para revisar otras gestiones.
+            </span>
+
+          </div>
+        )}
+
+      </div>
+
+    </div>
+  )
+}
+
+
+// ======================================================
+// MÉTRICA
+// ======================================================
+
+function Metric({
+  label,
+  value,
+  icon: Icon,
+  active,
+  onClick,
+  tone,
+}: {
+  label: string
+  value: number
+  icon: typeof Inbox
+  active?: boolean
+  onClick: () => void
+  tone?: "danger"
+}) {
+  return (
+    <button
+      className={`approval-metric ${
+        active
+          ? "active"
+          : ""
+      } ${
+        tone
+          ? `metric-${tone}`
+          : ""
+      }`}
+      onClick={
+        onClick
+      }
+    >
+
+      <Icon
+        size={18}
+      />
+
+      <div>
+
+        <strong>
+          {value}
+        </strong>
+
+        <span>
+          {label}
+        </span>
+
+      </div>
+
+    </button>
+  )
+}
+
+
+// ======================================================
+// ETIQUETA DE PESTAÑA
+// ======================================================
+
+function tabLabel(
+  value: ManagementView
+) {
+  const labels:
+    Record<
+      ManagementView,
+      string
+    > = {
+      NUEVAS:
+        "Nuevas",
+
+      POR_APROBAR:
+        "Por aprobar",
+
+      EN_GESTION:
+        "En gestión",
+
+      FALTA_INFO:
+        "Falta información",
+
+      POR_CONFIRMAR:
+        "Por confirmar",
+
+      SLA:
+        "SLA",
+
+      TODAS:
+        "Todas",
+    }
+
+  return labels[
+    value
+  ]
+}
+
+
+// ======================================================
+// SLA
+// ======================================================
+
+function getSLA(
+  request: RequestItem
+): {
+  label: string
+
+  tone:
+    | "ok"
+    | "warning"
+    | "danger"
+    | "paused"
+    | "neutral"
+
+  priority: number
+} {
+  if (
+    request.slaPausedReason
+  ) {
     return {
-      status:
-        "EN_GESTION" as const,
+      label:
+        "En pausa",
 
-      approvalContext:
-        undefined,
+      tone:
+        "paused",
 
-      currentResponsibleEmail:
-        request.managementOwnerEmail,
-
-      currentResponsibleName:
-        request.managementOwnerName ??
-        "Responsable de gestión",
-
-      resolutionSLAPausedAt:
-        undefined,
-
-      resolutionSLAPausedMinutes:
-        (
-          request.resolutionSLAPausedMinutes ??
-          0
-        ) +
-        pausedMinutes,
-
-      slaPausedReason:
-        undefined,
+      priority:
+        2,
     }
   }
 
-
-  // ----------------------------------------------------
-  // DESPUÉS DE REVISIÓN LOCAL
-  // ----------------------------------------------------
 
   if (
-    request.approvalContext ===
-    "JEFATURA_LOCAL"
+    request.status ===
+      "RESUELTA" ||
+    request.status ===
+      "RECHAZADA"
   ) {
-    const processApprover =
-      getProcessApprover(
-        request.processCode
-      )
+    return {
+      label:
+        "Finalizado",
 
+      tone:
+        "neutral",
 
-    if (
-      processApprover
-    ) {
-      const person =
-        assignmentPerson(
-          processApprover
-        )
-
-
-      const process =
-        mockProcesses.find(
-          (item) =>
-            item.code ===
-            request.processCode
-        )
-
-
-      return {
-        status:
-          "PENDIENTE_APROBACION" as const,
-
-        approvalContext:
-          "PROCESO" as const,
-
-        approvalSLAHours:
-          process?.approvalSLAHours,
-
-        approvalSLAStartedAt:
-          new Date().toISOString(),
-
-        currentResponsibleEmail:
-          person.email,
-
-        currentResponsibleName:
-          person.name,
-      }
+      priority:
+        5,
     }
   }
 
 
-  // ----------------------------------------------------
-  // PASA AL ÁREA RESPONSABLE
-  // ----------------------------------------------------
+  let hours:
+    number |
+    undefined
 
-  const manager =
-    assignmentPerson(
-      getProcessManager(
-        request.processCode
-      )
+  let started:
+    string |
+    undefined
+
+
+  if (
+    request.status ===
+    "RECIBIDA"
+  ) {
+    hours =
+      request.acceptanceSLAHours
+
+    started =
+      request.acceptanceSLAStartedAt
+  }
+
+
+  if (
+    request.status ===
+    "PENDIENTE_APROBACION"
+  ) {
+    hours =
+      request.approvalSLAHours
+
+    started =
+      request.approvalSLAStartedAt
+  }
+
+
+  if (
+    request.status ===
+    "EN_GESTION"
+  ) {
+    hours =
+      request.resolutionSLAHours
+
+    started =
+      request.resolutionSLAStartedAt
+  }
+
+
+  if (
+    !hours ||
+    !started
+  ) {
+    return {
+      label:
+        "A tiempo",
+
+      tone:
+        "ok",
+
+      priority:
+        3,
+    }
+  }
+
+
+  const startDate =
+    new Date(
+      started
     )
 
 
+  const due =
+    hours === 24
+      ? addBusinessDays(
+          startDate,
+          1
+        )
+      : new Date(
+          startDate.getTime() +
+            hours *
+              3600000
+        )
+
+
+  const remaining =
+    (
+      due.getTime() -
+      Date.now()
+    ) /
+    3600000
+
+
+  if (
+    remaining <= 0
+  ) {
+    return {
+      label:
+        "Vencida",
+
+      tone:
+        "danger",
+
+      priority:
+        0,
+    }
+  }
+
+
+  if (
+    remaining <= 6
+  ) {
+    return {
+      label:
+        "Por vencer",
+
+      tone:
+        "warning",
+
+      priority:
+        1,
+    }
+  }
+
+
   return {
-    status:
-      "RECIBIDA" as const,
+    label:
+      "A tiempo",
 
-    approvalContext:
-      undefined,
+    tone:
+      "ok",
 
-    acceptanceSLAHours:
-      MANAGER_ACCEPTANCE_HOURS,
-
-    acceptanceSLAStartedAt:
-      new Date().toISOString(),
-
-    currentResponsibleEmail:
-      manager.email,
-
-    currentResponsibleName:
-      manager.name,
+    priority:
+      3,
   }
 }
 
 
 // ======================================================
-// SOLICITAR APROBACIÓN ADICIONAL
+// DÍAS HÁBILES
 // ======================================================
 
-export function budgetApprovalRouting(
-  request: RequestItem
+function addBusinessDays(
+  date: Date,
+  days: number
 ) {
-  const approver =
-    mockUsers.find(
-      (item) =>
-        item.role ===
-        "GERENCIA_COMERCIAL"
+  const result =
+    new Date(
+      date
     )
 
+  let added =
+    0
 
-  return {
-    status:
-      "PENDIENTE_APROBACION" as const,
 
-    approvalContext:
-      "PRESUPUESTO_COMERCIAL" as const,
+  while (
+    added < days
+  ) {
+    result.setDate(
+      result.getDate() +
+        1
+    )
 
-    currentResponsibleEmail:
-      approver?.email,
+    const day =
+      result.getDay()
 
-    currentResponsibleName:
-      approver?.name ??
-      "Gerencia Comercial",
-
-    managementOwnerEmail:
-      request.managementOwnerEmail ??
-      request.currentResponsibleEmail,
-
-    managementOwnerName:
-      request.managementOwnerName ??
-      request.currentResponsibleName,
-
-    resolutionSLAPausedAt:
-      request.resolutionSLAPausedAt ??
-      new Date().toISOString(),
-
-    slaPausedReason:
-      "Esperando aprobación",
+    if (
+      day !== 0 &&
+      day !== 6
+    ) {
+      added += 1
+    }
   }
+
+
+  return result
 }
+
+
+// ======================================================
+// EXPORT DEFAULT EXPLÍCITO
+// ======================================================
+
+export default Aprobaciones
