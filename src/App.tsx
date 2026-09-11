@@ -35,13 +35,20 @@ import {
 } from "./services/auth"
 
 import {
-  mockProcessAssignments,
   mockUsers,
 } from "./data/mockData"
 
 import {
+  requestAssignments,
+} from "./data/requestConfig"
+
+import {
   canAccessApprovalInbox,
 } from "./services/permissions"
+
+import {
+  getUserScopeFromList,
+} from "./services/userDirectory"
 
 import type {
   UserScope,
@@ -101,29 +108,70 @@ export default function App() {
       "Usuario Ditalcar"
     )
 
+  const [liveProfile, setLiveProfile] =
+    useState<UserScope | null>(null)
+
 
   // ======================================================
-  // USUARIO MICROSOFT
+  // USUARIO MICROSOFT + PERFIL DESDE 02_USUARIOS
   // ======================================================
 
   useEffect(() => {
     if (
       !signedIn ||
-      demoUser
+      demoUser ||
+      !microsoftAccount
     ) {
       return
     }
 
-    getCurrentUser()
-      .then((user) =>
-        setName(
-          user.displayName
-        )
-      )
-      .catch(() => {})
+    let active = true
+
+    async function loadLiveUser() {
+      const fallbackName =
+        microsoftAccount?.name ||
+        "Usuario Ditalcar"
+
+      try {
+        const user =
+          await getCurrentUser()
+
+        if (!active) return
+
+        const displayName =
+          user.displayName ||
+          fallbackName
+
+        setName(displayName)
+
+        const profile =
+          await getUserScopeFromList(
+            microsoftAccount?.username ?? "",
+            displayName
+          )
+
+        if (
+          active &&
+          profile
+        ) {
+          setLiveProfile(profile)
+          setName(profile.name)
+        }
+      } catch {
+        // Si la ficha todavía no existe en 02_Usuarios,
+        // la app conserva el perfil piloto de respaldo.
+      }
+    }
+
+    loadLiveUser()
+
+    return () => {
+      active = false
+    }
   }, [
     signedIn,
     demoUser,
+    microsoftAccount?.username,
   ])
 
 
@@ -222,7 +270,8 @@ export default function App() {
   // ======================================================
 
   const currentUser: UserScope =
-    demoUser ?? {
+    demoUser ??
+    liveProfile ?? {
       email:
         microsoftAccount?.username ??
         "",
@@ -233,6 +282,15 @@ export default function App() {
 
       local:
         appConfig.pilot.branch,
+
+      localPrincipal:
+        appConfig.pilot.branch,
+
+      assignedLocals: [
+        appConfig.pilot.branch,
+      ],
+
+      scope: "LOCAL",
 
       active: true,
     }
@@ -255,7 +313,7 @@ export default function App() {
   const showApprovals =
     canAccessApprovalInbox(
       currentUser,
-      mockProcessAssignments
+      requestAssignments
     )
 
 
