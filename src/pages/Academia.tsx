@@ -1,43 +1,1781 @@
-import { useState } from "react"
-import { CheckCircle2, ChevronRight, ArrowLeft, ShieldCheck, Sparkles } from "lucide-react"
-import { consultaSteps, type ConsultaStep } from "../data/consulta"
+import {
+  useMemo,
+  useState,
+  type ComponentType,
+} from "react"
+import {
+  ArrowRight,
+  BarChart3,
+  BookOpen,
+  Bookmark,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  Eye,
+  FileText,
+  Filter,
+  FolderOpen,
+  GraduationCap,
+  HeartHandshake,
+  Layers3,
+  Library,
+  LockKeyhole,
+  PlayCircle,
+  RefreshCw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  Users,
+  XCircle,
+} from "lucide-react"
+import { useSearchParams } from "react-router-dom"
+import type { UserScope } from "../types"
+import { academyQuestions, type AcademyQuestion } from "../data/academyQuestions"
+import {
+  academyCourses,
+  academyEvaluations,
+  academyLibraryResources,
+  academyTeamProgress,
+  academyUpdates,
+  consultaDetailed,
+  customerJourney,
+  juniorJourney,
+  juniorPlaybooks,
+  salesPlaybooks,
+  selloExperiencia,
+  type AcademyAudience,
+  type AcademyCourse,
+  type AcademyEvaluation,
+  type AcademyTab,
+  type LibraryResource,
+} from "../data/academiaData"
+import {
+  createQuestionSet,
+  evaluationNeedsReinforcement,
+  getAcademyObservations,
+  getAcademyState,
+  getCompletedModules,
+  getCourseProgress,
+  getEvaluationAttempts,
+  getEvaluationBestScore,
+  getEvaluationLastScore,
+  getEvaluationReinforcementIds,
+  getUnseenUpdates,
+  markAcademyUpdateSeen,
+  markCourseModuleComplete,
+  saveAcademyObservation,
+  saveEvaluationAttempt,
+  toggleAcademyFavorite,
+  type ObservableValue,
+} from "../services/academyStore"
+import "./Academia.css"
 
-export default function Academia() {
-  const [selected, setSelected] = useState<ConsultaStep | null>(null)
-  if (selected) {
-    return (
-      <>
-        <button className="back-btn" onClick={() => setSelected(null)}><ArrowLeft size={17}/> Volver a CONSULTA</button>
-        <section className="detail-hero">
-          <div className="step-code">{selected.code}</div>
-          <div><span className="eyebrow">MODELO CONSULTA</span><h1>{selected.title}</h1><p>{selected.subtitle}</p></div>
-        </section>
-        <div className="detail-grid">
-          <article className="info-card"><Sparkles/><h3>Qué significa</h3><p>{selected.meaning}</p></article>
-          <article className="info-card"><CheckCircle2/><h3>Qué hacer</h3><ul>{selected.actions.map(x => <li key={x}>{x}</li>)}</ul></article>
-          <article className="info-card"><ShieldCheck/><h3>Qué evitar</h3><ul>{selected.avoid.map(x => <li key={x}>{x}</li>)}</ul></article>
-          <article className="info-card"><h3>Ejemplo aplicado</h3><blockquote>{selected.example}</blockquote></article>
+const CONSULTA_CODES = ["C", "O", "N", "S", "U", "L", "T", "A"]
+
+function normalize(value?: string) {
+  return value?.trim().toLowerCase() ?? ""
+}
+
+function getAudience(user: UserScope): AcademyAudience {
+  if (user.role === "EXPERIENCIA_CLIENTES") return "EXPERIENCIA"
+  if (user.role === "GERENCIA_VENTAS") return "GERENCIA_VENTAS"
+  if (
+    user.role === "GERENCIA_MARCA" ||
+    user.role === "JEFATURA_MARCA" ||
+    user.role === "JEFATURA_ZONAL"
+  ) {
+    return "GERENCIA_MARCA"
+  }
+  if (user.role === "JEFATURA_LOCAL") return "JEFATURA"
+  if (user.role === "VENDEDOR") return "VENTAS"
+  if (
+    user.role === "ADMINISTRATIVO" &&
+    ["junior", "operacion", "operación"].some((token) =>
+      normalize(user.areaFunctional).includes(token)
+    )
+  ) {
+    return "JUNIOR"
+  }
+  if (user.role === "ADMINISTRATIVO" && normalize(user.name).includes("junior")) {
+    return "JUNIOR"
+  }
+  return "CASA_MATRIZ"
+}
+
+function audienceLabel(audience: AcademyAudience) {
+  const labels: Record<AcademyAudience, string> = {
+    VENTAS: "Equipo de Ventas",
+    JEFATURA: "Jefatura Local",
+    GERENCIA_MARCA: "Gerencia de Marca",
+    GERENCIA_VENTAS: "Gerencia de Ventas",
+    JUNIOR: "Junior / Operación",
+    EXPERIENCIA: "Experiencia de Clientes",
+    CASA_MATRIZ: "Casa Matriz",
+  }
+  return labels[audience]
+}
+
+function canAdminAcademy(user: UserScope) {
+  return (
+    user.role === "EXPERIENCIA_CLIENTES" ||
+    (user.role === "EQUIPO_COMERCIAL" &&
+      normalize(user.areaFunctional).includes("project"))
+  )
+}
+
+function canObserveAcademy(user: UserScope) {
+  return [
+    "JEFATURA_LOCAL",
+    "GERENCIA_MARCA",
+    "JEFATURA_MARCA",
+    "JEFATURA_ZONAL",
+    "GERENCIA_VENTAS",
+    "EXPERIENCIA_CLIENTES",
+  ].includes(user.role)
+}
+
+function canSeeAcademyTeam(user: UserScope) {
+  return (
+    user.role === "JEFATURA_LOCAL" ||
+    user.role === "GERENCIA_MARCA" ||
+    user.role === "JEFATURA_MARCA" ||
+    user.role === "JEFATURA_ZONAL" ||
+    user.role.startsWith("GERENCIA_") ||
+    user.role === "EXPERIENCIA_CLIENTES"
+  )
+}
+
+function canSeeAcademyNetwork(user: UserScope) {
+  return (
+    user.role === "EXPERIENCIA_CLIENTES" ||
+    user.role.startsWith("GERENCIA_") ||
+    user.role === "GERENCIA_MARCA" ||
+    user.role === "JEFATURA_MARCA" ||
+    user.role === "JEFATURA_ZONAL"
+  )
+}
+
+function isContentVisible(status: string, admin: boolean) {
+  return status !== "ARCHIVADO" && (admin || status !== "BORRADOR")
+}
+
+export default function Academia({ currentUser }: { currentUser: UserScope }) {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedTab = searchParams.get("tab")?.toUpperCase() as AcademyTab | undefined
+  const initialTab: AcademyTab = [
+    "MODELO",
+    "PLAYBOOKS",
+    "CURSOS",
+    "EVALUACIONES",
+    "BIBLIOTECA",
+  ].includes(requestedTab ?? "")
+    ? (requestedTab as AcademyTab)
+    : "MODELO"
+
+  const [tab, setTab] = useState<AcademyTab>(initialTab)
+  const [vehicleRoute, setVehicleRoute] = useState<"NUEVOS" | "USADOS">("NUEVOS")
+  const [selectedConsulta, setSelectedConsulta] = useState("C")
+  const [selectedSello, setSelectedSello] = useState(selloExperiencia[0]?.title ?? "")
+  const [selectedPlaybook, setSelectedPlaybook] = useState(salesPlaybooks[0]?.id ?? "")
+  const [selectedJuniorPlaybook, setSelectedJuniorPlaybook] = useState(
+    juniorPlaybooks[0]?.id ?? ""
+  )
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  const [courseSearch, setCourseSearch] = useState("")
+  const [brandFilter, setBrandFilter] = useState("Todas")
+  const [localFilter, setLocalFilter] = useState("Todos")
+  const [librarySearch, setLibrarySearch] = useState("")
+  const [libraryCategory, setLibraryCategory] = useState("TODAS")
+  const [libraryBrand, setLibraryBrand] = useState("Todas")
+  const [libraryRoute, setLibraryRoute] = useState("TODOS")
+  const [storeVersion, setStoreVersion] = useState(0)
+
+  const [quizEvaluation, setQuizEvaluation] = useState<AcademyEvaluation | null>(null)
+  const [quizQuestions, setQuizQuestions] = useState<AcademyQuestion[]>([])
+  const [quizAnswers, setQuizAnswers] = useState<Record<string, number>>({})
+  const [quizResultId, setQuizResultId] = useState<string | null>(null)
+
+  const [observationOpen, setObservationOpen] = useState(false)
+  const [observationTarget, setObservationTarget] = useState("")
+  const [observationLocal, setObservationLocal] = useState(
+    currentUser.local ?? currentUser.localPrincipal ?? ""
+  )
+  const [observationBrand, setObservationBrand] = useState(
+    currentUser.brands?.[0] ?? ""
+  )
+  const [observationComment, setObservationComment] = useState("")
+  const [observationValues, setObservationValues] = useState<
+    Record<string, ObservableValue>
+  >({})
+  const [lastObservationScore, setLastObservationScore] = useState<number | null>(null)
+
+  const audience = getAudience(currentUser)
+  const admin = canAdminAcademy(currentUser)
+  const canObserve = canObserveAcademy(currentUser)
+  const canSeeTeam = canSeeAcademyTeam(currentUser)
+  const canSeeNetwork = canSeeAcademyNetwork(currentUser)
+  const salesModelAudience = [
+    "VENTAS",
+    "JEFATURA",
+    "GERENCIA_MARCA",
+    "GERENCIA_VENTAS",
+    "EXPERIENCIA",
+  ].includes(audience)
+  const salesPlaybookAudience = audience !== "JUNIOR"
+
+  const state = useMemo(() => getAcademyState(), [storeVersion])
+  const unseenUpdates = useMemo(
+    () =>
+      getUnseenUpdates(
+        academyUpdates.filter((item) => item.audiences.includes(audience))
+      ),
+    [audience, storeVersion]
+  )
+
+  const visibleCourses = useMemo(() => {
+    const query = courseSearch.trim().toLowerCase()
+    return academyCourses.filter(
+      (course) =>
+        course.audience.includes(audience) &&
+        isContentVisible(course.status, admin) &&
+        (!query ||
+          `${course.title} ${course.description} ${course.modules
+            .map((item) => item.title)
+            .join(" ")}`
+            .toLowerCase()
+            .includes(query))
+    )
+  }, [audience, admin, courseSearch, storeVersion])
+
+  const assignedCourses = visibleCourses.filter((course) =>
+    course.assignedTo.includes(audience)
+  )
+  const continuingCourses = assignedCourses.filter((course) => {
+    const progress = getCourseProgress(course)
+    return progress > 0 && progress < 100
+  })
+  const zeroAssignedCourses = assignedCourses.filter(
+    (course) => getCourseProgress(course) === 0
+  )
+
+  const visibleEvaluations = academyEvaluations.filter((evaluation) =>
+    evaluation.audience.includes(audience)
+  )
+  const pendingEvaluations = visibleEvaluations.filter((evaluation) => {
+    if (!evaluation.assignedTo.includes(audience)) return false
+    const attempts = getEvaluationAttempts(evaluation.id)
+    return !attempts.some((attempt) => attempt.passed) && attempts.length < evaluation.attempts
+  })
+
+  const recommendedCourse = visibleCourses.find(
+    (course) => !course.assignedTo.includes(audience) && getCourseProgress(course) === 0
+  )
+
+  const currentConsulta =
+    consultaDetailed.find((item) => item.code === selectedConsulta) ?? consultaDetailed[0]
+  const currentSello =
+    selloExperiencia.find((item) => item.title === selectedSello) ?? selloExperiencia[0]
+  const currentPlaybook =
+    salesPlaybooks.find((item) => item.id === selectedPlaybook) ?? salesPlaybooks[0]
+  const currentJuniorPlaybook =
+    juniorPlaybooks.find((item) => item.id === selectedJuniorPlaybook) ??
+    juniorPlaybooks[0]
+
+  const visibleLibrary = useMemo(() => {
+    const query = librarySearch.trim().toLowerCase()
+    return academyLibraryResources.filter((resource) => {
+      if (!resource.audiences.includes(audience) && !admin) return false
+      if (!isContentVisible(resource.status, admin)) return false
+      if (libraryCategory !== "TODAS" && resource.category !== libraryCategory) {
+        return false
+      }
+      if (libraryBrand !== "Todas" && resource.brand !== libraryBrand) return false
+      if (
+        libraryRoute !== "TODOS" &&
+        resource.route !== "AMBOS" &&
+        resource.route !== libraryRoute
+      ) {
+        return false
+      }
+      if (!query) return true
+      return `${resource.title} ${resource.description} ${resource.brand ?? ""} ${
+        resource.model ?? ""
+      } ${resource.documentType} ${resource.tags.join(" ")}`
+        .toLowerCase()
+        .includes(query)
+    })
+  }, [audience, admin, librarySearch, libraryCategory, libraryBrand, libraryRoute])
+
+  const libraryBrands = Array.from(
+    new Set(
+      academyLibraryResources
+        .map((resource) => resource.brand)
+        .filter((value): value is string => Boolean(value))
+    )
+  ).sort()
+
+  const teamRows = useMemo(() => {
+    const allowedLocals = new Set(
+      [
+        currentUser.local,
+        currentUser.localPrincipal,
+        ...(currentUser.assignedLocals ?? []),
+      ]
+        .filter((value): value is string => Boolean(value))
+        .map(normalize)
+    )
+    const allowedBrands = new Set((currentUser.brands ?? []).map(normalize))
+
+    return academyTeamProgress.filter((row) => {
+      if (currentUser.role === "JEFATURA_LOCAL" && allowedLocals.size) {
+        if (!allowedLocals.has(normalize(row.local))) return false
+      }
+      if (audience === "GERENCIA_MARCA") {
+        const localMatch = !allowedLocals.size || allowedLocals.has(normalize(row.local))
+        const brandMatch = !allowedBrands.size || allowedBrands.has(normalize(row.brand))
+        if (!localMatch && !brandMatch) return false
+      }
+      if (brandFilter !== "Todas" && row.brand !== brandFilter) return false
+      if (localFilter !== "Todos" && row.local !== localFilter) return false
+      return true
+    })
+  }, [currentUser, audience, brandFilter, localFilter])
+
+  const dashboardBrands = Array.from(new Set(teamRows.map((row) => row.brand))).sort()
+  const dashboardLocals = Array.from(new Set(teamRows.map((row) => row.local))).sort()
+
+  function changeTab(next: AcademyTab) {
+    setTab(next)
+    setSearchParams({ tab: next.toLowerCase() })
+  }
+
+  function refreshStore() {
+    setStoreVersion((value) => value + 1)
+  }
+
+  function toggleFavorite(id: string) {
+    toggleAcademyFavorite(id)
+    refreshStore()
+  }
+
+  function openUpdate(id: string, nextTab: AcademyTab) {
+    markAcademyUpdateSeen(id)
+    refreshStore()
+    changeTab(nextTab)
+  }
+
+  function completeModule(course: AcademyCourse, moduleId: string) {
+    markCourseModuleComplete(course.id, moduleId)
+    refreshStore()
+  }
+
+  function startQuiz(evaluation: AcademyEvaluation) {
+    const questions = createQuestionSet(evaluation)
+    setQuizEvaluation(evaluation)
+    setQuizQuestions(questions)
+    setQuizAnswers({})
+    setQuizResultId(null)
+  }
+
+  function submitQuiz() {
+    if (!quizEvaluation || !quizQuestions.length) return
+    const attempt = saveEvaluationAttempt(
+      quizEvaluation,
+      quizQuestions.map((question) => question.id),
+      quizAnswers
+    )
+    setQuizResultId(attempt.id)
+    refreshStore()
+  }
+
+  function submitObservation() {
+    if (!observationTarget.trim()) return
+    if (CONSULTA_CODES.some((code) => !observationValues[code])) return
+    if (!observationComment.trim()) return
+
+    const observation = saveAcademyObservation({
+      targetName: observationTarget.trim(),
+      local: observationLocal || currentUser.local || "",
+      brand: observationBrand || undefined,
+      observerName: currentUser.name,
+      observerEmail: currentUser.email,
+      values: observationValues,
+      comment: observationComment.trim(),
+    })
+    setLastObservationScore(observation.score)
+    setObservationOpen(false)
+    setObservationTarget("")
+    setObservationComment("")
+    setObservationValues({})
+    refreshStore()
+  }
+
+  const favoritesCount = state.favorites.length
+
+  return (
+    <div className="academy-page">
+      <section className="academy-hero">
+        <div>
+          <span className="academy-eyebrow">ACADEMIA DITALCAR · PILOTO</span>
+          <h1>
+            Aprender, aplicar y <em>mejorar la experiencia.</em>
+          </h1>
+          <p>
+            Una sola Academia para Ventas, Jefaturas, Gerencias, Junior y Casa Matriz,
+            con contenido filtrado según rol y alcance.
+          </p>
+          <div className="academy-profile">
+            <ShieldCheck size={16} /> Ruta activa: <strong>{audienceLabel(audience)}</strong>
+          </div>
         </div>
-      </>
+        <div className="academy-hero-result">
+          <span>MODELO DE APRENDIZAJE</span>
+          <strong>Aprendo → Veo cómo hacerlo → Aplico → Me evalúo → Refuerzo</strong>
+          <small>
+            {admin
+              ? "Administración Academia: Experiencia de Clientes · backup Project Manager."
+              : "Los contenidos obligatorios, opcionales y asignados cambian según tu perfil."}
+          </small>
+        </div>
+      </section>
+
+      <section className="academy-now">
+        <div className="academy-now-head">
+          <div>
+            <span className="academy-eyebrow">PRIMERA APERTURA</span>
+            <h2>Tu ruta de hoy</h2>
+          </div>
+          <span className="academy-pulse">Actualizado</span>
+        </div>
+
+        <div className="academy-now-grid academy-now-grid-six">
+          <QuickCard
+            icon={PlayCircle}
+            label="Continuar"
+            value={continuingCourses.length}
+            detail={
+              continuingCourses[0]
+                ? `${continuingCourses[0].title} · ${getCourseProgress(
+                    continuingCourses[0]
+                  )}%`
+                : "Sin cursos en progreso"
+            }
+            onClick={() => changeTab("CURSOS")}
+          />
+          <QuickCard
+            icon={Layers3}
+            label="Asignado"
+            value={zeroAssignedCourses.length}
+            detail={
+              zeroAssignedCourses[0]
+                ? `${zeroAssignedCourses[0].title} · 0%`
+                : "Sin nuevos asignados"
+            }
+            onClick={() => changeTab("CURSOS")}
+          />
+          <QuickCard
+            icon={ClipboardCheck}
+            label="Evaluaciones pendientes"
+            value={pendingEvaluations.length}
+            detail={pendingEvaluations[0]?.title ?? "Sin evaluaciones pendientes"}
+            onClick={() => changeTab("EVALUACIONES")}
+          />
+          <QuickCard
+            icon={Sparkles}
+            label="Novedades"
+            value={unseenUpdates.length}
+            detail="Nuevo, actualizado o recién asignado"
+            onClick={() =>
+              document.getElementById("academy-updates")?.scrollIntoView({
+                behavior: "smooth",
+              })
+            }
+          />
+          <QuickCard
+            icon={Bookmark}
+            label="Favoritos"
+            value={favoritesCount}
+            detail="Playbooks, cursos y documentos guardados"
+            onClick={() => changeTab("BIBLIOTECA")}
+          />
+          <QuickCard
+            icon={Target}
+            label="Recomendado"
+            value={recommendedCourse ? 1 : 0}
+            detail={recommendedCourse?.title ?? "Sin recomendación pendiente"}
+            onClick={() => changeTab("CURSOS")}
+          />
+        </div>
+
+        {unseenUpdates.length > 0 && (
+          <div className="academy-updates" id="academy-updates">
+            {unseenUpdates.slice(0, 4).map((update) => (
+              <button
+                type="button"
+                key={update.id}
+                onClick={() => openUpdate(update.id, update.tab)}
+              >
+                <span className={`academy-update-kind kind-${update.kind.toLowerCase()}`}>
+                  {update.kind}
+                </span>
+                <div>
+                  <strong>{update.title}</strong>
+                  <p>{update.detail}</p>
+                </div>
+                <ChevronRight size={16} />
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <nav className="academy-tabs" aria-label="Academia Ditalcar">
+        {(
+          ["MODELO", "PLAYBOOKS", "CURSOS", "EVALUACIONES", "BIBLIOTECA"] as AcademyTab[]
+        ).map((item) => (
+          <button
+            type="button"
+            key={item}
+            className={tab === item ? "active" : ""}
+            onClick={() => changeTab(item)}
+          >
+            {item === "MODELO" && <Target size={17} />}
+            {item === "PLAYBOOKS" && <BookOpen size={17} />}
+            {item === "CURSOS" && <GraduationCap size={17} />}
+            {item === "EVALUACIONES" && <ClipboardCheck size={17} />}
+            {item === "BIBLIOTECA" && <Library size={17} />}
+            {item.charAt(0) + item.slice(1).toLowerCase()}
+          </button>
+        ))}
+      </nav>
+
+      {tab === "MODELO" &&
+        (salesModelAudience ? (
+          <section className="academy-panel">
+            <div className="academy-panel-head">
+              <div>
+                <span className="academy-eyebrow">MODELO CONSULTA</span>
+                <h2>Comprender antes de ofrecer.</h2>
+                <p>
+                  Ocho principios que funcionan como lenguaje común durante todo el viaje
+                  del cliente. El modelo se mantiene para Nuevos y Usados; cambian controles,
+                  información y documentación.
+                </p>
+              </div>
+              <RouteToggle value={vehicleRoute} onChange={setVehicleRoute} />
+            </div>
+
+            <div className="consulta-strip">
+              {consultaDetailed.map((item) => (
+                <button
+                  type="button"
+                  key={item.code}
+                  className={selectedConsulta === item.code ? "active" : ""}
+                  onClick={() => setSelectedConsulta(item.code)}
+                >
+                  <span>{item.code}</span>
+                  <strong>{item.title}</strong>
+                </button>
+              ))}
+            </div>
+
+            <div className="consulta-detail consulta-detail-rich">
+              <div className="consulta-letter">{currentConsulta.code}</div>
+              <div className="consulta-copy consulta-main-copy">
+                <span>PRINCIPIO</span>
+                <h3>{currentConsulta.title}</h3>
+                <strong>{currentConsulta.principle}</strong>
+                <p>{currentConsulta.meaning}</p>
+                <div className="consulta-why">
+                  <span>POR QUÉ IMPORTA</span>
+                  <p>{currentConsulta.why}</p>
+                </div>
+              </div>
+              <InfoColumn title="Conductas esperadas" items={currentConsulta.behaviors} />
+              <InfoColumn title="Se ve bien cuando…" items={currentConsulta.signals} />
+              <InfoColumn title="Qué evitar" items={currentConsulta.avoid} danger />
+              <InfoColumn title="Preguntas / frases" items={currentConsulta.questions} />
+              <InfoColumn title="Cómo se mide" items={currentConsulta.indicators} />
+              <div className="consulta-example">
+                <span>EJEMPLO APLICADO</span>
+                <p>“{currentConsulta.example}”</p>
+              </div>
+            </div>
+
+            <div className="consulta-lenses consulta-lenses-wide">
+              <div>
+                <span>VENDEDOR</span>
+                <p>{currentConsulta.sellerLens}</p>
+              </div>
+              <div>
+                <span>JEFATURA LOCAL</span>
+                <p>{currentConsulta.managerLens}</p>
+              </div>
+              <div>
+                <span>GERENCIA DE MARCA / VENTAS</span>
+                <p>{currentConsulta.managementLens}</p>
+              </div>
+              <div>
+                <span>PLAYBOOKS RELACIONADOS</span>
+                <p>{currentConsulta.relatedPlaybooks.join(" · ")}</p>
+              </div>
+            </div>
+
+            <div className="academy-route-note">
+              <CarRouteCopy vehicleRoute={vehicleRoute} />
+            </div>
+
+            <div className="academy-subhead">
+              <span className="academy-eyebrow">VIAJE COMPLETO</span>
+              <h3>CONSULTA acompaña toda la atención</h3>
+            </div>
+            <div className="customer-journey">
+              {customerJourney.map((step, index) => (
+                <article key={step.id}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{step.title}</strong>
+                  <p>{step.detail}</p>
+                  <small>{step.consulta.join(" · ")}</small>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className="academy-panel">
+            <div className="academy-panel-head">
+              <div>
+                <span className="academy-eyebrow">SELLO DE EXPERIENCIA DITALCAR</span>
+                <h2>La experiencia también se construye detrás de escena.</h2>
+                <p>
+                  Exactitud, cuidado, preparación, comunicación, cumplimiento y un momento
+                  final coherente con lo prometido.
+                </p>
+              </div>
+            </div>
+
+            <div className="sello-strip">
+              {selloExperiencia.map((item) => (
+                <button
+                  type="button"
+                  key={`${item.code}-${item.title}`}
+                  className={selectedSello === item.title ? "active" : ""}
+                  onClick={() => setSelectedSello(item.title)}
+                >
+                  <span>{item.code}</span>
+                  <strong>{item.title}</strong>
+                </button>
+              ))}
+            </div>
+
+            {currentSello && (
+              <div className="sello-detail">
+                <div className="sello-main">
+                  <span>{currentSello.code}</span>
+                  <div>
+                    <h3>{currentSello.title}</h3>
+                    <p>{currentSello.summary}</p>
+                  </div>
+                </div>
+                <InfoColumn title="Conductas" items={currentSello.behaviors} />
+                <InfoColumn title="Evitar" items={currentSello.avoid} danger />
+              </div>
+            )}
+
+            <div className="academy-subhead">
+              <span className="academy-eyebrow">RUTA OPERACIONAL</span>
+              <h3>Recepción → Stock → Preparación → Control previo → Entrega</h3>
+            </div>
+            <div className="junior-journey">
+              {juniorJourney.map((step, index) => (
+                <article key={step.id}>
+                  <span>{String(index + 1).padStart(2, "0")}</span>
+                  <strong>{step.title}</strong>
+                  <p>{step.detail}</p>
+                </article>
+              ))}
+            </div>
+            <div className="academy-callout">
+              <HeartHandshake size={22} />
+              <div>
+                <strong>Atención básica al cliente</strong>
+                <p>
+                  La ruta Junior también considera toma de usados, calidad de unidad en la
+                  entrega y experiencia memorable con el cliente final. La Entrega a Cliente
+                  Final de Frogmi continúa siendo responsabilidad del vendedor.
+                </p>
+              </div>
+            </div>
+          </section>
+        ))}
+
+      {tab === "PLAYBOOKS" && (
+        <section className="academy-panel">
+          <div className="academy-panel-head">
+            <div>
+              <span className="academy-eyebrow">PLAYBOOKS</span>
+              <h2>{audience === "JUNIOR" ? "Ejecución operacional" : "Viaje del cliente"}</h2>
+              <p>
+                {audience === "JUNIOR"
+                  ? "Guías operacionales conectadas con Recepción, Stock, Preparación, Control previo y Entrega."
+                  : "Herramientas de consulta para aplicar CONSULTA en situaciones reales. No generan porcentaje de completitud: se consultan, guardan y relacionan con cursos/evaluaciones."}
+              </p>
+            </div>
+            {salesPlaybookAudience && (
+              <RouteToggle value={vehicleRoute} onChange={setVehicleRoute} />
+            )}
+          </div>
+
+          {salesPlaybookAudience ? (
+            <>
+              <div className="academy-before-apply">
+                <div>
+                  <span>ANTES DE APLICAR</span>
+                  <strong>
+                    CONSULTA relacionado: {currentPlaybook?.consulta.join(" · ")}
+                  </strong>
+                </div>
+                <div>
+                  <span>CURSOS RELACIONADOS</span>
+                  <strong>
+                    {currentPlaybook?.relatedCourses
+                      .map(
+                        (id) => academyCourses.find((course) => course.id === id)?.title ?? id
+                      )
+                      .join(" · ")}
+                  </strong>
+                </div>
+              </div>
+
+              <div className="playbook-journey">
+                {salesPlaybooks.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={selectedPlaybook === item.id ? "active" : ""}
+                    onClick={() => setSelectedPlaybook(item.id)}
+                  >
+                    <span>{item.transversal ? "TRANSVERSAL" : `0${item.order}`}</span>
+                    <strong>{item.title}</strong>
+                    <small>{item.journey}</small>
+                  </button>
+                ))}
+              </div>
+
+              {currentPlaybook && (
+                <div className="playbook-detail">
+                  <div className="playbook-detail-top">
+                    <div>
+                      <span className="academy-eyebrow">{currentPlaybook.journey}</span>
+                      <h3>{currentPlaybook.title}</h3>
+                      <p>{currentPlaybook.objective}</p>
+                      <div className="playbook-client-state">
+                        <span>QUÉ PUEDE ESTAR VIVIENDO EL CLIENTE</span>
+                        <p>{currentPlaybook.clientState}</p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="academy-favorite"
+                      onClick={() => toggleFavorite(currentPlaybook.id)}
+                    >
+                      <Bookmark
+                        size={16}
+                        fill={state.favorites.includes(currentPlaybook.id) ? "currentColor" : "none"}
+                      />
+                      {state.favorites.includes(currentPlaybook.id) ? "Guardado" : "Guardar"}
+                    </button>
+                  </div>
+
+                  <div className="playbook-result">
+                    <Target size={18} />
+                    <div>
+                      <span>RESULTADO ESPERADO</span>
+                      <strong>{currentPlaybook.result}</strong>
+                    </div>
+                  </div>
+
+                  <div className="playbook-meta-row">
+                    <span>CONSULTA: {currentPlaybook.consulta.join(" · ")}</span>
+                    <span>Versión {currentPlaybook.version}</span>
+                    <span>{currentPlaybook.status}</span>
+                  </div>
+
+                  <div className="route-notes">
+                    <div>
+                      <span>
+                        {vehicleRoute === "NUEVOS" ? "VEHÍCULOS NUEVOS" : "VEHÍCULOS USADOS"}
+                      </span>
+                      {(vehicleRoute === "NUEVOS"
+                        ? currentPlaybook.newVsUsed.nuevos
+                        : currentPlaybook.newVsUsed.usados
+                      ).map((note) => (
+                        <p key={note}>• {note}</p>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="playbook-sections">
+                    {currentPlaybook.sections.map((section) => (
+                      <article key={section.id}>
+                        <div className="playbook-section-head">
+                          <h4>{section.title}</h4>
+                          {section.consulta?.length ? (
+                            <span>{section.consulta.join(" · ")}</span>
+                          ) : null}
+                        </div>
+                        {section.bullets.map((item) => (
+                          <p key={item}>• {item}</p>
+                        ))}
+                        {section.note && <small>{section.note}</small>}
+                      </article>
+                    ))}
+                  </div>
+
+                  <div className="academy-deepen">
+                    <div>
+                      <span>¿QUIERES PROFUNDIZAR?</span>
+                      <strong>Curso → caso práctico → volver al viaje del cliente</strong>
+                    </div>
+                    <button type="button" onClick={() => changeTab("CURSOS")}>
+                      Ver cursos relacionados <ArrowRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <div className="junior-playbook-tabs">
+                {juniorPlaybooks.map((item) => (
+                  <button
+                    type="button"
+                    key={item.id}
+                    className={selectedJuniorPlaybook === item.id ? "active" : ""}
+                    onClick={() => setSelectedJuniorPlaybook(item.id)}
+                  >
+                    <strong>{item.title}</strong>
+                    <span>{item.journey}</span>
+                  </button>
+                ))}
+              </div>
+              {currentJuniorPlaybook && (
+                <div className="junior-playbook-detail">
+                  <div>
+                    <span className="academy-eyebrow">{currentJuniorPlaybook.journey}</span>
+                    <h3>{currentJuniorPlaybook.title}</h3>
+                    <p>{currentJuniorPlaybook.result}</p>
+                  </div>
+                  <div className="junior-playbook-actions">
+                    {currentJuniorPlaybook.bullets.map((item) => (
+                      <div key={item}>
+                        <CheckCircle2 size={16} />
+                        <span>{item}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <div className="academy-callout">
+                <ShieldCheck size={22} />
+                <div>
+                  <strong>Estándares Operacionales · transversal</strong>
+                  <p>
+                    Los estándares acompañan toda la ruta operacional, igual que Reclamos
+                    atraviesa el viaje comercial. Más adelante se cruzarán con Frogmi para
+                    comparar conocimiento versus ejecución real.
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {tab === "CURSOS" && (
+        <section className="academy-panel">
+          <div className="academy-panel-head">
+            <div>
+              <span className="academy-eyebrow">MICROCURSOS</span>
+              <h2>Aprender en módulos cortos.</h2>
+              <p>
+                Los contenidos pueden asignarse de a poco, quedar en 0% desde el momento de
+                asignación y liberarse por semana. Para cargos altos pueden mantenerse como
+                consulta opcional.
+              </p>
+            </div>
+          </div>
+
+          <div className="academy-search">
+            <Search size={17} />
+            <input
+              value={courseSearch}
+              onChange={(event) => setCourseSearch(event.target.value)}
+              placeholder="Buscar curso, habilidad o tema…"
+            />
+          </div>
+
+          <div className="course-grid">
+            {visibleCourses.map((course) => {
+              const progress = getCourseProgress(course)
+              const completedModules = getCompletedModules(course.id)
+              const assigned = course.assignedTo.includes(audience)
+              const mandatory = course.mandatoryFor.includes(audience)
+              const open = selectedCourse === course.id
+
+              return (
+                <article className={`course-card ${open ? "open" : ""}`} key={course.id}>
+                  <div className="course-top">
+                    <div>
+                      <span>{course.status}</span>
+                      {assigned && <b>ASIGNADO</b>}
+                      {course.new && <b>NUEVO</b>}
+                      {course.updated && <b>ACTUALIZADO</b>}
+                    </div>
+                    <button type="button" onClick={() => toggleFavorite(course.id)}>
+                      <Bookmark
+                        size={15}
+                        fill={state.favorites.includes(course.id) ? "currentColor" : "none"}
+                      />
+                    </button>
+                  </div>
+                  <h3>{course.title}</h3>
+                  <p>{course.description}</p>
+                  {course.sourceNote && <div className="course-source-note">{course.sourceNote}</div>}
+                  <div className="course-meta">
+                    <span>
+                      <Clock3 size={14} /> {course.duration} min
+                    </span>
+                    <span>{mandatory ? "Obligatorio" : "Opcional"}</span>
+                    <span>{course.releaseMode === "GRADUAL" ? "Liberación gradual" : "Disponible completo"}</span>
+                  </div>
+                  <div className="course-progress">
+                    <div>
+                      <span>Avance</span>
+                      <strong>{progress}%</strong>
+                    </div>
+                    <div>
+                      <i style={{ width: `${progress}%` }} />
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="course-action"
+                    onClick={() => setSelectedCourse(open ? null : course.id)}
+                  >
+                    {progress > 0 ? "Continuar" : "Ver módulos"} <ArrowRight size={15} />
+                  </button>
+
+                  {open && (
+                    <div className="course-modules">
+                      {course.modules.map((module, index) => {
+                        const completed = completedModules.includes(module.id)
+                        return (
+                          <div
+                            key={module.id}
+                            className={`${completed ? "completed" : ""} ${
+                              !module.available ? "locked" : ""
+                            }`}
+                          >
+                            <span>{completed ? <Check size={14} /> : index + 1}</span>
+                            <div>
+                              <div className="course-module-title">
+                                <strong>{module.title}</strong>
+                                <small>{module.duration} min</small>
+                              </div>
+                              <p>{module.detail}</p>
+                              {!module.available && (
+                                <em>
+                                  <LockKeyhole size={12} /> {module.releaseLabel ?? "Próximamente"}
+                                </em>
+                              )}
+                              {module.available && !completed && (
+                                <button
+                                  type="button"
+                                  onClick={() => completeModule(course, module.id)}
+                                >
+                                  Marcar módulo completado
+                                </button>
+                              )}
+                              {completed && <em className="module-done">Completado</em>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+        </section>
+      )}
+
+      {tab === "EVALUACIONES" && (
+        <section className="academy-panel">
+          <div className="academy-panel-head">
+            <div>
+              <span className="academy-eyebrow">EVALUACIONES</span>
+              <h2>Conocimiento y conducta observable.</h2>
+              <p>
+                Conocimiento: máximo 3 intentos, banco amplio y preguntas sin repetirse entre
+                intentos. Solo después del tercer intento fallido se activa Requiere refuerzo.
+              </p>
+            </div>
+            {canObserve && (
+              <button
+                type="button"
+                className="academy-primary-action"
+                onClick={() => setObservationOpen((value) => !value)}
+              >
+                <Eye size={16} /> Registrar observación CONSULTA
+              </button>
+            )}
+          </div>
+
+          {observationOpen && (
+            <ObservableForm
+              currentUser={currentUser}
+              target={observationTarget}
+              setTarget={setObservationTarget}
+              local={observationLocal}
+              setLocal={setObservationLocal}
+              brand={observationBrand}
+              setBrand={setObservationBrand}
+              values={observationValues}
+              setValues={setObservationValues}
+              comment={observationComment}
+              setComment={setObservationComment}
+              onSubmit={submitObservation}
+              onCancel={() => setObservationOpen(false)}
+            />
+          )}
+
+          {lastObservationScore !== null && (
+            <div className="academy-success-note">
+              <CheckCircle2 size={18} /> Observación guardada · Resultado {lastObservationScore}%
+            </div>
+          )}
+
+          {quizEvaluation && (
+            <QuizPanel
+              evaluation={quizEvaluation}
+              questions={quizQuestions}
+              answers={quizAnswers}
+              setAnswers={setQuizAnswers}
+              resultId={quizResultId}
+              onSubmit={submitQuiz}
+              onClose={() => {
+                setQuizEvaluation(null)
+                setQuizQuestions([])
+                setQuizAnswers({})
+                setQuizResultId(null)
+              }}
+              onRetry={() => startQuiz(quizEvaluation)}
+            />
+          )}
+
+          <div className="evaluation-grid">
+            {visibleEvaluations.map((evaluation) => {
+              const attempts = getEvaluationAttempts(evaluation.id)
+              const passed = attempts.some((attempt) => attempt.passed)
+              const needsRef = evaluationNeedsReinforcement(evaluation)
+              const best = getEvaluationBestScore(evaluation.id)
+              const last = getEvaluationLastScore(evaluation.id)
+              const assigned = evaluation.assignedTo.includes(audience)
+
+              return (
+                <article key={evaluation.id}>
+                  <div className="evaluation-icon">
+                    {evaluation.type === "OBSERVADA" ? <Eye /> : <ClipboardCheck />}
+                  </div>
+                  <span>{evaluation.type}</span>
+                  <h3>{evaluation.title}</h3>
+                  {assigned && <div className="evaluation-assigned">ASIGNADA</div>}
+                  <div className="evaluation-rules">
+                    <p>
+                      <strong>{evaluation.passing}%</strong> aprobación
+                    </p>
+                    <p>
+                      <strong>
+                        {evaluation.type === "OBSERVADA"
+                          ? "—"
+                          : `${attempts.length}/${evaluation.attempts}`}
+                      </strong>{" "}
+                      {evaluation.type === "OBSERVADA" ? "registro libre" : "intentos usados"}
+                    </p>
+                    <p>
+                      <strong>{evaluation.questionsPerAttempt}</strong> preguntas
+                    </p>
+                    <p>
+                      <strong>{evaluation.bankSize}</strong> banco total
+                    </p>
+                  </div>
+
+                  {best !== undefined && evaluation.type !== "OBSERVADA" && (
+                    <div className="evaluation-scores">
+                      <span>Mejor: {best}%</span>
+                      <span>Último: {last}%</span>
+                    </div>
+                  )}
+
+                  {needsRef && (
+                    <div className="evaluation-reinforcement">
+                      <XCircle size={16} />
+                      <div>
+                        <strong>Requiere refuerzo</strong>
+                        <p>
+                          {getEvaluationReinforcementIds(evaluation.id)
+                            .map(
+                              (id) =>
+                                academyCourses.find((course) => course.id === id)?.title ?? id
+                            )
+                            .slice(0, 4)
+                            .join(" · ") || "Revisar contenido relacionado"}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {evaluation.type === "OBSERVADA" ? (
+                    <div className="observed-scale">
+                      <span>Cumple</span>
+                      <span>Parcial</span>
+                      <span>No cumple</span>
+                      <small>+ comentario obligatorio</small>
+                    </div>
+                  ) : (
+                    <p className="evaluation-note">
+                      {passed
+                        ? "Evaluación aprobada. Se mantienen todos los intentos en el historial."
+                        : "Las preguntas utilizadas no vuelven a aparecer en los intentos siguientes."}
+                    </p>
+                  )}
+
+                  {evaluation.type !== "OBSERVADA" && (
+                    <button
+                      type="button"
+                      disabled={passed || attempts.length >= evaluation.attempts}
+                      onClick={() => startQuiz(evaluation)}
+                    >
+                      {passed
+                        ? "Aprobada"
+                        : attempts.length
+                          ? "Nuevo intento"
+                          : "Comenzar"}
+                      <ChevronRight size={15} />
+                    </button>
+                  )}
+                </article>
+              )
+            })}
+          </div>
+
+          {canObserve && getAcademyObservations().length > 0 && (
+            <div className="academy-observation-history">
+              <span className="academy-eyebrow">ÚLTIMAS OBSERVACIONES DEMO</span>
+              {getAcademyObservations()
+                .slice(0, 4)
+                .map((observation) => (
+                  <article key={observation.id}>
+                    <div>
+                      <strong>{observation.targetName}</strong>
+                      <span>
+                        {observation.local} · {observation.brand || "Sin marca"}
+                      </span>
+                    </div>
+                    <b>{observation.score}%</b>
+                    <small>{new Date(observation.createdAt).toLocaleDateString("es-CL")}</small>
+                  </article>
+                ))}
+            </div>
+          )}
+        </section>
+      )}
+
+      {tab === "BIBLIOTECA" && (
+        <section className="academy-panel">
+          <div className="academy-panel-head">
+            <div>
+              <span className="academy-eyebrow">BIBLIOTECA DITALCAR</span>
+              <h2>Información vigente, fácil de encontrar.</h2>
+              <p>
+                Fichas de producto, catálogos de accesorios, CRM, procesos, operación y
+                entrega. La fuente definitiva será una Biblioteca de documentos SharePoint;
+                React solo leerá metadatos y abrirá el archivo vigente.
+              </p>
+            </div>
+            <div className="sharepoint-badge">
+              <FolderOpen size={17} /> Biblioteca SharePoint
+            </div>
+          </div>
+
+          <div className="library-toolbar">
+            <div className="academy-search library-search">
+              <Search size={17} />
+              <input
+                value={librarySearch}
+                onChange={(event) => setLibrarySearch(event.target.value)}
+                placeholder="Buscar ficha, modelo, accesorio, CRM o proceso…"
+              />
+            </div>
+            <select
+              value={libraryCategory}
+              onChange={(event) => setLibraryCategory(event.target.value)}
+            >
+              <option value="TODAS">Todas las categorías</option>
+              <option value="PRODUCTO">Producto</option>
+              <option value="ACCESORIOS">Accesorios</option>
+              <option value="COMERCIAL">Comercial</option>
+              <option value="CRM">CRM</option>
+              <option value="PROCESOS">Procesos</option>
+              <option value="OPERACIONES">Operaciones</option>
+              <option value="ENTREGA">Entrega</option>
+              <option value="OTROS">Otros</option>
+            </select>
+            <select value={libraryBrand} onChange={(event) => setLibraryBrand(event.target.value)}>
+              <option>Todas</option>
+              {libraryBrands.map((brand) => (
+                <option key={brand}>{brand}</option>
+              ))}
+            </select>
+            <select value={libraryRoute} onChange={(event) => setLibraryRoute(event.target.value)}>
+              <option value="TODOS">Nuevos y Usados</option>
+              <option value="NUEVOS">Nuevos</option>
+              <option value="USADOS">Usados</option>
+            </select>
+          </div>
+
+          <div className="library-grid">
+            {visibleLibrary.map((resource) => (
+              <LibraryCard
+                key={resource.id}
+                resource={resource}
+                favorite={state.favorites.includes(resource.id)}
+                onFavorite={() => toggleFavorite(resource.id)}
+              />
+            ))}
+          </div>
+
+          {!visibleLibrary.length && (
+            <div className="academy-empty">
+              <Search size={24} />
+              <strong>Sin resultados</strong>
+              <span>Prueba con otra marca, categoría o término de búsqueda.</span>
+            </div>
+          )}
+        </section>
+      )}
+
+      {canSeeTeam && (
+        <section className="academy-team">
+          <div className="academy-team-head">
+            <div>
+              <span className="academy-eyebrow">SEGUIMIENTO</span>
+              <h2>{currentUser.role === "JEFATURA_LOCAL" ? "Mi equipo" : "Dashboard Academia"}</h2>
+              <p>
+                Conocimiento, avance y aplicación observable. Más adelante se podrá cruzar con
+                CRM, encuestas y Frogmi sin mezclar responsabilidades de cada formulario.
+              </p>
+            </div>
+            {canSeeNetwork && (
+              <div className="academy-filters">
+                <Filter size={16} />
+                <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}>
+                  <option>Todas</option>
+                  {dashboardBrands.map((brand) => (
+                    <option key={brand}>{brand}</option>
+                  ))}
+                </select>
+                <select value={localFilter} onChange={(event) => setLocalFilter(event.target.value)}>
+                  <option>Todos</option>
+                  {dashboardLocals.map((local) => (
+                    <option key={local}>{local}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <AcademyKPIs rows={teamRows} />
+
+          <div className="academy-team-table-wrap">
+            <table className="academy-team-table">
+              <thead>
+                <tr>
+                  <th>Equipo</th>
+                  <th>Marca</th>
+                  <th>Local</th>
+                  <th>Avance obligatorio</th>
+                  <th>Aprobación</th>
+                  <th>CONSULTA observado</th>
+                  <th>Pendientes</th>
+                  <th>Refuerzo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {teamRows.map((row) => (
+                  <tr key={row.id}>
+                    <td>
+                      <strong>{row.name}</strong>
+                      <span>{row.role}</span>
+                    </td>
+                    <td>{row.brand}</td>
+                    <td>{row.local}</td>
+                    <td>{row.mandatoryProgress}%</td>
+                    <td>{row.evaluationPass}%</td>
+                    <td>{row.consultaObserved ? `${row.consultaObserved}%` : "—"}</td>
+                    <td>{row.pendingEvaluations}</td>
+                    <td>
+                      <span className={row.reinforcement ? "team-alert" : "team-ok"}>
+                        {row.reinforcement ? "Requiere" : "OK"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {currentUser.role === "JEFATURA_LOCAL" && (
+            <div className="manager-board">
+              <div>
+                <span className="academy-eyebrow">TABLERO SEMANAL</span>
+                <h3>Preparar la reunión comercial</h3>
+                <p>
+                  Revisar acuerdos anteriores, estándares, avance del equipo, personas a reforzar
+                  y prioridades antes de la reunión de 15 minutos.
+                </p>
+              </div>
+              <button type="button">
+                Abrir tablero <ArrowRight size={16} />
+              </button>
+              <small>Responsable: Jefatura Local · Backup: Gerencia de Marca asociada</small>
+            </div>
+          )}
+        </section>
+      )}
+    </div>
+  )
+}
+
+function RouteToggle({
+  value,
+  onChange,
+}: {
+  value: "NUEVOS" | "USADOS"
+  onChange: (value: "NUEVOS" | "USADOS") => void
+}) {
+  return (
+    <div className="academy-route-toggle">
+      <button
+        type="button"
+        className={value === "NUEVOS" ? "active" : ""}
+        onClick={() => onChange("NUEVOS")}
+      >
+        Nuevos
+      </button>
+      <button
+        type="button"
+        className={value === "USADOS" ? "active" : ""}
+        onClick={() => onChange("USADOS")}
+      >
+        Usados
+      </button>
+    </div>
+  )
+}
+
+function CarRouteCopy({ vehicleRoute }: { vehicleRoute: "NUEVOS" | "USADOS" }) {
+  return (
+    <div>
+      <span>{vehicleRoute === "NUEVOS" ? "APLICACIÓN EN NUEVOS" : "APLICACIÓN EN USADOS"}</span>
+      <p>
+        {vehicleRoute === "NUEVOS"
+          ? "Validar versión, disponibilidad, bonos, financiamiento, unidad en tránsito, plazo, equipamiento y documentación de vehículo nuevo."
+          : "Trabajar sobre la unidad específica: año, kilometraje, estado, equipamiento real, antecedentes disponibles, documentación y disponibilidad efectiva."}
+      </p>
+    </div>
+  )
+}
+
+function QuickCard({
+  icon: Icon,
+  label,
+  value,
+  detail,
+  onClick,
+}: {
+  icon: ComponentType<{ size?: number }>
+  label: string
+  value: number
+  detail: string
+  onClick: () => void
+}) {
+  return (
+    <button type="button" className="academy-quick" onClick={onClick}>
+      <Icon size={19} />
+      <div>
+        <span>{label}</span>
+        <strong>{value}</strong>
+        <small>{detail}</small>
+      </div>
+      <ChevronRight size={16} />
+    </button>
+  )
+}
+
+function InfoColumn({
+  title,
+  items,
+  danger = false,
+}: {
+  title: string
+  items: string[]
+  danger?: boolean
+}) {
+  return (
+    <div className={`consulta-info ${danger ? "danger" : ""}`}>
+      <span>{title}</span>
+      {items.map((item) => (
+        <p key={item}>• {item}</p>
+      ))}
+    </div>
+  )
+}
+
+function QuizPanel({
+  evaluation,
+  questions,
+  answers,
+  setAnswers,
+  resultId,
+  onSubmit,
+  onClose,
+  onRetry,
+}: {
+  evaluation: AcademyEvaluation
+  questions: AcademyQuestion[]
+  answers: Record<string, number>
+  setAnswers: (value: Record<string, number>) => void
+  resultId: string | null
+  onSubmit: () => void
+  onClose: () => void
+  onRetry: () => void
+}) {
+  const attempts = getEvaluationAttempts(evaluation.id)
+  const result = resultId ? attempts.find((item) => item.id === resultId) : undefined
+  const canSubmit = questions.length > 0 && questions.every((question) => answers[question.id] !== undefined)
+  const remaining = Math.max(0, evaluation.attempts - attempts.length)
+
+  if (!questions.length && !result) {
+    return (
+      <div className="quiz-panel">
+        <div className="quiz-head">
+          <div>
+            <span className="academy-eyebrow">{evaluation.title}</span>
+            <h3>No quedan preguntas disponibles para un nuevo intento.</h3>
+          </div>
+          <button type="button" onClick={onClose}>Cerrar</button>
+        </div>
+      </div>
     )
   }
 
   return (
-    <>
-      <div className="page-head">
-        <span className="eyebrow">ACADEMIA DITALCAR</span>
-        <h1>Modelo CONSULTA</h1>
-        <p>8 comportamientos simples para una atención más consultiva, consistente y cercana.</p>
+    <div className="quiz-panel">
+      <div className="quiz-head">
+        <div>
+          <span className="academy-eyebrow">EVALUACIÓN EN CURSO</span>
+          <h3>{evaluation.title}</h3>
+          <p>
+            Intento {Math.min(attempts.length + (result ? 0 : 1), evaluation.attempts)} de {evaluation.attempts} ·
+            aprobación {evaluation.passing}% · estas preguntas no volverán a aparecer en otro intento.
+          </p>
+        </div>
+        <button type="button" onClick={onClose}>Cerrar</button>
       </div>
-      <div className="consulta-grid">
-        {consultaSteps.map((s,idx) => (
-          <button className="consulta-card" key={s.code} onClick={() => setSelected(s)}>
-            <div className="consulta-top"><span>{s.code}</span><small>0{idx+1}</small></div>
-            <h3>{s.title}</h3><p>{s.subtitle}</p>
-            <div className="module-link">Ver módulo <ChevronRight size={16}/></div>
-          </button>
+
+      {!result ? (
+        <>
+          <div className="quiz-questions">
+            {questions.map((question, questionIndex) => (
+              <article key={question.id}>
+                <span>Pregunta {questionIndex + 1}</span>
+                <h4>{question.prompt}</h4>
+                <div className="quiz-options">
+                  {question.options.map((option, optionIndex) => (
+                    <button
+                      type="button"
+                      key={option}
+                      className={answers[question.id] === optionIndex ? "selected" : ""}
+                      onClick={() =>
+                        setAnswers({ ...answers, [question.id]: optionIndex })
+                      }
+                    >
+                      <i>{String.fromCharCode(65 + optionIndex)}</i>
+                      <span>{option}</span>
+                    </button>
+                  ))}
+                </div>
+              </article>
+            ))}
+          </div>
+          <div className="quiz-footer">
+            <span>
+              Respondidas {Object.keys(answers).length}/{questions.length}
+            </span>
+            <button type="button" disabled={!canSubmit} onClick={onSubmit}>
+              Finalizar intento <CheckCircle2 size={16} />
+            </button>
+          </div>
+        </>
+      ) : (
+        <div className={`quiz-result ${result.passed ? "passed" : "failed"}`}>
+          {result.passed ? <CheckCircle2 size={34} /> : <RefreshCw size={34} />}
+          <div>
+            <span>{result.passed ? "APROBADA" : "RESULTADO DEL INTENTO"}</span>
+            <strong>{result.score}%</strong>
+            <p>
+              {result.passed
+                ? "El resultado quedó guardado en el historial de esta evaluación."
+                : remaining > 0
+                  ? `Quedan ${remaining} intento(s). El próximo usará preguntas diferentes.`
+                  : "Se utilizaron los tres intentos. Se activa Requiere refuerzo con contenidos específicos."}
+            </p>
+          </div>
+          {!result.passed && remaining > 0 && (
+            <button type="button" onClick={onRetry}>
+              Preparar siguiente intento
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ObservableForm({
+  currentUser,
+  target,
+  setTarget,
+  local,
+  setLocal,
+  brand,
+  setBrand,
+  values,
+  setValues,
+  comment,
+  setComment,
+  onSubmit,
+  onCancel,
+}: {
+  currentUser: UserScope
+  target: string
+  setTarget: (value: string) => void
+  local: string
+  setLocal: (value: string) => void
+  brand: string
+  setBrand: (value: string) => void
+  values: Record<string, ObservableValue>
+  setValues: (value: Record<string, ObservableValue>) => void
+  comment: string
+  setComment: (value: string) => void
+  onSubmit: () => void
+  onCancel: () => void
+}) {
+  const locals = Array.from(
+    new Set(
+      [
+        currentUser.local,
+        currentUser.localPrincipal,
+        ...(currentUser.assignedLocals ?? []),
+        ...academyTeamProgress.map((row) => row.local),
+      ].filter((value): value is string => Boolean(value))
+    )
+  )
+  const brands = Array.from(
+    new Set([...(currentUser.brands ?? []), ...academyTeamProgress.map((row) => row.brand)])
+  )
+  const valid =
+    target.trim() &&
+    comment.trim() &&
+    CONSULTA_CODES.every((code) => Boolean(values[code]))
+
+  return (
+    <div className="observable-form">
+      <div className="observable-head">
+        <div>
+          <span className="academy-eyebrow">EVALUACIÓN DE CONDUCTA</span>
+          <h3>Observación CONSULTA</h3>
+          <p>Registra hechos observables. Escala: Cumple · Parcial · No cumple + comentario.</p>
+        </div>
+        <button type="button" onClick={onCancel}>Cerrar</button>
+      </div>
+      <div className="observable-meta">
+        <label>
+          <span>Colaborador observado *</span>
+          <input value={target} onChange={(event) => setTarget(event.target.value)} placeholder="Nombre" />
+        </label>
+        <label>
+          <span>Local</span>
+          <select value={local} onChange={(event) => setLocal(event.target.value)}>
+            <option value="">Seleccionar</option>
+            {locals.map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+        <label>
+          <span>Marca</span>
+          <select value={brand} onChange={(event) => setBrand(event.target.value)}>
+            <option value="">Seleccionar</option>
+            {brands.map((item) => <option key={item}>{item}</option>)}
+          </select>
+        </label>
+      </div>
+      <div className="observable-grid">
+        {consultaDetailed.map((item) => (
+          <article key={item.code}>
+            <div>
+              <span>{item.code}</span>
+              <strong>{item.title}</strong>
+            </div>
+            <select
+              value={values[item.code] ?? ""}
+              onChange={(event) =>
+                setValues({
+                  ...values,
+                  [item.code]: event.target.value as ObservableValue,
+                })
+              }
+            >
+              <option value="">Seleccionar</option>
+              <option value="CUMPLE">Cumple</option>
+              <option value="PARCIAL">Parcial</option>
+              <option value="NO_CUMPLE">No cumple</option>
+            </select>
+          </article>
         ))}
       </div>
-    </>
+      <label className="observable-comment">
+        <span>Comentario / evidencia *</span>
+        <textarea
+          value={comment}
+          onChange={(event) => setComment(event.target.value)}
+          placeholder="Describe conductas observadas, hechos y oportunidades de refuerzo…"
+        />
+      </label>
+      <div className="observable-actions">
+        <button type="button" className="secondary" onClick={onCancel}>Cancelar</button>
+        <button type="button" className="primary" disabled={!valid} onClick={onSubmit}>
+          Guardar observación
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function LibraryCard({
+  resource,
+  favorite,
+  onFavorite,
+}: {
+  resource: LibraryResource
+  favorite: boolean
+  onFavorite: () => void
+}) {
+  const available = Boolean(resource.url)
+  return (
+    <article className="library-card">
+      <div className="library-card-top">
+        <div className="library-icon"><FileText size={20} /></div>
+        <button type="button" onClick={onFavorite} aria-label="Guardar recurso">
+          <Bookmark size={16} fill={favorite ? "currentColor" : "none"} />
+        </button>
+      </div>
+      <div className="library-badges">
+        <span>{resource.category}</span>
+        {resource.new && <b>NUEVO</b>}
+        {resource.updated && <b>ACTUALIZADO</b>}
+      </div>
+      <h3>{resource.title}</h3>
+      <p>{resource.description}</p>
+      <div className="library-meta">
+        <span>{resource.documentType}</span>
+        {resource.brand && <span>{resource.brand}</span>}
+        {resource.model && <span>{resource.model}</span>}
+        <span>{resource.route}</span>
+      </div>
+      <div className="library-version">
+        <div>
+          <span>Versión</span>
+          <strong>{resource.version}</strong>
+        </div>
+        <div>
+          <span>Estado</span>
+          <strong>{resource.documentState}</strong>
+        </div>
+      </div>
+      {available ? (
+        <a className="library-open" href={resource.url} target="_blank" rel="noreferrer">
+          Abrir documento <ArrowRight size={15} />
+        </a>
+      ) : (
+        <button type="button" className="library-open disabled" disabled>
+          Pendiente publicar en SharePoint
+        </button>
+      )}
+      {resource.sharePointPath && (
+        <small className="library-path">Destino: {resource.sharePointPath}</small>
+      )}
+    </article>
+  )
+}
+
+function AcademyKPIs({ rows }: { rows: typeof academyTeamProgress }) {
+  if (!rows.length) {
+    return <div className="academy-empty">Sin datos para los filtros seleccionados.</div>
+  }
+
+  const average = (values: number[]) =>
+    Math.round(values.reduce((total, value) => total + value, 0) / values.length)
+  const consultaValues = rows
+    .map((row) => row.consultaObserved)
+    .filter((value) => value > 0)
+
+  const metrics = [
+    {
+      label: "Avance obligatorio",
+      value: `${average(rows.map((row) => row.mandatoryProgress))}%`,
+    },
+    {
+      label: "Aprobación evaluaciones",
+      value: `${average(rows.map((row) => row.evaluationPass))}%`,
+    },
+    {
+      label: "Con refuerzo",
+      value: String(rows.filter((row) => row.reinforcement).length),
+    },
+    {
+      label: "CONSULTA observado",
+      value: consultaValues.length ? `${average(consultaValues)}%` : "—",
+    },
+    {
+      label: "Evaluaciones pendientes",
+      value: String(rows.reduce((total, row) => total + row.pendingEvaluations, 0)),
+    },
+  ]
+
+  return (
+    <div className="academy-kpis">
+      {metrics.map((metric) => (
+        <article key={metric.label}>
+          <BarChart3 size={17} />
+          <span>{metric.label}</span>
+          <strong>{metric.value}</strong>
+        </article>
+      ))}
+    </div>
   )
 }
