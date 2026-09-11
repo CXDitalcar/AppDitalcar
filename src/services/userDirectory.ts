@@ -43,6 +43,7 @@ const validRoles: UserRole[] = [
   "JEFATURA_LOCAL",
   "JEFATURA_MARCA",
   "JEFATURA_ZONAL",
+  "GERENCIA_MARCA",
   "GERENCIA_VENTAS",
   "JEFATURA_COMERCIAL_CLIENTES",
   "JEFATURA_OPERACIONES_COMERCIALES",
@@ -68,6 +69,9 @@ function mapRole(value: unknown): UserRole {
     jefaturalocal: "JEFATURA_LOCAL",
     jefaturamarca: "JEFATURA_MARCA",
     jefaturazonal: "JEFATURA_ZONAL",
+    gerentemarca: "GERENCIA_MARCA",
+    gerenciademarca: "GERENCIA_MARCA",
+    gerenciamarca: "GERENCIA_MARCA",
     gerenciaventas: "GERENCIA_VENTAS",
     jefaturacomercialyclientes: "JEFATURA_COMERCIAL_CLIENTES",
     jefaturacomercialclientes: "JEFATURA_COMERCIAL_CLIENTES",
@@ -93,7 +97,7 @@ function mapScope(value: unknown, role: UserRole, assignedLocals: string[]): Use
     return normalized as UserScopeLevel
   }
   if (assignedLocals.length > 1) return "MULTILOCAL"
-  if (role === "JEFATURA_MARCA") return "MARCA"
+  if (role === "GERENCIA_MARCA" || role === "JEFATURA_MARCA") return "MARCA"
   if (role === "JEFATURA_ZONAL") return "ZONA"
   if (
     [
