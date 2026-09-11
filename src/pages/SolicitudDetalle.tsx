@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react"
@@ -33,11 +34,10 @@ import {
 } from "../services/requestCatalog"
 
 import {
-  appendDemoTimeline,
-  getDemoRequests,
-  getDemoTimeline,
-  updateDemoRequest,
-} from "../services/demoStore"
+  getRequestById,
+  getRequestHistory,
+  saveRequestTransition,
+} from "../services/requestRepository"
 
 import {
   canApproveRequest,
@@ -62,6 +62,7 @@ import type {
   ProcessFieldDefinition,
   RequestFieldValue,
   RequestItem,
+  RequestTimelineItem,
   RequestTimelineType,
   UserScope,
 } from "../types"
@@ -89,26 +90,58 @@ export default function SolicitudDetalle({
   currentUser: UserScope
 }) {
   const { requestId } =
-    useParams<{
-      requestId: string
-    }>()
-
-  const request =
-    getDemoRequests().find(
-      (item) =>
-        item.id === requestId
-    )
+    useParams<{ requestId: string }>()
 
   const navigate = useNavigate()
+  const [request, setRequest] =
+    useState<RequestItem | null | undefined>(undefined)
+  const [loadError, setLoadError] =
+    useState("")
+
+  useEffect(() => {
+    let active = true
+
+    async function load() {
+      if (!requestId) {
+        setRequest(null)
+        return
+      }
+
+      setLoadError("")
+      try {
+        const value = await getRequestById(currentUser, requestId)
+        if (active) setRequest(value ?? null)
+      } catch (errorValue: any) {
+        if (active) {
+          setLoadError(errorValue?.message ?? "No fue posible cargar la solicitud.")
+          setRequest(null)
+        }
+      }
+    }
+
+    load()
+    return () => {
+      active = false
+    }
+  }, [requestId, currentUser.email, currentUser.role])
+
+  if (request === undefined) {
+    return (
+      <div className="request-detail-page">
+        <div className="request-detail-empty">
+          <Clock3 size={30} />
+          <h2>Cargando solicitud…</h2>
+        </div>
+      </div>
+    )
+  }
 
   if (!request) {
     return (
       <div className="request-detail-page">
         <button
           className="back-btn"
-          onClick={() =>
-            navigate("/solicitudes")
-          }
+          onClick={() => navigate("/solicitudes")}
         >
           <ArrowLeft size={17} />
           Volver
@@ -117,10 +150,7 @@ export default function SolicitudDetalle({
         <div className="request-detail-empty">
           <FileText size={32} />
           <h2>Solicitud no encontrada</h2>
-          <p>
-            No encontramos esta solicitud
-            en el piloto.
-          </p>
+          <p>{loadError || "No encontramos esta solicitud."}</p>
         </div>
       </div>
     )
@@ -169,6 +199,18 @@ function RequestDetailContent({
   const [historyVersion, setHistoryVersion] =
     useState(0)
 
+  const [history, setHistory] =
+    useState<RequestTimelineItem[]>([])
+
+  const [saving, setSaving] =
+    useState(false)
+
+  const [persistError, setPersistError] =
+    useState("")
+
+  const [persistWarnings, setPersistWarnings] =
+    useState<string[]>([])
+
   const process = getRequestProcess(request.processCode)
 
   const canView = canViewRequest(
@@ -194,14 +236,21 @@ function RequestDetailContent({
     request
   )
 
-  const history = useMemo(
-    () =>
-      getDemoTimeline(request.id),
-    [
-      request.id,
-      historyVersion,
-    ]
-  )
+  useEffect(() => {
+    let active = true
+
+    getRequestHistory(currentUser, request.id)
+      .then((items) => {
+        if (active) setHistory(items)
+      })
+      .catch(() => {
+        if (active) setHistory([])
+      })
+
+    return () => {
+      active = false
+    }
+  }, [request.id, historyVersion, currentUser.email])
 
   const fields = useMemo(
     () =>
@@ -265,49 +314,47 @@ function RequestDetailContent({
 
 
   // ====================================================
-  // PERSISTENCIA DEMO + HISTORIAL
+  // PERSISTENCIA DEMO / SHAREPOINT + HISTORIAL
   // ====================================================
 
-  function persist(
+  async function persist(
     patch: Partial<RequestItem>,
     type: RequestTimelineType,
     title: string,
     detail?: string
   ) {
-    const next = {
+    if (saving) return
+
+    const next: RequestItem = {
       ...request,
       ...patch,
     }
 
-    setRequest(next)
+    setSaving(true)
+    setPersistError("")
+    setPersistWarnings([])
 
-    updateDemoRequest(
-      request.id,
-      patch
-    )
-
-    appendDemoTimeline({
-      id:
-        `${request.id}-${Date.now()}`,
-      requestId:
-        request.id,
-      type,
-      authorEmail:
-        currentUser.email,
-      authorName:
-        currentUser.name,
-      createdAt:
-        new Date().toISOString(),
-      comment:
+    try {
+      const result = await saveRequestTransition(
+        currentUser,
+        request,
+        next,
+        type,
+        title,
         detail
-          ? `${title} · ${detail}`
-          : title,
-    })
+      )
 
-    setHistoryVersion(
-      (value) =>
-        value + 1
-    )
+      setRequest(result.request)
+      setPersistWarnings(result.warnings)
+      setHistoryVersion((value) => value + 1)
+    } catch (errorValue: any) {
+      setPersistError(
+        errorValue?.message ??
+          "No fue posible guardar el cambio de la solicitud."
+      )
+    } finally {
+      setSaving(false)
+    }
   }
 
 
@@ -498,6 +545,8 @@ function RequestDetailContent({
           request.requesterEmail,
         currentResponsibleName:
           request.requesterName,
+        currentResponsibleLabel:
+          "Solicitante",
       },
       "INFORMATION_REQUESTED",
       "Información solicitada",
@@ -658,6 +707,12 @@ function RequestDetailContent({
           undefined,
         resolutionSLAPausedAt:
           undefined,
+        currentResponsibleEmail:
+          request.requesterEmail,
+        currentResponsibleName:
+          request.requesterName,
+        currentResponsibleLabel:
+          "Solicitante / Jefatura Local",
       },
       "RESOLUTION_REPORTED",
       "Marcada como resuelta",
@@ -873,6 +928,25 @@ function RequestDetailContent({
         </div>
       )}
 
+      {persistError && (
+        <div className="pilot-flow-alert">
+          <Info size={17} />
+          <div>
+            <strong>No se pudo guardar el cambio</strong>
+            <span>{persistError}</span>
+          </div>
+        </div>
+      )}
+
+      {persistWarnings.length > 0 && (
+        <div className="pilot-flow-alert">
+          <Info size={17} />
+          <div>
+            <strong>Cambio guardado con observaciones</strong>
+            <span>{persistWarnings.join(" · ")}</span>
+          </div>
+        </div>
+      )}
 
       <div className="request-detail-layout">
         <div className="request-detail-main">
