@@ -16,7 +16,6 @@ import DemoLogin from "./components/DemoLogin"
 
 import Home from "./pages/Home"
 import Academia from "./pages/Academia"
-import PlaybooksVenta from "./pages/PlaybooksVenta"
 import MiLocal from "./pages/MiLocal"
 import Solicitudes from "./pages/Solicitudes"
 import NuevaSolicitud from "./pages/NuevaSolicitud"
@@ -373,7 +372,7 @@ export default function App() {
           <Route
             path="/academia"
             element={
-              <Academia />
+              <Academia currentUser={currentUser} />
             }
           />
 
@@ -384,9 +383,7 @@ export default function App() {
 
           <Route
             path="/playbooks-venta"
-            element={
-              <PlaybooksVenta />
-            }
+            element={<Navigate to="/academia?tab=playbooks" replace />}
           />
 
 
