@@ -1,7 +1,6 @@
 import {
   useMemo,
   useState,
-  type ComponentType,
 } from "react"
 import {
   ArrowRight,
@@ -1408,7 +1407,7 @@ function QuickCard({
   detail,
   onClick,
 }: {
-  icon: ComponentType<{ size?: number }>
+  icon: typeof PlayCircle
   label: string
   value: number
   detail: string
