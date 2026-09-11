@@ -2,7 +2,6 @@ import {
   BarChart3,
   ChevronRight,
   ClipboardCheck,
-  BookOpenCheck,
   FileCheck2,
   GraduationCap,
   MessagesSquare,
@@ -17,8 +16,7 @@ import { getPilotLocal, getVisiblePilotLocals, networkKPIs, type KPIItem } from 
 import type { UserScope } from "../types"
 
 const cards = [
-  { to: "/academia", title: "Academia", text: "Sello Ditalcar, CONSULTA y evaluaciones.", icon: GraduationCap },
-  { to: "/playbooks-venta", title: "Playbooks de Venta", text: "Viaje del cliente, CONSULTA y guías de atención.", icon: BookOpenCheck },
+  { to: "/academia", title: "Academia", text: "Modelo, playbooks, cursos, evaluaciones, biblioteca y progreso por rol.", icon: GraduationCap },
   { to: "/mi-local", title: "Mi Local", text: "KPI, estándares y brechas de la sucursal.", icon: ClipboardCheck },
   { to: "/solicitudes", title: "Solicitudes", text: "Crear, consultar y seguir requerimientos.", icon: MessagesSquare },
   { to: "/formularios", title: "Formularios", text: "Ruta, auditorías y seguimiento de brechas.", icon: FileCheck2 },
