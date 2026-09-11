@@ -1127,7 +1127,10 @@ function formatRole(
       "Jefatura Marca · Geely",
 
     JEFATURA_ZONAL:
-      "Jefatura Zonal",
+      "Gerencia de Marca",
+
+    GERENCIA_MARCA:
+      "Gerencia de Marca",
 
     GERENCIA_VENTAS:
       "Gerencia Ventas",
