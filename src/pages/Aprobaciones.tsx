@@ -1,4 +1,4 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -6,12 +6,13 @@ import {
   Clock3,
   Filter,
   Inbox,
+  RefreshCcw,
   Search,
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import "./Aprobaciones.css"
 import { requestAssignments } from "../data/requestConfig"
-import { getDemoRequests } from "../services/demoStore"
+import { listRequests } from "../services/requestRepository"
 import {
   canApproveRequest,
   canConfirmResolution,
@@ -43,8 +44,26 @@ export default function Aprobaciones({
   const [search, setSearch] = useState("")
   const [localFilter, setLocalFilter] = useState("TODOS")
   const [processFilter, setProcessFilter] = useState("TODOS")
+  const [requests, setRequests] = useState<RequestItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
 
-  const requests = getDemoRequests()
+  async function load() {
+    setLoading(true)
+    setError("")
+    try {
+      setRequests(await listRequests(currentUser))
+    } catch (errorValue: any) {
+      setError(errorValue?.message ?? "No fue posible cargar la bandeja.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    load()
+  }, [currentUser.email, currentUser.role])
+
   const accessible = requests.filter((request) =>
     canViewRequest(currentUser, request, requestAssignments)
   )
@@ -129,7 +148,6 @@ export default function Aprobaciones({
     )
     .filter((request) => {
       if (!query) return true
-
       return `${request.id} ${request.processName} ${request.local} ${request.requesterName} ${request.currentResponsibleName ?? ""}`
         .toLowerCase()
         .includes(query)
@@ -151,52 +169,28 @@ export default function Aprobaciones({
             en una sola vista.
           </p>
         </div>
+        <button className="secondary-btn" onClick={load} disabled={loading}>
+          <RefreshCcw size={16} /> Actualizar
+        </button>
       </div>
 
+      {error && (
+        <div className="error-box">
+          <AlertTriangle size={18} />
+          <div>
+            <strong>No se pudo cargar la bandeja</strong>
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
+
       <div className="approval-metrics">
-        <Metric
-          label="Nuevas"
-          value={metrics.nuevas}
-          icon={Inbox}
-          active={view === "NUEVAS"}
-          onClick={() => setView("NUEVAS")}
-        />
-        <Metric
-          label="Por aprobar"
-          value={metrics.aprobar}
-          icon={Clock3}
-          active={view === "POR_APROBAR"}
-          onClick={() => setView("POR_APROBAR")}
-        />
-        <Metric
-          label="En gestión"
-          value={metrics.gestion}
-          icon={Clock3}
-          active={view === "EN_GESTION"}
-          onClick={() => setView("EN_GESTION")}
-        />
-        <Metric
-          label="Falta información"
-          value={metrics.info}
-          icon={AlertTriangle}
-          active={view === "FALTA_INFO"}
-          onClick={() => setView("FALTA_INFO")}
-        />
-        <Metric
-          label="Por confirmar"
-          value={metrics.confirmar}
-          icon={CheckCircle2}
-          active={view === "POR_CONFIRMAR"}
-          onClick={() => setView("POR_CONFIRMAR")}
-        />
-        <Metric
-          label="Por vencer / vencidas"
-          value={metrics.sla}
-          icon={AlertTriangle}
-          tone="danger"
-          active={view === "SLA"}
-          onClick={() => setView("SLA")}
-        />
+        <Metric label="Nuevas" value={metrics.nuevas} icon={Inbox} active={view === "NUEVAS"} onClick={() => setView("NUEVAS")} />
+        <Metric label="Por aprobar" value={metrics.aprobar} icon={Clock3} active={view === "POR_APROBAR"} onClick={() => setView("POR_APROBAR")} />
+        <Metric label="En gestión" value={metrics.gestion} icon={Clock3} active={view === "EN_GESTION"} onClick={() => setView("EN_GESTION")} />
+        <Metric label="Falta información" value={metrics.info} icon={AlertTriangle} active={view === "FALTA_INFO"} onClick={() => setView("FALTA_INFO")} />
+        <Metric label="Por confirmar" value={metrics.confirmar} icon={CheckCircle2} active={view === "POR_CONFIRMAR"} onClick={() => setView("POR_CONFIRMAR")} />
+        <Metric label="Por vencer / vencidas" value={metrics.sla} icon={AlertTriangle} tone="danger" active={view === "SLA"} onClick={() => setView("SLA")} />
       </div>
 
       <div className="approval-tabs">
@@ -230,33 +224,14 @@ export default function Aprobaciones({
             placeholder="Buscar solicitud, local o solicitante..."
           />
         </div>
-
-        <div className="approval-filter-icon">
-          <Filter size={16} />
-        </div>
-
-        <select
-          value={localFilter}
-          onChange={(event) => setLocalFilter(event.target.value)}
-        >
+        <div className="approval-filter-icon"><Filter size={16} /></div>
+        <select value={localFilter} onChange={(event) => setLocalFilter(event.target.value)}>
           <option value="TODOS">Todos los locales</option>
-          {locals.map((local) => (
-            <option key={local} value={local}>
-              {local}
-            </option>
-          ))}
+          {locals.map((local) => <option key={local} value={local}>{local}</option>)}
         </select>
-
-        <select
-          value={processFilter}
-          onChange={(event) => setProcessFilter(event.target.value)}
-        >
+        <select value={processFilter} onChange={(event) => setProcessFilter(event.target.value)}>
           <option value="TODOS">Todos los procesos</option>
-          {processes.map((process) => (
-            <option key={process} value={process}>
-              {process}
-            </option>
-          ))}
+          {processes.map((process) => <option key={process} value={process}>{process}</option>)}
         </select>
       </div>
 
@@ -274,7 +249,6 @@ export default function Aprobaciones({
               <th />
             </tr>
           </thead>
-
           <tbody>
             {filtered.map((request) => (
               <tr
@@ -283,49 +257,34 @@ export default function Aprobaciones({
                 tabIndex={0}
                 onClick={() => navigate(`/solicitudes/${request.id}`)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    navigate(`/solicitudes/${request.id}`)
-                  }
+                  if (event.key === "Enter") navigate(`/solicitudes/${request.id}`)
                 }}
               >
-                <td>
-                  <div className="approval-request-main">
-                    <strong>{request.processName}</strong>
-                    <span>{request.id}</span>
-                  </div>
-                </td>
+                <td><div className="approval-request-main"><strong>{request.processName}</strong><span>{request.id}</span></div></td>
                 <td>{request.local}</td>
                 <td>{request.requesterName}</td>
-                <td>
-                  {new Date(request.createdAt).toLocaleDateString("es-CL")}
-                </td>
+                <td>{new Date(request.createdAt).toLocaleDateString("es-CL")}</td>
                 <td>{responsibleLabel(currentUser, request)}</td>
-                <td>
-                  <span className={`sla-badge sla-${getSLA(request).tone}`}>
-                    {getSLA(request).label}
-                  </span>
-                </td>
-                <td>
-                  <span className="status neutral">
-                    {visibleStatusLabel(request)}
-                  </span>
-                </td>
-                <td className="approval-row-arrow">
-                  <ChevronRight size={17} />
-                </td>
+                <td><span className={`sla-badge sla-${getSLA(request).tone}`}>{getSLA(request).label}</span></td>
+                <td><span className="status neutral">{visibleStatusLabel(request)}</span></td>
+                <td className="approval-row-arrow"><ChevronRight size={17} /></td>
               </tr>
             ))}
           </tbody>
         </table>
 
-        {!filtered.length && (
+        {loading && (
+          <div className="approval-empty">
+            <Clock3 size={28} />
+            <strong>Cargando pendientes…</strong>
+          </div>
+        )}
+
+        {!loading && !filtered.length && (
           <div className="approval-empty">
             <CheckCircle2 size={28} />
             <strong>Sin pendientes en esta vista</strong>
-            <span>
-              El contador y esta lista usan exactamente la misma regla de
-              permisos y estado.
-            </span>
+            <span>El contador y esta lista usan exactamente la misma regla de permisos y estado.</span>
           </div>
         )}
       </div>
@@ -350,16 +309,11 @@ function Metric({
 }) {
   return (
     <button
-      className={`approval-metric ${active ? "active" : ""} ${
-        tone ? `metric-${tone}` : ""
-      }`}
+      className={`approval-metric ${active ? "active" : ""} ${tone ? `metric-${tone}` : ""}`}
       onClick={onClick}
     >
       <Icon size={18} />
-      <div>
-        <strong>{value}</strong>
-        <span>{label}</span>
-      </div>
+      <div><strong>{value}</strong><span>{label}</span></div>
     </button>
   )
 }
@@ -374,7 +328,6 @@ function tabLabel(value: ManagementView) {
     SLA: "SLA",
     TODAS: "Todas",
   }
-
   return labels[value]
 }
 
@@ -383,17 +336,11 @@ function getSLA(request: RequestItem): {
   tone: "ok" | "warning" | "danger" | "paused" | "neutral"
   priority: number
 } {
-  if (request.slaPausedReason) {
-    return { label: "En pausa", tone: "paused", priority: 2 }
-  }
-
-  if (["RESUELTA", "RECHAZADA"].includes(request.status)) {
-    return { label: "Finalizado", tone: "neutral", priority: 5 }
-  }
+  if (request.slaPausedReason) return { label: "En pausa", tone: "paused", priority: 2 }
+  if (["RESUELTA", "RECHAZADA"].includes(request.status)) return { label: "Finalizado", tone: "neutral", priority: 5 }
 
   let hours: number | undefined
   let started: string | undefined
-
   if (request.status === "RECIBIDA") {
     hours = request.acceptanceSLAHours
     started = request.acceptanceSLAStartedAt
@@ -405,38 +352,22 @@ function getSLA(request: RequestItem): {
     started = request.resolutionSLAStartedAt
   }
 
-  if (!hours || !started) {
-    return { label: "A tiempo", tone: "ok", priority: 3 }
-  }
-
+  if (!hours || !started) return { label: "A tiempo", tone: "ok", priority: 3 }
   const startDate = new Date(started)
-  const due =
-    hours === 24
-      ? addBusinessDays(startDate, 1)
-      : new Date(startDate.getTime() + hours * 3600000)
-
+  const due = hours === 24 ? addBusinessDays(startDate, 1) : new Date(startDate.getTime() + hours * 3600000)
   const remaining = (due.getTime() - Date.now()) / 3600000
-
-  if (remaining <= 0) {
-    return { label: "Vencida", tone: "danger", priority: 0 }
-  }
-
-  if (remaining <= 6) {
-    return { label: "Por vencer", tone: "warning", priority: 1 }
-  }
-
+  if (remaining <= 0) return { label: "Vencida", tone: "danger", priority: 0 }
+  if (remaining <= 6) return { label: "Por vencer", tone: "warning", priority: 1 }
   return { label: "A tiempo", tone: "ok", priority: 3 }
 }
 
 function addBusinessDays(date: Date, days: number) {
   const result = new Date(date)
   let added = 0
-
   while (added < days) {
     result.setDate(result.getDate() + 1)
     const day = result.getDay()
     if (day !== 0 && day !== 6) added += 1
   }
-
   return result
 }
