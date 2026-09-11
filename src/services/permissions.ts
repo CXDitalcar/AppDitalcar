@@ -73,6 +73,18 @@ export function canViewRequest(
     return true
   }
 
+  if (user.role === "GERENCIA_MARCA") {
+    // La Gerencia de Marca ve los locales asignados a su perfil.
+    // Si aún no se cargaron, usamos marcas explícitas solo como respaldo
+    // cuando el nombre del local contiene la marca.
+    if (userHasLocal(user, request.local)) return true
+    return Boolean(
+      user.brands?.some((brand) =>
+        normalized(request.local).includes(normalized(brand))
+      )
+    )
+  }
+
   if (user.role === "JEFATURA_MARCA") {
     return isGeelyLocal(request.local)
   }
@@ -111,6 +123,7 @@ export function canApproveRequest(
         "JEFATURA_LOCAL",
         "JEFATURA_MARCA",
         "JEFATURA_ZONAL",
+        "GERENCIA_MARCA",
       ].includes(user.role)
     }
 
@@ -192,6 +205,7 @@ export function canAccessApprovalInbox(
       "JEFATURA_LOCAL",
       "JEFATURA_MARCA",
       "JEFATURA_ZONAL",
+      "GERENCIA_MARCA",
       "GERENCIA_COMERCIAL",
     ].includes(user.role)
   ) {
@@ -220,6 +234,13 @@ export function canViewLocalDetail(user: UserScope, local: string): boolean {
 
   if (user.role === "VENDEDOR" || user.role === "JEFATURA_LOCAL") {
     return userHasLocal(user, local)
+  }
+
+  if (user.role === "GERENCIA_MARCA") {
+    if (userHasLocal(user, local)) return true
+    return Boolean(
+      user.brands?.some((brand) => normalized(local).includes(normalized(brand)))
+    )
   }
 
   if (user.role === "JEFATURA_MARCA") return isGeelyLocal(local)
