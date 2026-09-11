@@ -21,7 +21,8 @@ export function roleLabel(role: UserRole) {
     VENDEDOR: "Vendedor",
     JEFATURA_LOCAL: "Jefatura Local",
     JEFATURA_MARCA: "Jefatura de Marca",
-    JEFATURA_ZONAL: "Jefatura Zonal",
+    JEFATURA_ZONAL: "Gerencia de Marca",
+    GERENCIA_MARCA: "Gerencia de Marca",
     GERENCIA_VENTAS: "Gerencia de Ventas",
     JEFATURA_COMERCIAL_CLIENTES: "Jefatura Comercial y Clientes",
     JEFATURA_OPERACIONES_COMERCIALES: "Jefatura Operaciones Comerciales",
@@ -136,29 +137,52 @@ function getSellerLocalReviewer(local: string) {
     }
   }
 
+  // Nueva estructura comercial: Gerencia de Marca es el respaldo
+  // de Jefatura Local. Durante la migración conservamos compatibilidad
+  // con los antiguos perfiles de Jefatura de Marca / Zonal.
+  const brandManager = mockUsers.find(
+    (item) =>
+      item.active &&
+      item.role === "GERENCIA_MARCA" &&
+      (
+        item.assignedLocals?.some(
+          (assigned) => assigned.trim().toLowerCase() === normalizedLocal
+        ) ||
+        item.local?.trim().toLowerCase() === normalizedLocal
+      )
+  )
+
+  if (brandManager) {
+    return {
+      email: brandManager.email,
+      name: brandManager.name,
+      label: "Gerencia de Marca",
+    }
+  }
+
   if (normalizedLocal.includes("geely")) {
-    const brandHead = mockUsers.find(
+    const legacyBrandHead = mockUsers.find(
       (item) => item.active && item.role === "JEFATURA_MARCA"
     )
 
-    if (brandHead) {
+    if (legacyBrandHead) {
       return {
-        email: brandHead.email,
-        name: brandHead.name,
-        label: "Jefatura de Marca",
+        email: legacyBrandHead.email,
+        name: legacyBrandHead.name,
+        label: "Gerencia de Marca",
       }
     }
   }
 
-  const zoneHead = mockUsers.find(
+  const legacyZoneHead = mockUsers.find(
     (item) => item.active && item.role === "JEFATURA_ZONAL"
   )
 
-  if (zoneHead) {
+  if (legacyZoneHead) {
     return {
-      email: zoneHead.email,
-      name: zoneHead.name,
-      label: "Jefatura Zonal",
+      email: legacyZoneHead.email,
+      name: legacyZoneHead.name,
+      label: "Gerencia de Marca",
     }
   }
 
