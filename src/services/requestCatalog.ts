@@ -18,6 +18,7 @@ const DEMO_EMAILS = new Set([
   "jefatura.local@ditalcar.cl",
   "jefatura.marca@ditalcar.cl",
   "jefatura.zonal@ditalcar.cl",
+  "gerencia.marca@ditalcar.cl",
   "gerencia.ventas@ditalcar.cl",
   "comercial.clientes@ditalcar.cl",
   "operaciones.comerciales@ditalcar.cl",
@@ -27,7 +28,9 @@ const DEMO_EMAILS = new Set([
   "marketing@ditalcar.cl",
   "experiencia.clientes@ditalcar.cl",
   "administrativo@ditalcar.cl",
+  "junior.demo@ditalcar.cl",
   "equipo.comercial@ditalcar.cl",
+  "project.manager@ditalcar.cl",
   "gerencia.general@ditalcar.cl",
 ])
 
@@ -68,13 +71,31 @@ export function getRequestProcess(code: string) {
   return requestProcesses.find((process) => process.code === code)
 }
 
+function migratedRoleMatches(
+  userRole: UserScope["role"],
+  configuredRole?: UserScope["role"]
+) {
+  if (!configuredRole) return false
+  if (configuredRole === userRole) return true
+
+  // Durante la migración, GERENCIA_MARCA reemplaza los antiguos
+  // perfiles JEFATURA_MARCA / JEFATURA_ZONAL en configuraciones existentes.
+  if (userRole === "GERENCIA_MARCA") {
+    return ["JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(configuredRole)
+  }
+
+  return false
+}
+
 export function getProcessesForUser(user: UserScope) {
   return requestProcesses
     .filter(
       (process) =>
         process.active &&
         process.manualRequest &&
-        process.requesterRoles.includes(user.role)
+        process.requesterRoles.some((role) =>
+          migratedRoleMatches(user.role, role)
+        )
     )
     .sort((a, b) => a.order - b.order)
 }
@@ -161,7 +182,7 @@ export function assignmentMatchesUser(
     if (
       isDemoUser(user) &&
       assignment.role &&
-      assignment.role === user.role
+      migratedRoleMatches(user.role, assignment.role)
     ) {
       return true
     }
@@ -169,7 +190,10 @@ export function assignmentMatchesUser(
     return false
   }
 
-  if (assignment.role && assignment.role !== user.role) {
+  if (
+    assignment.role &&
+    !migratedRoleMatches(user.role, assignment.role)
+  ) {
     return false
   }
 
@@ -238,7 +262,9 @@ export function getLocalOptions(
   }
 
   const brandScope =
-    user.scope === "MARCA" || user.role === "JEFATURA_MARCA"
+    user.scope === "MARCA" ||
+    user.role === "GERENCIA_MARCA" ||
+    user.role === "JEFATURA_MARCA"
 
   if (brandScope && user.brands?.length) {
     const brands = user.brands.map(normalize)
