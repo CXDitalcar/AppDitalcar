@@ -154,10 +154,13 @@ function formatRole(
       "Jefatura de Local",
 
     JEFATURA_MARCA:
-      "Jefatura de Marca",
+      "Gerencia de Marca",
 
     JEFATURA_ZONAL:
-      "Jefatura Zonal",
+      "Gerencia de Marca",
+
+    GERENCIA_MARCA:
+      "Gerencia de Marca",
 
     GERENCIA_VENTAS:
       "Gerencia de Ventas",
