@@ -1,100 +1,139 @@
 import { useEffect, useMemo, useState } from "react"
 import { AlertCircle, Plus, RefreshCcw, Search } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
-import { getSolicitudes, type Solicitud } from "../services/graph"
-import { getDemoRequests } from "../services/demoStore"
+import { listRequests } from "../services/requestRepository"
 import { requestAssignments } from "../data/requestConfig"
 import { canViewRequest } from "../services/permissions"
 import type { RequestItem, UserScope } from "../types"
-import StatusBadge from "../components/StatusBadge"
 import { responsibleLabel, visibleStatusLabel } from "../services/requestPresentation"
 
-function pick(fields: Record<string, any>, names: string[]) {
-  for (const name of names) if (fields[name] !== undefined && fields[name] !== null) return fields[name]
-  return ""
-}
-
-export default function Solicitudes({ branch, currentUser, demoMode }: { branch: string; currentUser: UserScope; demoMode: boolean }) {
+export default function Solicitudes({
+  branch,
+  currentUser,
+  demoMode,
+}: {
+  branch: string
+  currentUser: UserScope
+  demoMode: boolean
+}) {
   const navigate = useNavigate()
-  const [rows,setRows] = useState<Solicitud[]>([])
-  const [demoRows,setDemoRows] = useState<RequestItem[]>([])
-  const [loading,setLoading] = useState(!demoMode)
-  const [error,setError] = useState("")
-  const [query,setQuery] = useState("")
+  const [rows, setRows] = useState<RequestItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+  const [query, setQuery] = useState("")
 
   async function load() {
-    setError("")
-    if (demoMode) {
-      setDemoRows(getDemoRequests())
-      setLoading(false)
-      return
-    }
     setLoading(true)
-    try { setRows(await getSolicitudes()) }
-    catch(e:any) { setError(e?.message || "No fue posible cargar las solicitudes.") }
-    finally { setLoading(false) }
+    setError("")
+    try {
+      setRows(await listRequests(currentUser))
+    } catch (errorValue: any) {
+      setError(errorValue?.message || "No fue posible cargar las solicitudes.")
+    } finally {
+      setLoading(false)
+    }
   }
 
-  useEffect(() => { load() }, [demoMode])
+  useEffect(() => {
+    load()
+  }, [currentUser.email, currentUser.role, demoMode])
 
-  const visibleDemo = useMemo(() => {
+  const visible = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return demoRows
-      .filter((request) => canViewRequest(currentUser, request, requestAssignments))
-      .filter((request) => !q || `${request.id} ${request.processName} ${request.local} ${request.requesterName} ${request.status}`.toLowerCase().includes(q))
-      .sort((a,b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-  }, [demoRows, query, currentUser])
-
-  const filteredLive = useMemo(() => {
-    const q = query.toLowerCase().trim()
-    return rows.filter(r => {
-      const f = r.fields
-      const local = String(pick(f,["Local","local","Sucursal","Sucursal0"]))
-      const solicitud = String(pick(f,["Solicitud","Title","Title0"]))
-      const estado = String(pick(f,["EstadoFlujo","Estado","Status"]))
-      const area = String(pick(f,["_x00c1_rearesponsable","Area_x0020_responsable","Área responsable","AreaResponsable"]))
-      const matchesBranch = branch === "Red Ditalcar" || !branch || !local || local.toLowerCase().includes(branch.toLowerCase())
-      const matchesQuery = !q || `${solicitud} ${estado} ${area} ${local}`.toLowerCase().includes(q)
-      return matchesBranch && matchesQuery
-    })
-  }, [rows,query,branch])
+    return rows
+      .filter((request) =>
+        canViewRequest(currentUser, request, requestAssignments)
+      )
+      .filter((request) => {
+        if (!q) return true
+        return `${request.id} ${request.processName} ${request.local} ${request.requesterName} ${request.status} ${request.currentResponsibleName ?? ""}`
+          .toLowerCase()
+          .includes(q)
+      })
+      .sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      )
+  }, [rows, query, currentUser])
 
   return (
     <div className="requests-page-pilot">
       <div className="page-head inline">
-        <div><span className="eyebrow">SOLICITUDES</span><h1>Seguimiento</h1><p>{demoMode ? "Piloto interactivo · flujo por rol y SLA" : "Fuente: SharePoint · Tablero General Solicitudes"}</p></div>
-        <div className="request-head-actions"><button className="secondary-btn" onClick={load}><RefreshCcw size={17}/> Actualizar</button><Link className="primary-btn" to="/solicitudes/nueva"><Plus size={17}/> Nueva solicitud</Link></div>
+        <div>
+          <span className="eyebrow">SOLICITUDES</span>
+          <h1>Seguimiento</h1>
+          <p>
+            {demoMode
+              ? "Piloto interactivo · flujo por rol y SLA"
+              : "Fuente real · Tablero General Solicitudes + seguimiento Lists"}
+          </p>
+        </div>
+        <div className="request-head-actions">
+          <button className="secondary-btn" onClick={load} disabled={loading}>
+            <RefreshCcw size={17} /> Actualizar
+          </button>
+          <Link className="primary-btn" to="/solicitudes/nueva">
+            <Plus size={17} /> Nueva solicitud
+          </Link>
+        </div>
       </div>
 
-      <div className="toolbar"><Search size={18}/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Buscar solicitud, local, proceso o estado..." /></div>
+      <div className="toolbar">
+        <Search size={18} />
+        <input
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Buscar solicitud, local, proceso o estado..."
+        />
+      </div>
 
       {loading && <div className="empty">Cargando solicitudes…</div>}
-      {error && <div className="error-box"><AlertCircle/><div><strong>No se pudieron cargar las solicitudes</strong><span>{error}</span></div></div>}
 
-      {demoMode ? (
+      {error && (
+        <div className="error-box">
+          <AlertCircle />
+          <div>
+            <strong>No se pudieron cargar las solicitudes</strong>
+            <span>{error}</span>
+          </div>
+        </div>
+      )}
+
+      {!loading && !error && (
         <div className="requests-grid">
-          {visibleDemo.map((request) => (
-            <button className="request-card request-card-button" key={request.id} onClick={() => navigate(`/solicitudes/${request.id}`)}>
-              <div className="request-top"><PilotStatus request={request}/><span>#{request.id}</span></div>
+          {visible.map((request) => (
+            <button
+              className="request-card request-card-button"
+              key={request.id}
+              onClick={() => navigate(`/solicitudes/${request.id}`)}
+            >
+              <div className="request-top">
+                <PilotStatus request={request} />
+                <span>#{request.id}</span>
+              </div>
               <h3>{request.processName}</h3>
-              <div className="request-meta"><span>{request.local}</span><span>{request.requesterName}</span><span>{responsibleLabel(currentUser, request)}</span></div>
-              {request.slaPausedReason && <div className="request-paused">SLA pausado · {request.slaPausedReason}</div>}
-              <div className="request-foot"><small>{new Date(request.createdAt).toLocaleDateString("es-CL")}</small></div>
+              <div className="request-meta">
+                <span>{request.local}</span>
+                <span>{request.requesterName}</span>
+                <span>{responsibleLabel(currentUser, request)}</span>
+              </div>
+              {request.slaPausedReason && (
+                <div className="request-paused">
+                  SLA pausado · {request.slaPausedReason}
+                </div>
+              )}
+              <div className="request-foot">
+                <small>
+                  {new Date(request.createdAt).toLocaleDateString("es-CL")}
+                </small>
+              </div>
             </button>
           ))}
         </div>
-      ) : (
-        <div className="requests-grid">
-          {!loading && !error && filteredLive.map(({id,fields}) => {
-            const title = String(pick(fields,["Solicitud","Title","Title0"])) || `Solicitud #${id}`
-            const status = String(pick(fields,["EstadoFlujo","Estado","Status"]))
-            const area = String(pick(fields,["_x00c1_rearesponsable","Area_x0020_responsable","Área responsable","AreaResponsable"]))
-            const category = String(pick(fields,["Categor_x00ed_as","Categorias","Categorías","Categoria"]))
-            const local = String(pick(fields,["Local","local","Sucursal","Sucursal0"]))
-            const date = String(pick(fields,["Fecha_x0020_solicitud","FechaSolicitud","Fecha solicitud","Created"]))
-            return <article className="request-card" key={id}><div className="request-top"><StatusBadge value={status}/><span>#{id}</span></div><h3>{title}</h3><div className="request-meta"><span>{area || "Área por asignar"}</span><span>{category || "Sin categoría"}</span><span>{local || "Sin local"}</span></div><div className="request-foot"><small>{date ? new Date(date).toLocaleDateString("es-CL") : "Sin fecha"}</small></div></article>
-          })}
-        </div>
+      )}
+
+      {!loading && !error && visible.length === 0 && (
+        <div className="empty">No hay solicitudes visibles para este perfil.</div>
       )}
     </div>
   )
