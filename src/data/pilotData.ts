@@ -98,6 +98,26 @@ export function getVisiblePilotLocals(user: UserScope) {
     return pilotLocals
   }
 
+  if (user.role === "GERENCIA_MARCA") {
+    const assigned = new Set(
+      (user.assignedLocals ?? []).map((local) => local.toLowerCase())
+    )
+    if (assigned.size) {
+      return pilotLocals.filter((local) => assigned.has(local.name.toLowerCase()))
+    }
+
+    const brands = new Set(
+      (user.brands ?? []).map((brand) => brand.toLowerCase())
+    )
+    if (brands.size) {
+      return pilotLocals.filter((local) =>
+        local.brands.some((brand) => brands.has(brand.toLowerCase()))
+      )
+    }
+
+    return []
+  }
+
   if (user.role === "JEFATURA_MARCA") {
     return pilotLocals.filter((local) => local.operation === "GEELY")
   }
