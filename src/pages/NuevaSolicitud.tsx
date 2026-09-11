@@ -23,15 +23,15 @@ import {
   mockForms,
 } from "../data/mockData"
 import {
-  createDemoRequest,
-  getDemoRequests,
-  nextDemoRequestId,
-} from "../services/demoStore"
+  createRequest,
+  findActiveRequestByBreach,
+} from "../services/requestRepository"
 import {
   getLocalOptions,
   getProcessesForUser,
   getRequestFields,
   getSupplyCatalog,
+  isDemoUser,
 } from "../services/requestCatalog"
 import { initialRequestRouting } from "../services/workflow"
 import type {
@@ -87,15 +87,6 @@ const familyInfo: Record<
   },
 }
 
-const activeStatuses = new Set<RequestStatus>([
-  "RECIBIDA",
-  "INFORMACION_REQUERIDA",
-  "PENDIENTE_APROBACION",
-  "APROBADA",
-  "APROBADA_CON_AJUSTE",
-  "EN_GESTION",
-  "RESUELTA_POR_CONFIRMAR",
-])
 
 export default function NuevaSolicitud({
   currentUser,
@@ -120,6 +111,8 @@ export default function NuevaSolicitud({
   const [createdStatus, setCreatedStatus] = useState<RequestStatus | null>(null)
   const [duplicateId, setDuplicateId] = useState("")
   const [error, setError] = useState("")
+  const [submitting, setSubmitting] = useState(false)
+  const [warnings, setWarnings] = useState<string[]>([])
 
   const sourceBreach = useMemo(
     () =>
@@ -178,19 +171,30 @@ export default function NuevaSolicitud({
   }, [processFromUrl, availableProcesses])
 
   useEffect(() => {
-    if (!sourceBreach) {
-      setDuplicateId("")
-      return
+    let active = true
+
+    async function checkDuplicate() {
+      if (!sourceBreach) {
+        setDuplicateId("")
+        return
+      }
+
+      try {
+        const existing = await findActiveRequestByBreach(
+          currentUser,
+          sourceBreach.id
+        )
+        if (active) setDuplicateId(existing?.id ?? "")
+      } catch {
+        if (active) setDuplicateId("")
+      }
     }
 
-    const existing = getDemoRequests().find(
-      (request) =>
-        request.originBreachId === sourceBreach.id &&
-        activeStatuses.has(request.status)
-    )
-
-    setDuplicateId(existing?.id ?? "")
-  }, [sourceBreach])
+    checkDuplicate()
+    return () => {
+      active = false
+    }
+  }, [sourceBreach, currentUser])
 
   const visibleFamilies = useMemo(() => {
     return (Object.keys(familyInfo) as RequestFamily[]).filter((family) =>
@@ -384,8 +388,8 @@ export default function NuevaSolicitud({
     return [...simple, ...repeated]
   }
 
-  function submitRequest() {
-    if (!selectedProcess) return
+  async function submitRequest() {
+    if (!selectedProcess || submitting) return
 
     if (duplicateId) {
       setError("Esta brecha ya tiene una solicitud activa.")
@@ -398,45 +402,57 @@ export default function NuevaSolicitud({
       return
     }
 
-    const routing = initialRequestRouting(
-      currentUser,
-      selectedProcess.code,
-      selectedLocal
-    )
+    setSubmitting(true)
+    setError("")
+    setWarnings([])
 
-    const id = nextDemoRequestId()
-    const request: RequestItem = {
-      id,
-      processCode: selectedProcess.code,
-      processName: selectedProcess.name,
-      family: selectedProcess.family,
-      requesterEmail: currentUser.email,
-      requesterName: currentUser.name,
-      requesterRole: currentUser.role,
-      local: selectedLocal,
-      fields: buildRequestFields(),
-      createdAt: new Date().toISOString(),
-      approvalSLAPausedMinutes: 0,
-      resolutionSLAPausedMinutes: 0,
-      reopened: false,
-      autoClosed: false,
-      originFormCode: sourceForm?.code,
-      originExecutionId: sourceBreach?.executionId,
-      originBreachId: sourceBreach?.id,
-      internalCheckpoints:
-        selectedProcess.code === "UNI-BON-01"
-          ? [
-              { checkpointId: "BON_SOLICITUD_MARCA", completed: false },
-              { checkpointId: "BON_FACTURA_RECIBIDA", completed: false },
-            ]
-          : [],
-      ...routing,
+    try {
+      const routing = initialRequestRouting(
+        currentUser,
+        selectedProcess.code,
+        selectedLocal
+      )
+
+      const request: Omit<RequestItem, "id"> = {
+        processCode: selectedProcess.code,
+        processName: selectedProcess.name,
+        family: selectedProcess.family,
+        requesterEmail: currentUser.email,
+        requesterName: currentUser.name,
+        requesterRole: currentUser.role,
+        local: selectedLocal,
+        fields: buildRequestFields(),
+        createdAt: new Date().toISOString(),
+        approvalSLAPausedMinutes: 0,
+        resolutionSLAPausedMinutes: 0,
+        reopened: false,
+        autoClosed: false,
+        originFormCode: sourceForm?.code,
+        originExecutionId: sourceBreach?.executionId,
+        originBreachId: sourceBreach?.id,
+        internalCheckpoints:
+          selectedProcess.code === "UNI-BON-01"
+            ? [
+                { checkpointId: "BON_SOLICITUD_MARCA", completed: false },
+                { checkpointId: "BON_FACTURA_RECIBIDA", completed: false },
+              ]
+            : [],
+        ...routing,
+      }
+
+      const result = await createRequest(currentUser, request)
+      setCreatedId(result.request.id)
+      setCreatedStatus(result.request.status)
+      setWarnings(result.warnings)
+      setStep(4)
+    } catch (errorValue: any) {
+      setError(
+        errorValue?.message ??
+          "No fue posible registrar la solicitud."
+      )
+    } finally {
+      setSubmitting(false)
     }
-
-    createDemoRequest(request)
-    setCreatedId(id)
-    setCreatedStatus(routing.status)
-    setStep(4)
   }
 
   if (createdId && selectedProcess) {
@@ -450,7 +466,7 @@ export default function NuevaSolicitud({
           <h1>Solicitud ingresada</h1>
           <p>
             <strong>{selectedProcess.name}</strong> ya forma parte del
-            seguimiento del piloto.
+            seguimiento de solicitudes Ditalcar.
           </p>
 
           <div className="request-success-info">
@@ -468,7 +484,7 @@ export default function NuevaSolicitud({
             </div>
             <div>
               <span>Fuente</span>
-              <strong>Piloto Demo</strong>
+              <strong>{isDemoUser(currentUser) ? "Piloto Demo" : "Tablero General Solicitudes"}</strong>
             </div>
           </div>
 
@@ -486,6 +502,25 @@ export default function NuevaSolicitud({
                 disponibles de cotizaciones, ventas, stock y consumo histórico,
                 sin mostrar el objetivo antes del envío.
               </p>
+            </div>
+          )}
+
+          {warnings.length > 0 && (
+            <div
+              style={{
+                marginTop: 16,
+                padding: 14,
+                border: "1px solid rgba(255,183,77,.28)",
+                borderRadius: 10,
+                background: "rgba(255,183,77,.07)",
+                color: "#e9c77f",
+                fontSize: 12,
+              }}
+            >
+              <strong>Solicitud creada con observaciones de sincronización</strong>
+              {warnings.map((warning) => (
+                <div key={warning}>{warning}</div>
+              ))}
             </div>
           )}
 
@@ -882,9 +917,13 @@ export default function NuevaSolicitud({
             <button className="secondary-btn" onClick={() => setStep(3)}>
               Editar
             </button>
-            <button className="primary-btn" onClick={submitRequest}>
-              Enviar solicitud
-              <CheckCircle2 size={17} />
+            <button
+              className="primary-btn"
+              onClick={submitRequest}
+              disabled={submitting}
+            >
+              {submitting ? "Registrando..." : "Enviar solicitud"}
+              {!submitting && <CheckCircle2 size={17} />}
             </button>
           </div>
         </section>
