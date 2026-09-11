@@ -41,6 +41,18 @@ export const mockUsers: UserScope[] = [
   },
 
   {
+    email: "gerencia.marca@ditalcar.cl",
+    name: "Gerencia Marca Demo",
+    role: "GERENCIA_MARCA",
+    scope: "MARCA",
+    brands: ["Chery", "Renault"],
+    assignedLocals: ["Vespucio", "Cantagallo"],
+    localPrincipal: "Vespucio",
+    active: true,
+  },
+
+
+  {
     email: "jefatura.zonal@ditalcar.cl",
     name: "Jefatura Zonal Demo",
     role: "JEFATURA_ZONAL",
@@ -112,9 +124,30 @@ export const mockUsers: UserScope[] = [
   },
 
   {
+    email: "junior.demo@ditalcar.cl",
+    name: "Junior Demo",
+    role: "ADMINISTRATIVO",
+    local: "Vespucio",
+    localPrincipal: "Vespucio",
+    assignedLocals: ["Vespucio"],
+    scope: "LOCAL",
+    areaFunctional: "Junior / Operación",
+    active: true,
+  },
+
+  {
     email: "equipo.comercial@ditalcar.cl",
     name: "Equipo Comercial Demo",
     role: "EQUIPO_COMERCIAL",
+    active: true,
+  },
+
+  {
+    email: "project.manager@ditalcar.cl",
+    name: "Project Manager Demo",
+    role: "EQUIPO_COMERCIAL",
+    scope: "RED",
+    areaFunctional: "Project Management",
     active: true,
   },
 
