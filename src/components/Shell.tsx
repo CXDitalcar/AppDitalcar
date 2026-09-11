@@ -6,7 +6,6 @@ import {
 import {
   BadgeCheck,
   BookOpen,
-  BookOpenCheck,
   Building2,
   ClipboardCheck,
   ClipboardList,
@@ -75,11 +74,6 @@ const mainNavigation: NavigationItem[] = [
     icon: BookOpen,
   },
 
-  {
-    label: "Playbooks de Venta",
-    to: "/playbooks-venta",
-    icon: BookOpenCheck,
-  },
 
   {
     label: "Mi local",
@@ -494,10 +488,13 @@ function formatRole(
       "Jefatura Local",
 
     JEFATURA_MARCA:
-      "Jefatura Marca · Geely",
+      "Gerencia de Marca",
 
     JEFATURA_ZONAL:
-      "Jefatura Zonal",
+      "Gerencia de Marca",
+
+    GERENCIA_MARCA:
+      "Gerencia de Marca",
 
     GERENCIA_VENTAS:
       "Gerencia Ventas",
