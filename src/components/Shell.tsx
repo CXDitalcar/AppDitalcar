@@ -27,6 +27,10 @@ import "./Shell.css"
 import type {
   UserScope,
 } from "../types"
+import {
+  canAccessPilotModule,
+  type PilotModule,
+} from "../data/pilotStellantis"
 
 
 // ======================================================
@@ -58,6 +62,7 @@ type NavigationItem = {
   label: string
   to: string
   icon: typeof LayoutDashboard
+  module: PilotModule
 }
 
 
@@ -66,12 +71,14 @@ const mainNavigation: NavigationItem[] = [
     label: "Inicio",
     to: "/",
     icon: LayoutDashboard,
+    module: "HOME",
   },
 
   {
     label: "Academia",
     to: "/academia",
     icon: BookOpen,
+    module: "ACADEMIA",
   },
 
 
@@ -79,18 +86,21 @@ const mainNavigation: NavigationItem[] = [
     label: "Mi local",
     to: "/mi-local",
     icon: Building2,
+    module: "MI_LOCAL",
   },
 
   {
     label: "Solicitudes",
     to: "/solicitudes",
     icon: ClipboardList,
+    module: "SOLICITUDES",
   },
 
   {
     label: "Formularios",
     to: "/formularios",
     icon: ClipboardCheck,
+    module: "FORMULARIOS",
   },
 ]
 
@@ -131,6 +141,13 @@ export default function Shell({
           currentUser.role
         )
       : "Ditalcar Colaboradores"
+
+
+  const visibleNavigation = currentUser
+    ? mainNavigation.filter((item) =>
+        canAccessPilotModule(currentUser, item.module)
+      )
+    : mainNavigation
 
 
   function closeMobileMenu() {
@@ -188,7 +205,7 @@ export default function Shell({
 
           <div className="app-sidebar-links">
 
-            {mainNavigation.map(
+            {visibleNavigation.map(
               (item) => {
                 const Icon =
                   item.icon
@@ -485,7 +502,7 @@ function formatRole(
       "Vendedor",
 
     JEFATURA_LOCAL:
-      "Jefatura Local",
+      "Jefatura de Sucursal",
 
     JEFATURA_MARCA:
       "Gerencia de Marca",
@@ -515,7 +532,7 @@ function formatRole(
       "Gerencia Comercial",
 
     JEFATURA_MARKETING:
-      "Jefatura Marketing",
+      "Equipo de Marketing",
 
     EXPERIENCIA_CLIENTES:
       "Experiencia de Clientes",
