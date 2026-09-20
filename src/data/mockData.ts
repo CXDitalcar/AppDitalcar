@@ -16,146 +16,102 @@ import type {
 export const mockUsers: UserScope[] = [
   {
     email: "vendedor.demo@ditalcar.cl",
-    name: "Vendedor Demo",
+    name: "Vendedor Piloto",
     role: "VENDEDOR",
-    local: "Vespucio",
-    brands: ["Chery", "Renault"],
+    local: "Stellantis Nueva Tobalaba",
+    localPrincipal: "Stellantis Nueva Tobalaba",
+    assignedLocals: ["Stellantis Nueva Tobalaba"],
+    brands: ["Jeep", "RAM", "Fiat"],
+    scope: "LOCAL",
     active: true,
   },
-
   {
-    email: "jefatura.local@ditalcar.cl",
-    name: "Jefatura Local Demo",
+    email: "jefe.stellantis.nt@ditalcar.cl",
+    name: "Jefe Sucursal · Stellantis Nueva Tobalaba",
     role: "JEFATURA_LOCAL",
-    local: "Vespucio",
-    brands: ["Chery", "Renault"],
+    local: "Stellantis Nueva Tobalaba",
+    localPrincipal: "Stellantis Nueva Tobalaba",
+    assignedLocals: ["Stellantis Nueva Tobalaba"],
+    brands: ["Jeep", "RAM", "Fiat"],
+    scope: "LOCAL",
+    active: true,
+  },
+  {
+    email: "gerencia.marca.stellantis@ditalcar.cl",
+    name: "Gerencia de Marca · Stellantis",
+    role: "GERENCIA_MARCA",
+    localPrincipal: "Stellantis Nueva Tobalaba",
+    assignedLocals: ["Stellantis Nueva Tobalaba"],
+    brands: ["Jeep", "RAM", "Fiat"],
+    scope: "MARCA",
+    active: true,
+  },
+  {
+    email: "experiencia.clientes@ditalcar.cl",
+    name: "Experiencia de Clientes",
+    role: "EXPERIENCIA_CLIENTES",
+    scope: "RED",
+    areaFunctional: "Experiencia de Clientes",
+    active: true,
+  },
+  {
+    email: "marketing@ditalcar.cl",
+    name: "Equipo de Marketing",
+    role: "JEFATURA_MARKETING",
+    scope: "RED",
+    areaFunctional: "Marketing",
+    active: true,
+  },
+  {
+    email: "gerencia.comercial@ditalcar.cl",
+    name: "Gerencia Comercial",
+    role: "GERENCIA_COMERCIAL",
+    scope: "RED",
+    areaFunctional: "Comercial",
     active: true,
   },
 
+  // Perfiles antiguos se conservan desactivados únicamente para compatibilidad
+  // con datos históricos y reglas todavía no migradas.
   {
     email: "jefatura.marca@ditalcar.cl",
     name: "Jefatura Marca Demo",
     role: "JEFATURA_MARCA",
-    brands: ["Chery"],
-    active: true,
+    brands: ["Geely"],
+    active: false,
   },
-
-  {
-    email: "gerencia.marca@ditalcar.cl",
-    name: "Gerencia Marca Demo",
-    role: "GERENCIA_MARCA",
-    scope: "MARCA",
-    brands: ["Chery", "Renault"],
-    assignedLocals: ["Vespucio", "Cantagallo"],
-    localPrincipal: "Vespucio",
-    active: true,
-  },
-
-
   {
     email: "jefatura.zonal@ditalcar.cl",
     name: "Jefatura Zonal Demo",
     role: "JEFATURA_ZONAL",
     zone: "Santiago",
-    active: true,
+    active: false,
   },
-
   {
     email: "gerencia.ventas@ditalcar.cl",
     name: "Gerencia Ventas Demo",
     role: "GERENCIA_VENTAS",
-    active: true,
+    active: false,
   },
-
   {
     email: "comercial.clientes@ditalcar.cl",
     name: "Jefatura Comercial y Clientes",
     role: "JEFATURA_COMERCIAL_CLIENTES",
-    active: true,
+    active: false,
   },
-
-  {
-    email: "operaciones.comerciales@ditalcar.cl",
-    name: "Jefatura Operaciones Comerciales",
-    role: "JEFATURA_OPERACIONES_COMERCIALES",
-    active: true,
-  },
-
-  {
-    email: "jefatura.administracion@ditalcar.cl",
-    name: "Jefatura Administración",
-    role: "JEFATURA_ADMINISTRACION",
-    active: true,
-  },
-
-  {
-    email: "gerencia.administracion@ditalcar.cl",
-    name: "Gerencia Administración",
-    role: "GERENCIA_ADMINISTRACION",
-    active: true,
-  },
-
-  {
-    email: "gerencia.comercial@ditalcar.cl",
-    name: "Gerencia Comercial",
-    role: "GERENCIA_COMERCIAL",
-    active: true,
-  },
-
-  {
-    email: "marketing@ditalcar.cl",
-    name: "Jefatura Marketing",
-    role: "JEFATURA_MARKETING",
-    active: true,
-  },
-
-  {
-    email: "experiencia.clientes@ditalcar.cl",
-    name: "Experiencia de Clientes",
-    role: "EXPERIENCIA_CLIENTES",
-    active: true,
-  },
-
-  {
-    email: "administrativo@ditalcar.cl",
-    name: "Administrativo Demo",
-    role: "ADMINISTRATIVO",
-    active: true,
-  },
-
-  {
-    email: "junior.demo@ditalcar.cl",
-    name: "Junior Demo",
-    role: "ADMINISTRATIVO",
-    local: "Vespucio",
-    localPrincipal: "Vespucio",
-    assignedLocals: ["Vespucio"],
-    scope: "LOCAL",
-    areaFunctional: "Junior / Operación",
-    active: true,
-  },
-
-  {
-    email: "equipo.comercial@ditalcar.cl",
-    name: "Equipo Comercial Demo",
-    role: "EQUIPO_COMERCIAL",
-    active: true,
-  },
-
   {
     email: "project.manager@ditalcar.cl",
     name: "Project Manager Demo",
     role: "EQUIPO_COMERCIAL",
     scope: "RED",
     areaFunctional: "Project Management",
-    active: true,
+    active: false,
   },
-
   {
     email: "gerencia.general@ditalcar.cl",
     name: "Gerencia General",
     role: "GERENCIA_GENERAL",
-    active: true,
+    active: false,
   },
 ]
 
@@ -1183,208 +1139,89 @@ export const mockProcessAssignments: ProcessAssignment[] = [
 export const mockRequests: RequestItem[] = [
   {
     id: "SOL-001",
-
-    processCode: "UNI-BON-01",
-    processName: "Bonificación",
-    family: "UNIDADES",
-
-    requesterEmail:
-      "vendedor.demo@ditalcar.cl",
-    requesterName:
-      "Vendedor Demo",
-    requesterRole:
-      "VENDEDOR",
-
-    local: "Vespucio",
-
-    status:
-      "PENDIENTE_APROBACION",
-
-    currentResponsibleEmail:
-      "operaciones.comerciales@ditalcar.cl",
-
-    currentResponsibleName:
-      "Jefatura Operaciones Comerciales",
-
-    fields: [
-      {
-        fieldId: "BON_NV",
-        requestedValue: "66534",
-      },
-      {
-        fieldId: "BON_CLIENTE",
-        requestedValue:
-          "Cliente Demo",
-      },
-      {
-        fieldId: "BON_MARCA",
-        requestedValue:
-          "Chery",
-      },
-      {
-        fieldId: "BON_MODELO",
-        requestedValue:
-          "Tiggo 7",
-      },
-      {
-        fieldId: "BON_MONTO",
-        requestedValue:
-          "350000",
-      },
-      {
-        fieldId: "BON_MOTIVO",
-        requestedValue:
-          "Apoyo para cierre de negocio.",
-      },
-    ],
-
-    createdAt:
-      "2026-08-31T09:10:00-04:00",
-
-    approvalSLAPausedMinutes: 0,
-
-    reopened: false,
-    autoClosed: false,
-
-    internalCheckpoints: [
-      {
-        checkpointId:
-          "BON_SOLICITUD_MARCA",
-        completed: false,
-      },
-      {
-        checkpointId:
-          "BON_FACTURA_RECIBIDA",
-        completed: false,
-      },
-    ],
-  },
-
-  {
-    id: "SOL-002",
-
-    processCode: "UNI-TRA-01",
-    processName: "Traslado de unidad",
-    family: "UNIDADES",
-
-    requesterEmail:
-      "jefatura.local@ditalcar.cl",
-    requesterName:
-      "Jefatura Local Demo",
-    requesterRole:
-      "JEFATURA_LOCAL",
-
-    local: "Vespucio",
-
-    status:
-      "PENDIENTE_APROBACION",
-
-    currentResponsibleEmail:
-      "operaciones.comerciales@ditalcar.cl",
-
-    currentResponsibleName:
-      "Jefatura Operaciones Comerciales",
-
-    fields: [
-      {
-        fieldId: "TRA_VIN",
-        requestedValue:
-          "VIN-DEMO-001",
-      },
-      {
-        fieldId: "TRA_MARCA",
-        requestedValue:
-          "Chery",
-      },
-      {
-        fieldId: "TRA_MODELO",
-        requestedValue:
-          "Tiggo 8",
-      },
-      {
-        fieldId: "TRA_ORIGEN",
-        requestedValue:
-          "Cantagallo",
-      },
-      {
-        fieldId: "TRA_DESTINO",
-        requestedValue:
-          "Vespucio",
-      },
-      {
-        fieldId: "TRA_MOTIVO",
-        requestedValue:
-          "Unidad requerida para cliente.",
-      },
-    ],
-
-    createdAt:
-      "2026-08-31T08:30:00-04:00",
-
-    approvalSLAPausedMinutes: 0,
-
-    reopened: false,
-    autoClosed: false,
-
-    internalCheckpoints: [],
-  },
-
-  {
-    id: "SOL-003",
-
     processCode: "COL-CRE-01",
     processName: "Credencial",
     family: "COLABORADORES",
-
-    requesterEmail:
-      "jefatura.local@ditalcar.cl",
-    requesterName:
-      "Jefatura Local Demo",
-    requesterRole:
-      "JEFATURA_LOCAL",
-
-    local: "Vespucio",
-
-    status:
-      "EN_GESTION",
-
-    currentResponsibleEmail:
-      "experiencia.clientes@ditalcar.cl",
-
-    currentResponsibleName:
-      "Experiencia de Clientes",
-
+    requesterEmail: "vendedor.demo@ditalcar.cl",
+    requesterName: "Vendedor Piloto",
+    requesterRole: "VENDEDOR",
+    local: "Stellantis Nueva Tobalaba",
+    status: "RECIBIDA",
+    currentResponsibleEmail: "experiencia.clientes@ditalcar.cl",
+    currentResponsibleName: "Experiencia de Clientes",
+    currentResponsibleLabel: "Experiencia de Clientes",
     fields: [
-      {
-        fieldId: "CRE_NOMBRE",
-        requestedValue:
-          "Colaborador Demo",
-      },
-      {
-        fieldId: "CRE_CARGO",
-        requestedValue:
-          "Vendedor",
-      },
-      {
-        fieldId: "CRE_LOCAL",
-        requestedValue:
-          "Vespucio",
-      },
-      {
-        fieldId: "CRE_TIPO",
-        requestedValue:
-          "Nueva",
-      },
+      { fieldId: "COL-CRE-01-NOMBRE_COLABORADOR", requestedValue: "Vendedor Piloto" },
+      { fieldId: "COL-CRE-01-CARGO", requestedValue: "Vendedor" },
+      { fieldId: "COL-CRE-01-TELEFONO", requestedValue: "+56 9 5555 5555" },
+      { fieldId: "COL-CRE-01-EMAIL_CORPORATIVO", requestedValue: "vendedor.demo@ditalcar.cl" },
+      { fieldId: "COL-CRE-01-TIPO_CREDENCIAL", requestedValue: "Nueva" },
     ],
-
-    createdAt:
-      "2026-08-30T16:20:00-04:00",
-
+    createdAt: "2026-09-20T09:15:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-20T09:15:00-03:00",
     approvalSLAPausedMinutes: 0,
-
+    resolutionSLAPausedMinutes: 0,
     reopened: false,
     autoClosed: false,
-
+    internalCheckpoints: [],
+  },
+  {
+    id: "SOL-002",
+    processCode: "COL-FIR-01",
+    processName: "Pie de firma",
+    family: "COLABORADORES",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "RECIBIDA",
+    currentResponsibleEmail: "marketing@ditalcar.cl",
+    currentResponsibleName: "Equipo de Marketing",
+    currentResponsibleLabel: "Equipo Marketing",
+    fields: [
+      { fieldId: "COL-FIR-01-NOMBRE_COLABORADOR", requestedValue: "Jefe Sucursal Piloto" },
+      { fieldId: "COL-FIR-01-CARGO", requestedValue: "Jefe de Sucursal" },
+      { fieldId: "COL-FIR-01-TELEFONO", requestedValue: "+56 9 5555 0000" },
+      { fieldId: "COL-FIR-01-EMAIL_CORPORATIVO", requestedValue: "jefe.stellantis.nt@ditalcar.cl" },
+      { fieldId: "COL-FIR-01-TIPO_SOLICITUD", requestedValue: "Actualización" },
+    ],
+    createdAt: "2026-09-20T10:10:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-20T10:10:00-03:00",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAPausedMinutes: 0,
+    reopened: false,
+    autoClosed: false,
+    internalCheckpoints: [],
+  },
+  {
+    id: "SOL-003",
+    processCode: "INS-MOB-01",
+    processName: "Mobiliario y equipamiento",
+    family: "INSUMOS_SHOWROOM",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "EN_GESTION",
+    currentResponsibleEmail: "experiencia.clientes@ditalcar.cl",
+    currentResponsibleName: "Experiencia de Clientes",
+    currentResponsibleLabel: "Experiencia de Clientes",
+    fields: [
+      { fieldId: "INS-MOB-01-ELEMENTO", requestedValue: "Mueble / equipamiento showroom" },
+      { fieldId: "INS-MOB-01-CANTIDAD", requestedValue: "1" },
+      { fieldId: "INS-MOB-01-MOTIVO", requestedValue: "Mejora de experiencia del local" },
+      { fieldId: "INS-MOB-01-DESCRIPCION", requestedValue: "Solicitud demostrativa del piloto." },
+    ],
+    createdAt: "2026-09-19T15:20:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-19T15:20:00-03:00",
+    managementAcceptedAt: "2026-09-19T16:00:00-03:00",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAPausedMinutes: 0,
+    reopened: false,
+    autoClosed: false,
     internalCheckpoints: [],
   },
 ]
@@ -1668,6 +1505,17 @@ export const mockFormExecutions: MockFormExecution[] = [
     nonCompliant: 3,
     requested: 0,
   },
+  {
+    id: "EJ-RUTA-STL-001",
+    formCode: "FOR-RUTA-01",
+    local: "Stellantis Nueva Tobalaba",
+    completedByName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    completedByEmail: "jefe.stellantis.nt@ditalcar.cl",
+    completedAt: "2026-09-18T10:35:00-03:00",
+    compliant: 18,
+    nonCompliant: 4,
+    requested: 0,
+  }
 ]
 
 
@@ -1774,4 +1622,44 @@ export const mockFormBreaches: MockFormBreach[] = [
     linkedRequestId:
       "SOL-003",
   },
+  {
+    id: "BRE-RUTA-STL-001",
+    executionId: "EJ-RUTA-STL-001",
+    formCode: "FOR-RUTA-01",
+    local: "Stellantis Nueva Tobalaba",
+    section: "Imagen del equipo",
+    question: "¿Todos los colaboradores cuentan con su credencial?",
+    status: "NO_CUMPLE",
+    mappedProcessCode: "COL-CRE-01",
+  },
+  {
+    id: "BRE-RUTA-STL-002",
+    executionId: "EJ-RUTA-STL-001",
+    formCode: "FOR-RUTA-01",
+    local: "Stellantis Nueva Tobalaba",
+    section: "Sala de ventas",
+    question: "¿Los horarios de atención se encuentran visibles y actualizados?",
+    status: "NO_CUMPLE",
+    mappedProcessCode: "EXP-HOR-01",
+  },
+  {
+    id: "BRE-RUTA-STL-003",
+    executionId: "EJ-RUTA-STL-001",
+    formCode: "FOR-RUTA-01",
+    local: "Stellantis Nueva Tobalaba",
+    section: "Sala de ventas",
+    question: "¿El organigrama visible se encuentra actualizado?",
+    status: "NO_CUMPLE",
+    mappedProcessCode: "EXP-ORG-01",
+  },
+  {
+    id: "BRE-RUTA-STL-004",
+    executionId: "EJ-RUTA-STL-001",
+    formCode: "FOR-RUTA-01",
+    local: "Stellantis Nueva Tobalaba",
+    section: "Señalización",
+    question: "¿La señalización requerida se encuentra completa y en buen estado?",
+    status: "NO_CUMPLE",
+    mappedProcessCode: "EXP-SEN-01",
+  }
 ]
