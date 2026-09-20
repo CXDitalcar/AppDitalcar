@@ -40,6 +40,9 @@ import {
 import {
   requestAssignments,
 } from "./data/requestConfig"
+import {
+  canAccessPilotModule,
+} from "./data/pilotStellantis"
 
 import {
   canAccessApprovalInbox,
@@ -301,6 +304,7 @@ export default function App() {
 
   const currentBranch =
     currentUser.local ??
+    currentUser.localPrincipal ??
     currentUser.zone ??
     "Red Ditalcar"
 
@@ -314,6 +318,11 @@ export default function App() {
       currentUser,
       requestAssignments
     )
+
+  const canSeeAcademia = canAccessPilotModule(currentUser, "ACADEMIA")
+  const canSeeMiLocal = canAccessPilotModule(currentUser, "MI_LOCAL")
+  const canSeeFormularios = canAccessPilotModule(currentUser, "FORMULARIOS")
+  const canSeeInsumos = canAccessPilotModule(currentUser, "INSUMOS")
 
 
   // ======================================================
@@ -372,7 +381,11 @@ export default function App() {
           <Route
             path="/academia"
             element={
-              <Academia currentUser={currentUser} />
+              canSeeAcademia ? (
+                <Academia currentUser={currentUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
 
@@ -394,10 +407,14 @@ export default function App() {
           <Route
             path="/mi-local"
             element={
-              <MiLocal
-                branch={currentBranch}
-                currentUser={currentUser}
-              />
+              canSeeMiLocal ? (
+                <MiLocal
+                  branch={currentBranch}
+                  currentUser={currentUser}
+                />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
 
@@ -476,7 +493,11 @@ export default function App() {
           <Route
             path="/insumos"
             element={
-              <PedidoInsumos currentUser={currentUser} />
+              canSeeInsumos ? (
+                <PedidoInsumos currentUser={currentUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
 
@@ -487,11 +508,11 @@ export default function App() {
           <Route
             path="/formularios"
             element={
-              <Formularios
-                currentUser={
-                  currentUser
-                }
-              />
+              canSeeFormularios ? (
+                <Formularios currentUser={currentUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
 
@@ -503,11 +524,11 @@ export default function App() {
           <Route
             path="/formularios/:executionId"
             element={
-              <FormularioDetalle
-                currentUser={
-                  currentUser
-                }
-              />
+              canSeeFormularios ? (
+                <FormularioDetalle currentUser={currentUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
             }
           />
 
