@@ -139,3 +139,31 @@
   font-size:9px;
   line-height:1.45;
 }
+
+.demo-seller-fields{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  margin-top:12px;
+}
+
+.demo-user-select input{
+  width:100%;
+  box-sizing:border-box;
+  padding:11px 12px;
+  border:1px solid #303037;
+  border-radius:10px;
+  outline:none;
+  background:#111114;
+  color:#fff;
+}
+
+.demo-user-select input:focus{
+  border-color:rgba(225,38,47,.65);
+}
+
+@media (max-width:640px){
+  .demo-seller-fields{
+    grid-template-columns:1fr;
+  }
+}
