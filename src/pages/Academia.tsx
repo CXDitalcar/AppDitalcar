@@ -107,7 +107,7 @@ function getAudience(user: UserScope): AcademyAudience {
 function audienceLabel(audience: AcademyAudience) {
   const labels: Record<AcademyAudience, string> = {
     VENTAS: "Equipo de Ventas",
-    JEFATURA: "Jefatura Local",
+    JEFATURA: "Jefatura de Sucursal",
     GERENCIA_MARCA: "Gerencia de Marca",
     GERENCIA_VENTAS: "Gerencia de Ventas",
     JUNIOR: "Junior / Operación",
@@ -1351,7 +1351,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
               <button type="button">
                 Abrir tablero <ArrowRight size={16} />
               </button>
-              <small>Responsable: Jefatura Local · Backup: Gerencia de Marca asociada</small>
+              <small>Responsable: Jefatura de Sucursal · Backup: Gerencia de Marca asociada</small>
             </div>
           )}
         </section>
