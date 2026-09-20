@@ -552,6 +552,11 @@ function FormCard({
     ).length
 
 
+  const canComplete =
+    form.roles.includes(currentUser.role) &&
+    (!form.stellantisOnly || isStellantisLocal(currentUser.local))
+
+
   function openForm() {
     window.open(
       form.url,
@@ -729,19 +734,24 @@ function FormCard({
         )}
 
 
-        <button
-          type="button"
-          className="form-primary-btn"
-          onClick={
-            openForm
-          }
-        >
-          Realizar formulario
-
-          <ArrowUpRight
-            size={17}
-          />
-        </button>
+        {canComplete ? (
+          <button
+            type="button"
+            className="form-primary-btn"
+            onClick={openForm}
+          >
+            Realizar formulario
+            <ArrowUpRight size={17} />
+          </button>
+        ) : (
+          <div
+            className="form-readonly-badge"
+            title="Visible para seguimiento. No está asignado a este perfil."
+          >
+            <Eye size={16} />
+            Visible para seguimiento
+          </div>
+        )}
 
       </div>
 
@@ -804,35 +814,24 @@ function SummaryCard({
 function getFormsToComplete(
   currentUser: UserScope
 ) {
-  return mockForms.filter(
-    (form) => {
-      if (!form.active) {
-        return false
-      }
+  if (!currentUser.active) return []
 
+  // Experiencia mantiene visualización completa durante el piloto para
+  // poder revisar en paralelo módulos todavía ocultos al resto de perfiles.
+  if (currentUser.role === "EXPERIENCIA_CLIENTES") {
+    return mockForms.filter((form) => form.active)
+  }
 
-      if (
-        !form.roles.includes(
-          currentUser.role
-        )
-      ) {
-        return false
-      }
+  // Piloto Stellantis Nueva Tobalaba: Ruta visible para Jefatura Local y
+  // Gerencia de Marca. La asignación para realizarla sigue siendo solo de
+  // Jefatura Local (se valida dentro de FormCard mediante form.roles).
+  if (["JEFATURA_LOCAL", "GERENCIA_MARCA"].includes(currentUser.role)) {
+    return mockForms.filter(
+      (form) => form.active && form.code === "FOR-RUTA-01"
+    )
+  }
 
-
-      if (
-        form.stellantisOnly &&
-        !isStellantisLocal(
-          currentUser.local
-        )
-      ) {
-        return false
-      }
-
-
-      return true
-    }
-  )
+  return []
 }
 
 
@@ -847,6 +846,7 @@ function canUserSeeTracking(
     "JEFATURA_LOCAL",
     "JEFATURA_MARCA",
     "JEFATURA_ZONAL",
+    "GERENCIA_MARCA",
     "GERENCIA_VENTAS",
     "JEFATURA_COMERCIAL_CLIENTES",
     "EXPERIENCIA_CLIENTES",
@@ -926,6 +926,24 @@ function canViewExecution(
       execution.local ===
         currentUser.local
     )
+  }
+
+
+  if (
+    currentUser.role ===
+    "GERENCIA_MARCA"
+  ) {
+    const assigned = new Set(
+      [
+        ...(currentUser.assignedLocals ?? []),
+        ...(currentUser.local ? [currentUser.local] : []),
+        ...(currentUser.localPrincipal ? [currentUser.localPrincipal] : []),
+      ]
+        .filter(Boolean)
+        .map((local) => local.toLowerCase())
+    )
+
+    return assigned.has(execution.local.toLowerCase())
   }
 
 
@@ -1064,6 +1082,9 @@ function getTrackingDescription(
     case "JEFATURA_ZONAL":
       return "Resultados de tus locales, excluyendo las operaciones Geely y Stellantis."
 
+    case "GERENCIA_MARCA":
+      return "Seguimiento de Ruta y brechas de los locales asignados a tu gerencia de marca."
+
     case "GERENCIA_VENTAS":
       return "Vista general de revisiones y brechas de toda la red."
 
@@ -1121,7 +1142,7 @@ function formatRole(
       "Vendedor",
 
     JEFATURA_LOCAL:
-      "Jefatura Local",
+      "Jefatura de Sucursal",
 
     JEFATURA_MARCA:
       "Jefatura Marca · Geely",
@@ -1151,7 +1172,7 @@ function formatRole(
       "Gerencia Comercial",
 
     JEFATURA_MARKETING:
-      "Jefatura Marketing",
+      "Equipo de Marketing",
 
     EXPERIENCIA_CLIENTES:
       "Experiencia de Clientes",
