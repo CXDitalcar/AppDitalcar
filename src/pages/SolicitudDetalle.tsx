@@ -712,7 +712,7 @@ function RequestDetailContent({
         currentResponsibleName:
           request.requesterName,
         currentResponsibleLabel:
-          "Solicitante / Jefatura Local",
+          "Solicitante / Jefatura de Sucursal",
       },
       "RESOLUTION_REPORTED",
       "Marcada como resuelta",
@@ -1584,7 +1584,7 @@ function RequestDetailContent({
                 <strong>Por confirmar</strong>
                 <p>
                   Puede confirmar el solicitante
-                  o la Jefatura Local.
+                  o la Jefatura de Sucursal.
                   El plazo es 48 h.
                 </p>
               </div>
