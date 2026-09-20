@@ -29,6 +29,20 @@ export const networkKPIs: KPIItem[] = [
 
 export const pilotLocals: PilotLocal[] = [
   {
+    name: "Stellantis Nueva Tobalaba",
+    zone: "Santiago",
+    operation: "STELLANTIS",
+    brands: ["Jeep", "RAM", "Fiat"],
+    kpis: [
+      { id: "ruta", label: "Ruta realizada", value: 100, unit: "%", target: 100, note: "Ruta semanal del piloto Stellantis Nueva Tobalaba.", state: "OK" },
+      { id: "exactitud", label: "Exactitud de revisión", value: 90, unit: "%", target: 90, note: "Dato demostrativo hasta conectar resultados reales.", state: "OK" },
+      { id: "estandares", label: "Cumplimiento estándares", value: 88, unit: "%", target: 90, note: "Dato demostrativo para validar la vista del piloto.", state: "WATCH" },
+      { id: "consulta", label: "Avance CONSULTA", value: 75, unit: "%", target: 80, note: "Dato demostrativo para validar la vista del piloto.", state: "WATCH" },
+      { id: "sla", label: "SLA a tiempo", value: 90, unit: "%", target: 90, note: "Seguimiento de solicitudes del piloto.", state: "OK" },
+      { id: "brechas", label: "Brechas abiertas", value: 3, unit: "count", note: "Brechas de ejemplo asociadas a la Ruta de Experiencia.", state: "WATCH" },
+    ],
+  },
+  {
     name: "Vespucio",
     zone: "Santiago",
     operation: "GENERAL",
@@ -85,7 +99,7 @@ export const pilotFlow = {
   managerAcceptanceHours: 24,
   resolutionConfirmationHours: 48,
   budgetApproverRole: "GERENCIA_COMERCIAL" as const,
-  infrastructureFinalApproverRole: "GERENCIA_GENERAL" as const,
+  infrastructureFinalApproverRole: "GERENCIA_COMERCIAL" as const,
 }
 
 export function getPilotLocal(name?: string) {
