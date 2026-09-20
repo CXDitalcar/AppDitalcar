@@ -9,6 +9,6 @@ export const appConfig = {
     solicitudesListId: "3ae1d625-c96b-42ee-b5f5-bbb8cc122d0b",
   },
   pilot: {
-    branch: "Vespucio",
+    branch: "Stellantis Nueva Tobalaba",
   },
 }
