@@ -14,15 +14,21 @@ import { Link } from "react-router-dom"
 
 import { getPilotLocal, getVisiblePilotLocals, networkKPIs, type KPIItem } from "../data/pilotData"
 import type { UserScope } from "../types"
+import { canAccessPilotModule, isPilotFullAccess, type PilotModule } from "../data/pilotStellantis"
 
-const cards = [
-  { to: "/academia", title: "Academia", text: "Modelo, playbooks, cursos, evaluaciones, biblioteca y progreso por rol.", icon: GraduationCap },
-  { to: "/mi-local", title: "Mi Local", text: "KPI, estándares y brechas de la sucursal.", icon: ClipboardCheck },
-  { to: "/solicitudes", title: "Solicitudes", text: "Crear, consultar y seguir requerimientos.", icon: MessagesSquare },
-  { to: "/formularios", title: "Formularios", text: "Ruta, auditorías y seguimiento de brechas.", icon: FileCheck2 },
-  { to: "/insumos", title: "Insumos", text: "Stock, sugerencia y pedido inteligente del local.", icon: PackageOpen },
+const cards: Array<{
+  to: string
+  title: string
+  text: string
+  icon: typeof GraduationCap
+  module: PilotModule
+}> = [
+  { to: "/academia", title: "Academia", text: "Modelo, playbooks, cursos, evaluaciones, biblioteca y progreso por rol.", icon: GraduationCap, module: "ACADEMIA" },
+  { to: "/mi-local", title: "Mi Local", text: "KPI, estándares y brechas de la sucursal.", icon: ClipboardCheck, module: "MI_LOCAL" },
+  { to: "/solicitudes", title: "Solicitudes", text: "Crear, consultar y seguir requerimientos del piloto.", icon: MessagesSquare, module: "SOLICITUDES" },
+  { to: "/formularios", title: "Ruta de Experiencia", text: "Realización y seguimiento de la Ruta según tu perfil.", icon: FileCheck2, module: "FORMULARIOS" },
+  { to: "/insumos", title: "Insumos", text: "Stock, sugerencia y pedido inteligente del local.", icon: PackageOpen, module: "INSUMOS" },
 ]
-
 export default function Home({
   userName,
   branch,
@@ -38,6 +44,10 @@ export default function Home({
   const local = getPilotLocal(currentUser.local)
   const visibleLocals = getVisiblePilotLocals(currentUser)
   const managementView = visibleLocals.length > 1
+  const fullAccess = isPilotFullAccess(currentUser)
+  const visibleCards = cards.filter((card) =>
+    canAccessPilotModule(currentUser, card.module)
+  )
 
   return (
     <>
@@ -47,11 +57,13 @@ export default function Home({
           <h1>Una sola forma de vivir<br/><em>la experiencia Ditalcar.</em></h1>
           <p>Academia, estándares, formularios, KPI y solicitudes operativas en un solo lugar.</p>
           <div className="welcome"><Sparkles size={17}/> Hola, {firstName} · {branch}</div>
-          {demoMode && <div className="pilot-data-note">Piloto Vespucio · datos demostrativos para validar experiencia y flujo.</div>}
+          {demoMode && <div className="pilot-data-note">Piloto Stellantis Nueva Tobalaba · perfiles y datos demostrativos para validar Ruta y Solicitudes.</div>}
         </div>
         <div className="hero-orbit"><div className="orbit"><span>D</span></div></div>
       </section>
 
+      {fullAccess ? (
+        <>
       <section className="section">
         <div className="section-head kpi-section-head">
           <div>
@@ -112,12 +124,41 @@ export default function Home({
         </section>
       )}
 
+        </>
+      ) : (
+        <section className="section">
+          <div className="section-head">
+            <div>
+              <span className="eyebrow">PILOTO ACTIVO</span>
+              <h2>Stellantis Nueva Tobalaba</h2>
+            </div>
+          </div>
+          <div className="module-grid">
+            <article className="module-card" style={{cursor:"default"}}>
+              <div className="module-number">01</div>
+              <h3>Ruta de Experiencia</h3>
+              <p>Visible para Jefatura de Sucursal, Gerencia de Marca y Experiencia. Solo la Jefatura la tiene asignada para realizar.</p>
+            </article>
+            <article className="module-card" style={{cursor:"default"}}>
+              <div className="module-number">02</div>
+              <h3>Solicitudes</h3>
+              <p>Credenciales, pie de firma, horarios, señalizaciones, organigrama y solicitudes de Experiencia habilitadas según perfil.</p>
+            </article>
+            <article className="module-card" style={{cursor:"default"}}>
+              <div className="module-number">03</div>
+              <h3>Modo piloto</h3>
+              <p>Mientras Microsoft no esté habilitado, la prueba guarda la información localmente en este navegador.</p>
+            </article>
+          </div>
+        </section>
+      )}
+
       <section className="section">
         <div className="section-head">
           <div><span className="eyebrow">ACCESOS PRINCIPALES</span><h2>¿Qué necesitas hacer?</h2></div>
         </div>
         <div className="module-grid">
-          {cards.map(({to,title,text,icon:Icon}) => (
+          {visibleCards.map(({to,title,text,icon:Icon}) => (
             <Link className="module-card" to={to} key={title}>
               <div className="module-icon"><Icon/></div>
               <div className="module-number">DITALCAR</div>
