@@ -1,8 +1,8 @@
 import { mockRequests } from "../data/mockData"
 import type { RequestItem, RequestTimelineItem } from "../types"
 
-const REQUESTS_KEY = "ditalcar-pilot-requests-v4"
-const TIMELINE_KEY = "ditalcar-pilot-request-timeline-v2"
+const REQUESTS_KEY = "ditalcar-pilot-stellantis-nt-requests-v1"
+const TIMELINE_KEY = "ditalcar-pilot-stellantis-nt-timeline-v1"
 
 function cloneSeed(): RequestItem[] {
   return JSON.parse(JSON.stringify(mockRequests)) as RequestItem[]
