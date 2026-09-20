@@ -24,7 +24,7 @@ const exactManagerRoles: UserRole[] = [
 export function roleLabel(role?: UserRole) {
   const labels: Partial<Record<UserRole, string>> = {
     VENDEDOR: "Vendedor",
-    JEFATURA_LOCAL: "Jefatura Local",
+    JEFATURA_LOCAL: "Jefatura de Sucursal",
     JEFATURA_MARCA: "Jefatura de Marca",
     JEFATURA_ZONAL: "Gerencia de Marca",
     GERENCIA_MARCA: "Gerencia de Marca",
@@ -34,7 +34,7 @@ export function roleLabel(role?: UserRole) {
     JEFATURA_ADMINISTRACION: "Jefatura Administración",
     GERENCIA_ADMINISTRACION: "Gerencia Administración",
     GERENCIA_COMERCIAL: "Gerencia Comercial",
-    JEFATURA_MARKETING: "Jefatura Marketing",
+    JEFATURA_MARKETING: "Equipo de Marketing",
     EXPERIENCIA_CLIENTES: "Experiencia de Clientes",
     ADMINISTRATIVO: "Administración",
     EQUIPO_COMERCIAL: "Equipo Comercial",
@@ -71,10 +71,10 @@ export function responsibleLabel(
   if (request.approvalContext === "JEFATURA_LOCAL") {
     if (canSeeExactManager(user) && request.currentResponsibleName) {
       return `${request.currentResponsibleName} · ${
-        request.currentResponsibleLabel ?? "Jefatura Local"
+        request.currentResponsibleLabel ?? "Jefatura de Sucursal"
       }`
     }
-    return request.currentResponsibleLabel ?? "Jefatura Local"
+    return request.currentResponsibleLabel ?? "Jefatura de Sucursal"
   }
 
   if (request.approvalContext === "PRESUPUESTO_COMERCIAL") {
