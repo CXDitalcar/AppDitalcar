@@ -6,6 +6,10 @@ import {
   requestFields,
   requestProcesses,
 } from "../data/requestConfig"
+import {
+  getPilotRequestCodesForUser,
+  PILOT_LOCAL,
+} from "../data/pilotStellantis"
 import type {
   ProcessAssignment,
   ProcessConfig,
@@ -16,9 +20,11 @@ import type {
 const DEMO_EMAILS = new Set([
   "vendedor.demo@ditalcar.cl",
   "jefatura.local@ditalcar.cl",
+  "jefe.stellantis.nt@ditalcar.cl",
   "jefatura.marca@ditalcar.cl",
   "jefatura.zonal@ditalcar.cl",
   "gerencia.marca@ditalcar.cl",
+  "gerencia.marca.stellantis@ditalcar.cl",
   "gerencia.ventas@ditalcar.cl",
   "comercial.clientes@ditalcar.cl",
   "operaciones.comerciales@ditalcar.cl",
@@ -88,6 +94,8 @@ function migratedRoleMatches(
 }
 
 export function getProcessesForUser(user: UserScope) {
+  const pilotCodes = getPilotRequestCodesForUser(user)
+
   return requestProcesses
     .filter(
       (process) =>
@@ -95,7 +103,8 @@ export function getProcessesForUser(user: UserScope) {
         process.manualRequest &&
         process.requesterRoles.some((role) =>
           migratedRoleMatches(user.role, role)
-        )
+        ) &&
+        (pilotCodes === null || pilotCodes.has(process.code))
     )
     .sort((a, b) => a.order - b.order)
 }
@@ -321,7 +330,7 @@ export function getLocalOptions(
 
   return {
     mode: "LOCKED" as const,
-    options: [user.local ?? "Vespucio"],
-    selected: user.local ?? "Vespucio",
+    options: [user.local ?? PILOT_LOCAL],
+    selected: user.local ?? PILOT_LOCAL,
   }
 }
