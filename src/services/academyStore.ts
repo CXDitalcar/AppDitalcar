@@ -21,6 +21,21 @@ export type AcademyAttempt = {
 
 export type ObservableValue = "CUMPLE" | "PARCIAL" | "NO_CUMPLE"
 
+export type AcademyFeedbackValue = "SI" | "PARCIAL" | "NO"
+
+export type AcademyFeedback = {
+  id: string
+  contentId: string
+  contentType: "PLAYBOOK" | "CURSO" | "MATERIAL"
+  authorEmail: string
+  authorName: string
+  useful: AcademyFeedbackValue
+  understood: AcademyFeedbackValue
+  sufficient: AcademyFeedbackValue
+  comment: string
+  createdAt: string
+}
+
 export type AcademyObservation = {
   id: string
   targetName: string
@@ -41,6 +56,7 @@ type AcademyState = {
   completedModules: Record<string, string[]>
   attempts: AcademyAttempt[]
   observations: AcademyObservation[]
+  feedback: AcademyFeedback[]
 }
 
 const emptyState: AcademyState = {
@@ -49,6 +65,7 @@ const emptyState: AcademyState = {
   completedModules: {},
   attempts: [],
   observations: [],
+  feedback: [],
 }
 
 function readState(): AcademyState {
@@ -67,6 +84,7 @@ function readState(): AcademyState {
       observations: Array.isArray(parsed.observations)
         ? parsed.observations
         : [],
+      feedback: Array.isArray(parsed.feedback) ? parsed.feedback : [],
     }
   } catch {
     return { ...emptyState }
@@ -249,4 +267,33 @@ export function saveAcademyObservation(
 
 export function getAcademyObservations() {
   return readState().observations
+}
+
+
+export function saveAcademyFeedback(
+  input: Omit<AcademyFeedback, "id" | "createdAt">
+) {
+  const state = readState()
+  const feedback: AcademyFeedback = {
+    ...input,
+    id: `feedback-${Date.now()}`,
+    createdAt: new Date().toISOString(),
+  }
+  state.feedback = state.feedback.filter(
+    (item) =>
+      !(item.contentId === input.contentId && item.authorEmail === input.authorEmail)
+  )
+  state.feedback.unshift(feedback)
+  writeState(state)
+  return feedback
+}
+
+export function getAcademyFeedback(contentId: string, authorEmail: string) {
+  return readState().feedback.find(
+    (item) => item.contentId === contentId && item.authorEmail === authorEmail
+  )
+}
+
+export function hasAcademyFeedback(contentId: string, authorEmail: string) {
+  return Boolean(getAcademyFeedback(contentId, authorEmail))
 }
