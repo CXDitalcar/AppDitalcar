@@ -72,3 +72,15 @@ button,input{font:inherit}.shell{min-height:100vh;display:flex;background-image:
 
 @media(max-width:1100px){.kpi-grid,.kpi-grid-local{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:760px){.kpi-grid,.kpi-grid-local,.local-overview-grid,.local-management-grid{grid-template-columns:1fr}.kpi-section-head,.local-page-head,.local-standard-head,.insumo-submit{align-items:flex-start;flex-direction:column}.request-head-actions{width:100%}.request-head-actions .primary-btn,.request-head-actions .secondary-btn{flex:1;justify-content:center}.insumo-submit>div{text-align:left}}
+
+/* ======================================================
+   SEMÁFORO GENERAL · DITALCAR
+   Verde: actividad lista / KPI >= 90%
+   Naranjo: atención / KPI 60-89%
+   Rojo: crítico / KPI < 60%
+====================================================== */
+.signal-light{display:inline-flex;align-items:center;gap:7px;color:#b8b8bf;font-size:10px;font-weight:800;line-height:1}.signal-light>i{display:block;width:11px;height:11px;border-radius:50%;border:1px solid rgba(255,255,255,.12);box-shadow:0 0 0 3px rgba(255,255,255,.025)}.signal-light.signal-compact>i{width:9px;height:9px}.signal-light.signal-green>i{background:#39c779;box-shadow:0 0 12px rgba(57,199,121,.55)}.signal-light.signal-orange>i{background:#f3a83b;box-shadow:0 0 12px rgba(243,168,59,.45)}.signal-light.signal-red>i{background:#ef4450;box-shadow:0 0 12px rgba(239,68,80,.48)}.signal-light.signal-neutral>i{background:#6f6f78}.activity-hub{margin-top:26px}.activity-hub-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}.activity-panel{border:1px solid #29292f;border-radius:16px;background:rgba(17,17,20,.94);padding:18px}.activity-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.activity-panel-head h2{font-size:20px;margin:4px 0 0}.activity-list{display:grid;gap:8px}.activity-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:11px 12px;border:1px solid #29292f;border-radius:10px;background:#101012;color:#fff;text-decoration:none}.activity-row:hover{border-color:rgba(225,38,47,.42)}.activity-row strong{display:block;font-size:12px}.activity-row span{display:block;margin-top:3px;color:#85858e;font-size:10px;line-height:1.4}.activity-row small{color:#777780;font-size:9px}.activity-empty{padding:16px;border:1px dashed #2b2b31;border-radius:10px;color:#7d7d86;font-size:11px;text-align:center}.kpi-signal-row{display:flex;align-items:center;justify-content:space-between;gap:10px}.local-overview-status{display:flex;align-items:center;gap:6px;color:#888891;font-size:9px}
+@media(max-width:800px){.activity-hub-grid{grid-template-columns:1fr}}
+.request-status-signal{display:inline-flex;align-items:center;gap:7px}
+
+.pilot-test-tag{display:inline-flex;align-items:center;width:max-content;border:1px solid rgba(106,150,255,.35);border-radius:999px;background:rgba(106,150,255,.08);color:#9ab8ff;padding:3px 7px;font-size:8px;font-weight:900;letter-spacing:.08em}
