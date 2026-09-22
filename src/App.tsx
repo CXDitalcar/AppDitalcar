@@ -1,18 +1,8 @@
-import {
-  useEffect,
-  useState,
-} from "react"
-
-import {
-  BrowserRouter,
-  Navigate,
-  Route,
-  Routes,
-} from "react-router-dom"
+import { useEffect, useState } from "react"
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 
 import Shell from "./components/Shell"
-import Brand from "./components/Brand"
-import DemoLogin from "./components/DemoLogin"
+import AuthScreen from "./components/AuthScreen"
 
 import Home from "./pages/Home"
 import Academia from "./pages/Academia"
@@ -24,283 +14,60 @@ import SolicitudDetalle from "./pages/SolicitudDetalle"
 import Formularios from "./pages/Formularios"
 import FormularioDetalle from "./pages/FormularioDetalle"
 import PedidoInsumos from "./pages/PedidoInsumos"
+import KPI from "./pages/KPI"
 
 import { appConfig } from "./config"
-
-import {
-  getAccount,
-  getCurrentUser,
-  signIn,
-} from "./services/auth"
-
-import {
-  mockUsers,
-} from "./data/mockData"
-
-import {
-  requestAssignments,
-} from "./data/requestConfig"
-import {
-  canAccessPilotModule,
-} from "./data/pilotStellantis"
-
-import {
-  canAccessApprovalInbox,
-} from "./services/permissions"
-
-import {
-  getUserScopeFromList,
-} from "./services/userDirectory"
-
-import type {
-  UserScope,
-} from "./types"
-
-
-const DEMO_STORAGE_KEY =
-  "ditalcar-demo-user"
-
+import { demoViewUsers } from "./data/mockData"
+import { requestAssignments } from "./data/requestConfig"
+import { canAccessPilotModule } from "./data/pilotStellantis"
+import { canAccessApprovalInbox } from "./services/permissions"
+import { getApiSession, logoutApiSession } from "./services/auth"
+import type { UserScope } from "./types"
 
 export default function App() {
-  const microsoftAccount =
-    getAccount()
-
-
-  // ======================================================
-  // USUARIO DEMO
-  // ======================================================
-
-  const [demoUser, setDemoUser] =
-    useState<UserScope | null>(() => {
-      const storedEmail =
-        localStorage.getItem(
-          DEMO_STORAGE_KEY
-        )
-
-      if (!storedEmail) {
-        return null
-      }
-
-      return (
-        mockUsers.find(
-          (user) =>
-            user.email === storedEmail
-        ) ?? null
-      )
-    })
-
-
-  // ======================================================
-  // SESIÓN
-  // ======================================================
-
-  const [signedIn, setSignedIn] =
-    useState(
-      Boolean(
-        microsoftAccount ||
-        demoUser
-      )
-    )
-
-
-  const [name, setName] =
-    useState(
-      demoUser?.name ||
-      microsoftAccount?.name ||
-      "Usuario Ditalcar"
-    )
-
-  const [liveProfile, setLiveProfile] =
-    useState<UserScope | null>(null)
-
-
-  // ======================================================
-  // USUARIO MICROSOFT + PERFIL DESDE 02_USUARIOS
-  // ======================================================
+  const [apiUser, setApiUser] = useState<UserScope | null>(null)
+  const [viewAsUser, setViewAsUser] = useState<UserScope | null>(null)
+  const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    if (
-      !signedIn ||
-      demoUser ||
-      !microsoftAccount
-    ) {
-      return
-    }
-
     let active = true
-
-    async function loadLiveUser() {
-      const fallbackName =
-        microsoftAccount?.name ||
-        "Usuario Ditalcar"
-
-      try {
-        const user =
-          await getCurrentUser()
-
-        if (!active) return
-
-        const displayName =
-          user.displayName ||
-          fallbackName
-
-        setName(displayName)
-
-        const profile =
-          await getUserScopeFromList(
-            microsoftAccount?.username ?? "",
-            displayName
-          )
-
-        if (
-          active &&
-          profile
-        ) {
-          setLiveProfile(profile)
-          setName(profile.name)
-        }
-      } catch {
-        // Si la ficha todavía no existe en 02_Usuarios,
-        // la app conserva el perfil piloto de respaldo.
-      }
-    }
-
-    loadLiveUser()
+    getApiSession()
+      .then((user) => {
+        if (active) setApiUser(user)
+      })
+      .finally(() => {
+        if (active) setAuthLoading(false)
+      })
 
     return () => {
       active = false
     }
-  }, [
-    signedIn,
-    demoUser,
-    microsoftAccount?.username,
-  ])
+  }, [])
 
-
-  // ======================================================
-  // ENTRAR EN DEMO
-  // ======================================================
-
-  function enterDemo(
-    user: UserScope
-  ) {
-    localStorage.setItem(
-      DEMO_STORAGE_KEY,
-      user.email
-    )
-
-    setDemoUser(user)
-
-    setName(user.name)
-
-    setSignedIn(true)
+  async function exitApi() {
+    await logoutApiSession()
+    setApiUser(null)
+    setViewAsUser(null)
   }
 
-
-  // ======================================================
-  // SALIR DE DEMO
-  // ======================================================
-
-  function exitDemo() {
-    localStorage.removeItem(
-      DEMO_STORAGE_KEY
-    )
-
-    setDemoUser(null)
-
-    setSignedIn(false)
-
-    setName(
-      "Usuario Ditalcar"
-    )
-  }
-
-
-  // ======================================================
-  // LOGIN
-  // ======================================================
-
-  if (!signedIn) {
+  if (authLoading) {
     return (
-      <div className="login">
-
-        <div className="login-card">
-
-          <Brand large />
-
-          <h1>
-            Colaboradores
-          </h1>
-
-          <p>
-            Ingresa con tu cuenta
-            corporativa para acceder
-            al portal interno Ditalcar.
-          </p>
-
-          <button
-            className="primary-btn"
-            onClick={async () => {
-              await signIn()
-
-              setSignedIn(true)
-            }}
-          >
-            Ingresar con Microsoft 365
-          </button>
-
-          <small>
-            Acceso restringido a
-            DITALCAR SA
-          </small>
-
-
-          <DemoLogin
-            users={mockUsers}
-            onEnter={enterDemo}
-          />
-
-        </div>
-
+      <div className="auth-loading-screen">
+        <strong>Ditalcar Colaboradores</strong>
+        <span>Validando sesión…</span>
       </div>
     )
   }
 
+  if (!apiUser) {
+    return <AuthScreen onAuthenticated={setApiUser} />
+  }
 
-  // ======================================================
-  // USUARIO ACTUAL
-  // ======================================================
-
-  const currentUser: UserScope =
-    demoUser ??
-    liveProfile ?? {
-      email:
-        microsoftAccount?.username ??
-        "",
-
-      name,
-
-      role: "VENDEDOR",
-
-      local:
-        appConfig.pilot.branch,
-
-      localPrincipal:
-        appConfig.pilot.branch,
-
-      assignedLocals: [
-        appConfig.pilot.branch,
-      ],
-
-      scope: "LOCAL",
-
-      active: true,
-    }
-
-
-  // ======================================================
-  // ÁMBITO ACTUAL
-  // ======================================================
+  const baseUser = apiUser
+  const experienceCanViewAs = baseUser.role === "EXPERIENCIA_CLIENTES"
+  const baseUserEmail = baseUser.email
+  const currentUser = viewAsUser ?? baseUser
+  const dataPilotMode = appConfig.data.mode === "pilot"
 
   const currentBranch =
     currentUser.local ??
@@ -308,75 +75,57 @@ export default function App() {
     currentUser.zone ??
     "Red Ditalcar"
 
-
-  // ======================================================
-  // PERMISOS
-  // ======================================================
-
-  const showApprovals =
-    canAccessApprovalInbox(
-      currentUser,
-      requestAssignments
-    )
-
+  const showApprovals = canAccessApprovalInbox(currentUser, requestAssignments)
   const canSeeAcademia = canAccessPilotModule(currentUser, "ACADEMIA")
   const canSeeMiLocal = canAccessPilotModule(currentUser, "MI_LOCAL")
   const canSeeFormularios = canAccessPilotModule(currentUser, "FORMULARIOS")
   const canSeeInsumos = canAccessPilotModule(currentUser, "INSUMOS")
+  const canSeeKPI = canAccessPilotModule(currentUser, "KPI")
 
+  // “Ver como” es una herramienta administrativa de Experiencia, no una vía de ingreso.
+  const viewAsOptions = demoViewUsers.map((user) => ({
+    ...user,
+    active: true,
+    testingView: true,
+  }))
 
-  // ======================================================
-  // APP
-  // ======================================================
+  function handleViewAs(email: string) {
+    if (!experienceCanViewAs) return
+    if (!email || email === baseUserEmail) {
+      setViewAsUser(null)
+      return
+    }
+    const profile = viewAsOptions.find((user) => user.email === email)
+    setViewAsUser(profile ?? null)
+  }
 
   return (
     <BrowserRouter>
-
       <Shell
-        currentUser={
-          currentUser
-        }
-        userName={
-          name
-        }
-        branch={
-          currentBranch
-        }
-        demoMode={Boolean(
-          demoUser
-        )}
-        onDemoLogout={
-          demoUser
-            ? exitDemo
-            : undefined
-        }
-        showApprovals={
-          showApprovals
-        }
+        currentUser={currentUser}
+        authenticatedUser={baseUser}
+        userName={currentUser.name}
+        branch={currentBranch}
+        demoMode={false}
+        onLogout={exitApi}
+        showApprovals={showApprovals}
+        viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
+        viewAsEmail={viewAsUser?.email ?? baseUserEmail}
+        onViewAs={experienceCanViewAs ? handleViewAs : undefined}
+        showPilotFeedback={canAccessPilotModule(currentUser, "HOME")}
       >
-
         <Routes>
-
-          {/* ==================================================
-              INICIO
-          ================================================== */}
-
           <Route
             path="/"
             element={
               <Home
-                userName={name}
+                userName={currentUser.name}
                 branch={currentBranch}
                 currentUser={currentUser}
-                demoMode={Boolean(demoUser)}
+                demoMode={dataPilotMode}
               />
             }
           />
-
-
-          {/* ==================================================
-              ACADEMIA
-          ================================================== */}
 
           <Route
             path="/academia"
@@ -389,39 +138,18 @@ export default function App() {
             }
           />
 
-
-          {/* ==================================================
-              PLAYBOOKS DE VENTA
-          ================================================== */}
-
-          <Route
-            path="/playbooks-venta"
-            element={<Navigate to="/academia?tab=playbooks" replace />}
-          />
-
-
-          {/* ==================================================
-              MI LOCAL
-          ================================================== */}
+          <Route path="/playbooks-venta" element={<Navigate to="/academia?tab=playbooks" replace />} />
 
           <Route
             path="/mi-local"
             element={
               canSeeMiLocal ? (
-                <MiLocal
-                  branch={currentBranch}
-                  currentUser={currentUser}
-                />
+                <MiLocal branch={currentBranch} currentUser={currentUser} />
               ) : (
                 <Navigate to="/" replace />
               )
             }
           />
-
-
-          {/* ==================================================
-              MIS SOLICITUDES
-          ================================================== */}
 
           <Route
             path="/solicitudes"
@@ -429,66 +157,25 @@ export default function App() {
               <Solicitudes
                 branch={currentBranch}
                 currentUser={currentUser}
-                demoMode={Boolean(demoUser)}
+                demoMode={dataPilotMode}
               />
             }
           />
 
-
-          {/* ==================================================
-              NUEVA SOLICITUD
-          ================================================== */}
-
-          <Route
-            path="/solicitudes/nueva"
-            element={
-              <NuevaSolicitud
-                currentUser={
-                  currentUser
-                }
-              />
-            }
-          />
-
-
-          {/* ==================================================
-              APROBACIONES
-          ================================================== */}
+          <Route path="/solicitudes/nueva" element={<NuevaSolicitud currentUser={currentUser} />} />
 
           <Route
             path="/aprobaciones"
             element={
               showApprovals ? (
-                <Aprobaciones
-                  currentUser={
-                    currentUser
-                  }
-                />
+                <Aprobaciones currentUser={currentUser} />
               ) : (
-                <Navigate
-                  to="/"
-                  replace
-                />
+                <Navigate to="/" replace />
               )
             }
           />
 
-
-          {/* ==================================================
-              DETALLE DE SOLICITUD
-          ================================================== */}
-
-          <Route
-            path="/solicitudes/:requestId"
-            element={
-              <SolicitudDetalle
-                currentUser={
-                  currentUser
-                }
-              />
-            }
-          />
-
+          <Route path="/solicitudes/:requestId" element={<SolicitudDetalle currentUser={currentUser} />} />
 
           <Route
             path="/insumos"
@@ -501,9 +188,12 @@ export default function App() {
             }
           />
 
-          {/* ==================================================
-              FORMULARIOS
-          ================================================== */}
+          <Route
+            path="/kpi"
+            element={
+              canSeeKPI ? <KPI currentUser={currentUser} /> : <Navigate to="/" replace />
+            }
+          />
 
           <Route
             path="/formularios"
@@ -516,11 +206,6 @@ export default function App() {
             }
           />
 
-
-          {/* ==================================================
-              DETALLE DE REVISIÓN
-          ================================================== */}
-
           <Route
             path="/formularios/:executionId"
             element={
@@ -531,11 +216,8 @@ export default function App() {
               )
             }
           />
-
         </Routes>
-
       </Shell>
-
     </BrowserRouter>
   )
 }
