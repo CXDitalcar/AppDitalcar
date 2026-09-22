@@ -26,6 +26,7 @@ import {
 } from "react-router-dom"
 
 import "./SolicitudDetalle.css"
+import SignalLight, { signalFromRequest } from "../components/SignalLight"
 
 import { requestAssignments } from "../data/requestConfig"
 import {
@@ -177,6 +178,7 @@ function RequestDetailContent({
   currentUser: UserScope
 }) {
   const navigate = useNavigate()
+  const showSlaTerm = currentUser.role === "EXPERIENCIA_CLIENTES"
 
   const [request, setRequest] =
     useState<RequestItem>(seed)
@@ -859,8 +861,9 @@ function RequestDetailContent({
 
       <div className="request-detail-header">
         <div>
-          <div className="eyebrow">
+          <div className="eyebrow request-id-row">
             {request.id}
+            {request.isTest && <span className="pilot-test-tag">PRUEBA</span>}
           </div>
 
           <h1>{request.processName}</h1>
@@ -905,7 +908,7 @@ function RequestDetailContent({
         />
 
         <Summary
-          label="SLA"
+          label={showSlaTerm ? "SLA" : "Plazo"}
           value={
             request.slaPausedReason
               ? "En pausa"
@@ -915,12 +918,30 @@ function RequestDetailContent({
         />
       </div>
 
+      <div className="request-user-action">
+        <SignalLight tone={signalFromRequest(request)} />
+        <div>
+          <span>TU ACCIÓN</span>
+          <strong>{userActionLabel(currentUser, request, canApprove, canManage, canConfirm)}</strong>
+          <small>{userActionDetail(currentUser, request, canApprove, canManage, canConfirm)}</small>
+        </div>
+      </div>
+
+      {request.isTest && (
+        <div className="pilot-flow-alert pilot-test-alert">
+          <Info size={17} />
+          <div>
+            <strong>Solicitud de prueba</strong>
+            <span>Este caso existe para que Gerencias y Jefaturas puedan revisar el flujo sin afectar datos reales.</span>
+          </div>
+        </div>
+      )}
 
       {request.slaPausedReason && (
         <div className="pilot-flow-alert">
           <Clock3 size={17} />
           <div>
-            <strong>SLA en pausa</strong>
+            <strong>{showSlaTerm ? "SLA en pausa" : "Plazo en pausa"}</strong>
             <span>
               {request.slaPausedReason}
             </span>
@@ -1265,7 +1286,7 @@ function RequestDetailContent({
 
             {request.slaPausedReason && (
               <div className="request-side-row">
-                <span>SLA</span>
+                <span>{showSlaTerm ? "SLA" : "Plazo"}</span>
                 <strong>En pausa</strong>
               </div>
             )}
@@ -1556,7 +1577,7 @@ function RequestDetailContent({
               <h3>Responder</h3>
 
               <p className="side-note">
-                El SLA está en pausa y continuará
+                {showSlaTerm ? "El SLA" : "El plazo"} está en pausa y continuará
                 desde el punto anterior.
               </p>
 
@@ -1777,4 +1798,41 @@ function formatValue(
   }
 
   return value || "—"
+}
+
+
+function userActionLabel(
+  user: UserScope,
+  request: RequestItem,
+  canApprove: boolean,
+  canManage: boolean,
+  canConfirm: boolean
+) {
+  if (request.status === "RECIBIDA" && canManage) return "Tomar solicitud"
+  if (request.status === "PENDIENTE_APROBACION" && canApprove) return "Revisar y aprobar"
+  if (request.status === "EN_GESTION" && canManage) return "Continuar gestión"
+  if (request.status === "RESUELTA_POR_CONFIRMAR" && canConfirm) return "Confirmar si quedó resuelto"
+  if (request.status === "INFORMACION_REQUERIDA") {
+    if (request.currentResponsibleEmail?.toLowerCase() === user.email.toLowerCase()) {
+      return "Completar información solicitada"
+    }
+    return "Esperar información"
+  }
+  if (request.status === "RESUELTA") return "Sin acción pendiente"
+  if (request.status === "RECHAZADA") return "Sin acción pendiente"
+  return "Solo seguimiento"
+}
+
+function userActionDetail(
+  user: UserScope,
+  request: RequestItem,
+  canApprove: boolean,
+  canManage: boolean,
+  canConfirm: boolean
+) {
+  const action = userActionLabel(user, request, canApprove, canManage, canConfirm)
+  if (action === "Solo seguimiento") return "Puedes revisar el avance y el historial, pero no tienes una acción requerida en este estado."
+  if (action === "Sin acción pendiente") return "La solicitud no requiere una acción adicional de tu parte."
+  if (action === "Esperar información") return "El plazo está detenido mientras la persona responsable completa los antecedentes."
+  return "Esta actividad está disponible para tu perfil y requiere continuar el flujo."
 }
