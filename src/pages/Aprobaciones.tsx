@@ -11,6 +11,7 @@ import {
 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import "./Aprobaciones.css"
+import SignalLight, { signalFromRequest } from "../components/SignalLight"
 import { requestAssignments } from "../data/requestConfig"
 import { listRequests } from "../services/requestRepository"
 import {
@@ -40,6 +41,7 @@ export default function Aprobaciones({
   currentUser: UserScope
 }) {
   const navigate = useNavigate()
+  const showSlaTerm = currentUser.role === "EXPERIENCIA_CLIENTES"
   const [view, setView] = useState<ManagementView>("NUEVAS")
   const [search, setSearch] = useState("")
   const [localFilter, setLocalFilter] = useState("TODOS")
@@ -80,17 +82,22 @@ export default function Aprobaciones({
       requestAssignments
     )
     const canConfirm = canConfirmResolution(currentUser, request)
+    const oversight = [
+      "GERENCIA_MARCA",
+      "GERENCIA_VENTAS",
+      "EXPERIENCIA_CLIENTES",
+    ].includes(currentUser.role)
 
     if (target === "NUEVAS") {
-      return request.status === "RECIBIDA" && canManage
+      return request.status === "RECIBIDA" && (canManage || oversight)
     }
 
     if (target === "POR_APROBAR") {
-      return request.status === "PENDIENTE_APROBACION" && canApprove
+      return request.status === "PENDIENTE_APROBACION" && (canApprove || oversight)
     }
 
     if (target === "EN_GESTION") {
-      return request.status === "EN_GESTION" && canManage
+      return request.status === "EN_GESTION" && (canManage || oversight)
     }
 
     if (target === "FALTA_INFO") {
@@ -98,6 +105,7 @@ export default function Aprobaciones({
         request.status === "INFORMACION_REQUERIDA" &&
         (canManage ||
           canApprove ||
+          oversight ||
           request.requesterEmail.toLowerCase() ===
             currentUser.email.toLowerCase() ||
           (currentUser.role === "JEFATURA_LOCAL" &&
@@ -106,7 +114,7 @@ export default function Aprobaciones({
     }
 
     if (target === "POR_CONFIRMAR") {
-      return request.status === "RESUELTA_POR_CONFIRMAR" && canConfirm
+      return request.status === "RESUELTA_POR_CONFIRMAR" && (canConfirm || oversight)
     }
 
     if (target === "SLA") {
@@ -165,7 +173,7 @@ export default function Aprobaciones({
           <div className="eyebrow">SOLICITUDES</div>
           <h1>Bandeja de gestión</h1>
           <p>
-            Nuevas, aprobaciones, gestiones, información pendiente y SLA
+            Nuevas, aprobaciones, gestiones, información pendiente y {showSlaTerm ? "SLA" : "plazos"}
             en una sola vista.
           </p>
         </div>
@@ -210,7 +218,7 @@ export default function Aprobaciones({
             className={view === item ? "approval-tab active" : "approval-tab"}
             onClick={() => setView(item)}
           >
-            {tabLabel(item)}
+            {tabLabel(item, showSlaTerm)}
           </button>
         ))}
       </div>
@@ -244,7 +252,7 @@ export default function Aprobaciones({
               <th>Solicitante</th>
               <th>Ingresada</th>
               <th>Responsable</th>
-              <th>SLA</th>
+              <th>{showSlaTerm ? "SLA" : "Plazo"}</th>
               <th>Estado</th>
               <th />
             </tr>
@@ -260,13 +268,13 @@ export default function Aprobaciones({
                   if (event.key === "Enter") navigate(`/solicitudes/${request.id}`)
                 }}
               >
-                <td><div className="approval-request-main"><strong>{request.processName}</strong><span>{request.id}</span></div></td>
+                <td><div className="approval-request-main"><strong>{request.processName}</strong><span>{request.id}{request.isTest ? " · PRUEBA" : ""}</span></div></td>
                 <td>{request.local}</td>
                 <td>{request.requesterName}</td>
                 <td>{new Date(request.createdAt).toLocaleDateString("es-CL")}</td>
                 <td>{responsibleLabel(currentUser, request)}</td>
                 <td><span className={`sla-badge sla-${getSLA(request).tone}`}>{getSLA(request).label}</span></td>
-                <td><span className="status neutral">{visibleStatusLabel(request)}</span></td>
+                <td><span className="request-status-signal"><SignalLight tone={signalFromRequest(request)} compact /><span className="status neutral">{visibleStatusLabel(request)}</span></span></td>
                 <td className="approval-row-arrow"><ChevronRight size={17} /></td>
               </tr>
             ))}
@@ -312,20 +320,21 @@ function Metric({
       className={`approval-metric ${active ? "active" : ""} ${tone ? `metric-${tone}` : ""}`}
       onClick={onClick}
     >
+      <SignalLight tone={value > 0 ? (tone === "danger" ? "red" : "green") : "neutral"} compact />
       <Icon size={18} />
       <div><strong>{value}</strong><span>{label}</span></div>
     </button>
   )
 }
 
-function tabLabel(value: ManagementView) {
+function tabLabel(value: ManagementView, showSlaTerm: boolean) {
   const labels: Record<ManagementView, string> = {
     NUEVAS: "Nuevas",
     POR_APROBAR: "Por aprobar",
     EN_GESTION: "En gestión",
     FALTA_INFO: "Falta información",
     POR_CONFIRMAR: "Por confirmar",
-    SLA: "SLA",
+    SLA: showSlaTerm ? "SLA" : "Plazos",
     TODAS: "Todas",
   }
   return labels[value]
