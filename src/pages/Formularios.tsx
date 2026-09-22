@@ -13,6 +13,7 @@ import {
 } from "react-router-dom"
 
 import "./Formularios.css"
+import SignalLight from "../components/SignalLight"
 
 import {
   mockFormBreaches,
@@ -430,6 +431,8 @@ export default function Formularios({
 
                       <div className="tracking-results">
 
+                        <SignalLight tone={execution.nonCompliant > 0 ? "orange" : "green"} compact />
+
                         <span className="result-pill result-ok">
                           {
                             execution.compliant
@@ -570,6 +573,11 @@ function FormCard({
     <article className="form-card">
 
       <div className="form-card-top">
+
+        <div className="form-card-signal">
+          <SignalLight tone={pendingBreaches > 0 ? "orange" : canComplete ? "green" : "neutral"} compact />
+          <span>{pendingBreaches > 0 ? "Requiere seguimiento" : canComplete ? "Actividad disponible" : "Solo seguimiento"}</span>
+        </div>
 
         <div className="form-card-icon">
 
