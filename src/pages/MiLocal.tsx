@@ -9,6 +9,7 @@ import {
 } from "lucide-react"
 
 import StatusBadge from "../components/StatusBadge"
+import SignalLight, { signalFromPercent } from "../components/SignalLight"
 
 import {
   getPilotLocal,
@@ -172,7 +173,7 @@ export default function MiLocal({
 
                           <span>
                             {
-                              kpi.label
+                              kpi.id === "sla" ? "Solicitudes a tiempo" : kpi.label
                             }
                           </span>
 
@@ -183,6 +184,9 @@ export default function MiLocal({
                               ? `${kpi.value}%`
                               : kpi.value}
                           </strong>
+                          {kpi.unit === "%" && (
+                            <SignalLight tone={signalFromPercent(kpi.value)} compact />
+                          )}
 
                         </div>
                       )
@@ -314,11 +318,15 @@ export default function MiLocal({
 
                   <span>
                     {
-                      kpi.label
+                      kpi.id === "sla" ? "Solicitudes a tiempo" : kpi.label
                     }
                   </span>
 
 
+                  <div className="kpi-signal-row">
+                    {kpi.unit === "%" && (
+                      <SignalLight tone={signalFromPercent(kpi.value)} compact />
+                    )}
                   {kpi.target !==
                     undefined && (
                     <small>
@@ -332,6 +340,7 @@ export default function MiLocal({
                         : ""}
                     </small>
                   )}
+                  </div>
 
                 </div>
 
@@ -346,7 +355,7 @@ export default function MiLocal({
 
                 <p>
                   {
-                    kpi.note
+                    kpi.note.replace(/SLA/gi, "plazo")
                   }
                 </p>
 
