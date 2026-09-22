@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import {
   ArrowRight,
   Building2,
@@ -19,7 +19,10 @@ export default function DemoLogin({
   users: UserScope[]
   onEnter: (user: UserScope) => void
 }) {
-  const activeUsers = users.filter((user) => user.active)
+  const activeUsers = useMemo(
+    () => users.filter((user) => user.active),
+    [users]
+  )
 
   const [selectedEmail, setSelectedEmail] = useState(
     activeUsers[0]?.email ?? ""
@@ -28,34 +31,44 @@ export default function DemoLogin({
   const selectedUser =
     activeUsers.find((user) => user.email === selectedEmail) ?? activeUsers[0]
 
-  const [sellerName, setSellerName] = useState("Vendedor Piloto")
-  const [sellerLocal, setSellerLocal] = useState(PILOT_LOCAL)
+  const [profileName, setProfileName] = useState("Vendedor Piloto")
+  const [profileLocal, setProfileLocal] = useState(PILOT_LOCAL)
+
+  const editablePilotProfile =
+    selectedUser?.role === "VENDEDOR" || selectedUser?.role === "JEFATURA_LOCAL"
 
   useEffect(() => {
-    if (selectedUser?.role === "VENDEDOR") {
-      setSellerName(selectedUser.name || "Vendedor Piloto")
-      setSellerLocal(selectedUser.local || PILOT_LOCAL)
-    }
-  }, [selectedUser?.email])
+    if (!selectedUser || !editablePilotProfile) return
+
+    setProfileName(
+      selectedUser.name ||
+        (selectedUser.role === "JEFATURA_LOCAL"
+          ? "Jefatura de Sucursal"
+          : "Vendedor Piloto")
+    )
+    setProfileLocal(selectedUser.local || PILOT_LOCAL)
+  }, [selectedUser?.email, editablePilotProfile])
 
   if (!selectedUser) return null
 
-  const isSeller = selectedUser.role === "VENDEDOR"
-
   function enterSelectedProfile() {
-    if (!isSeller) {
+    if (!editablePilotProfile) {
       onEnter(selectedUser)
       return
     }
 
-    const cleanName = sellerName.trim() || "Vendedor Piloto"
+    const fallbackName =
+      selectedUser.role === "JEFATURA_LOCAL"
+        ? "Jefatura de Sucursal"
+        : "Vendedor Piloto"
 
     onEnter({
       ...selectedUser,
-      name: cleanName,
-      local: sellerLocal,
-      localPrincipal: sellerLocal,
-      assignedLocals: [sellerLocal],
+      name: profileName.trim() || fallbackName,
+      local: profileLocal,
+      localPrincipal: profileLocal,
+      assignedLocals: [profileLocal],
+      scope: "LOCAL",
     })
   }
 
@@ -67,10 +80,10 @@ export default function DemoLogin({
         </div>
 
         <div>
-          <strong>Piloto Stellantis Nueva Tobalaba</strong>
+          <strong>Modo prueba · Ver como</strong>
           <span>
-            Vista temporal para probar solicitudes, Ruta y permisos mientras
-            Microsoft queda habilitado.
+            Revisa la experiencia de cada cargo durante el piloto. La autenticación
+            definitiva será con correo y contraseña propia.
           </span>
         </div>
       </div>
@@ -89,13 +102,17 @@ export default function DemoLogin({
         </select>
       </label>
 
-      {isSeller && (
+      {editablePilotProfile && (
         <div className="demo-seller-fields">
           <label className="demo-user-select">
-            <span>Nombre del vendedor</span>
+            <span>
+              {selectedUser.role === "JEFATURA_LOCAL"
+                ? "Nombre de la jefatura"
+                : "Nombre del vendedor"}
+            </span>
             <input
-              value={sellerName}
-              onChange={(event) => setSellerName(event.target.value)}
+              value={profileName}
+              onChange={(event) => setProfileName(event.target.value)}
               placeholder="Nombre y apellido"
             />
           </label>
@@ -103,8 +120,8 @@ export default function DemoLogin({
           <label className="demo-user-select">
             <span>Local</span>
             <select
-              value={sellerLocal}
-              onChange={(event) => setSellerLocal(event.target.value)}
+              value={profileLocal}
+              onChange={(event) => setProfileLocal(event.target.value)}
             >
               {ditalcarLocals.map((local) => (
                 <option key={local.name} value={local.name}>
@@ -122,12 +139,16 @@ export default function DemoLogin({
         </div>
 
         <div className="demo-user-data">
-          <strong>{isSeller ? sellerName || "Vendedor Piloto" : selectedUser.name}</strong>
+          <strong>
+            {editablePilotProfile
+              ? profileName || selectedUser.name
+              : selectedUser.name}
+          </strong>
           <span>{formatRole(selectedUser.role)}</span>
           <small>
             <Building2 size={13} />
-            {isSeller
-              ? sellerLocal
+            {editablePilotProfile
+              ? profileLocal
               : selectedUser.local ??
                 selectedUser.localPrincipal ??
                 selectedUser.zone ??
@@ -146,9 +167,9 @@ export default function DemoLogin({
       </button>
 
       <small className="demo-warning">
-        En modo piloto las solicitudes se guardan localmente en este navegador
-        y no modifican SharePoint. Experiencia de Clientes mantiene acceso
-        completo para revisar módulos todavía ocultos al resto de perfiles.
+        En modo prueba las solicitudes se guardan localmente en este navegador
+        y no modifican SharePoint. Experiencia de Clientes puede usar “Ver como”
+        para revisar todos los cargos sin perder su acceso completo.
       </small>
     </div>
   )
