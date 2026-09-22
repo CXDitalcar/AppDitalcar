@@ -531,7 +531,7 @@ export const selloExperiencia: SelloPrinciple[] = [
     summary:
       "Cumplir el estándar y los tiempos comprometidos, separando gestión de traslado/logística.",
     behaviors: [
-      "Respetar SLA de gestión.",
+      "Respetar el plazo de gestión.",
       "Registrar cuándo queda listo para traslado.",
       "Confirmar recepción en local.",
     ],
@@ -1277,6 +1277,9 @@ export type CourseModule = {
   detail: string
   available: boolean
   releaseLabel?: string
+  bullets?: string[]
+  highlight?: string
+  note?: string
 }
 
 export type AcademyCourse = {
@@ -1303,9 +1306,10 @@ function module(
   duration: number,
   detail: string,
   available = true,
-  releaseLabel?: string
+  releaseLabel?: string,
+  extra?: Pick<CourseModule, "bullets" | "highlight" | "note">
 ): CourseModule {
-  return { id, title, duration, detail, available, releaseLabel }
+  return { id, title, duration, detail, available, releaseLabel, ...extra }
 }
 
 export const pilotCRMModules: CourseModule[] = [
@@ -1347,7 +1351,331 @@ export const pilotCRMModules: CourseModule[] = [
   ),
 ]
 
+export const PILOT_VISIBLE_COURSE_IDS = [
+  "bienvenida-clientes",
+  "test-drive-piloto",
+  "cotizacion-pilot",
+  "convertir-lead",
+] as const
+
+export const PILOT_VISIBLE_EVALUATION_IDS = [
+  "eval-bienvenida",
+  "eval-test-drive",
+  "eval-cotizacion",
+] as const
+
 export const academyCourses: AcademyCourse[] = [
+  {
+    id: "bienvenida-clientes",
+    title: "Bienvenida y recepción del cliente",
+    description:
+      "Recibir con rapidez, entender el motivo de visita y ofrecer bebestibles de forma proactiva al cliente y sus acompañantes.",
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    duration: 8,
+    mandatoryFor: ["VENTAS"],
+    status: "PILOTO",
+    assignedTo: ["VENTAS"],
+    seedProgress: 0,
+    new: true,
+    releaseMode: "TODO",
+    modules: [
+      module(
+        "bienvenida-1",
+        "Recibir dentro del primer minuto",
+        2,
+        "La experiencia comienza apenas el cliente entra a la sala. El objetivo es que sepa rápidamente que fue visto y será atendido.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Acercarse o reconocer al cliente dentro del primer minuto.",
+            "Saludar de forma cordial y natural.",
+            "Evitar que el cliente quede esperando sin contexto."
+          ],
+          highlight: "El cliente debe sentirse recibido desde el primer momento."
+        }
+      ),
+      module(
+        "bienvenida-2",
+        "Entender el motivo de la visita",
+        2,
+        "Preguntar qué necesita el cliente y, de acuerdo con eso, atender directamente o derivar correctamente.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Preguntar el motivo de la visita.",
+            "Confirmar si viene por un modelo, cotización, entrega, postventa u otra gestión.",
+            "Derivar solo cuando corresponda y explicar quién continuará la atención."
+          ]
+        }
+      ),
+      module(
+        "bienvenida-3",
+        "Bebestibles · gesto proactivo",
+        2,
+        "Ofrecer agua, café u otro bebestible disponible como parte de la bienvenida, sin esperar a que el cliente lo solicite.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Ofrecer el bebestible al cliente.",
+            "Considerar también a sus acompañantes.",
+            "Hacerlo de forma natural, sin interrumpir la conversación."
+          ],
+          highlight: "No esperar a que el cliente lo pida."
+        }
+      ),
+      module(
+        "bienvenida-4",
+        "Cierre de la bienvenida",
+        2,
+        "La bienvenida termina cuando el cliente ya está atendido, orientado y sabe cuál será el siguiente paso.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Cliente recibido.",
+            "Motivo identificado.",
+            "Atención o derivación definida.",
+            "Bebestible ofrecido."
+          ]
+        }
+      )
+    ],
+    relatedPlaybooks: ["primer-contacto"],
+  },
+  {
+    id: "test-drive-piloto",
+    title: "Test Drive",
+    description:
+      "Preparar, documentar y acompañar una prueba de manejo segura, ordenada y comercialmente útil.",
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    duration: 12,
+    mandatoryFor: ["VENTAS"],
+    status: "PILOTO",
+    assignedTo: ["VENTAS"],
+    seedProgress: 0,
+    new: true,
+    releaseMode: "TODO",
+    modules: [
+      module(
+        "tdp-1",
+        "Documentación antes de salir",
+        3,
+        "No se inicia el Test Drive hasta completar la validación del conductor y el documento de responsabilidad.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Revisar que el cliente porte licencia de conducir.",
+            "Tomar y guardar una fotografía o escaneo de la licencia en el registro definido para Test Drive.",
+            "Solicitar la firma del documento de responsabilidad antes de salir.",
+            "Guardar respaldo del documento firmado según el procedimiento."
+          ],
+          highlight: "Licencia respaldada + documento de responsabilidad firmado = requisitos obligatorios antes de iniciar.",
+          note: "La imagen de la licencia contiene datos personales: debe quedar en un repositorio restringido y no visible para perfiles que no la necesiten."
+        }
+      ),
+      module(
+        "tdp-2",
+        "Elegir ruta corta o ruta larga",
+        2,
+        "Cada sucursal debe trabajar con dos recorridos previamente definidos para evitar improvisaciones.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Ruta corta: experiencia breve y controlada.",
+            "Ruta larga: permite experimentar más condiciones de conducción.",
+            "Informar al cliente qué ruta se realizará antes de comenzar."
+          ],
+          highlight: "Siempre seleccionar una de las dos rutas definidas por el local: corta o larga."
+        }
+      ),
+      module(
+        "tdp-3",
+        "Preparar el vehículo",
+        2,
+        "La unidad debe estar en condiciones que permitan vivir una experiencia representativa del producto.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Vehículo limpio y en buenas condiciones.",
+            "Combustible siempre en 1/2 estanque o más antes de salir.",
+            "Revisar que no existan elementos que interfieran con la experiencia.",
+            "Explicar requisitos, ruta y duración antes de comenzar."
+          ],
+          highlight: "Combustible mínimo para Test Drive: 1/2 estanque."
+        }
+      ),
+      module(
+        "tdp-4",
+        "Acompañar y guiar la experiencia",
+        3,
+        "El vendedor acompaña al cliente y conecta la prueba con las necesidades que detectó previamente.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Acompañar al cliente durante la prueba.",
+            "Resolver dudas técnicas durante el recorrido.",
+            "Relacionar atributos con el uso real del cliente.",
+            "Como referencia de estándar, considerar una prueba de al menos 15 minutos o 5 km cuando las condiciones lo permitan."
+          ]
+        }
+      ),
+      module(
+        "tdp-5",
+        "Cerrar el Test Drive",
+        2,
+        "Al volver, recoger la percepción del cliente y transformar la experiencia en un siguiente paso concreto.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Preguntar qué le gustó y qué dudas aparecieron.",
+            "Aplicar la encuesta de satisfacción mediante QR cuando corresponda.",
+            "Acordar el próximo paso: cotización, tasación, otra alternativa o continuidad comercial."
+          ]
+        }
+      )
+    ],
+    relatedPlaybooks: ["orientacion"],
+  },
+  {
+    id: "cotizacion-pilot",
+    title: "Cotización, presentación y seguimiento",
+    description:
+      "Gestionar la cotización en Pilot, presentar el presupuesto con claridad y retomar contacto dentro de las 24 horas.",
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    duration: 12,
+    mandatoryFor: ["VENTAS"],
+    status: "PILOTO",
+    assignedTo: ["VENTAS"],
+    seedProgress: 0,
+    new: true,
+    releaseMode: "TODO",
+    modules: [
+      module(
+        "cot-1",
+        "Preparar la cotización en Pilot",
+        3,
+        "La gestión oficial de la oportunidad y de la cotización se mantiene en Pilot.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Validar modelo, versión y alternativa conversada.",
+            "Revisar valores y opciones de financiamiento cuando correspondan.",
+            "Asegurar que la cotización responda a la conversación previa y no sea un documento genérico."
+          ],
+          highlight: "La App Ditalcar no reemplaza Pilot: la gestión comercial oficial sigue ocurriendo en el CRM."
+        }
+      ),
+      module(
+        "cot-2",
+        "Presentar el presupuesto",
+        3,
+        "Cotizar no es solo enviar un archivo. El vendedor debe explicar el presupuesto y aclarar sus componentes.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Explicar qué vehículo y alternativa se están cotizando.",
+            "Explicar valores, financiamiento y condiciones relevantes.",
+            "Aclarar dudas antes de cerrar la interacción."
+          ],
+          highlight: "Cotizar ≠ enviar. La cotización debe presentarse y explicarse."
+        }
+      ),
+      module(
+        "cot-3",
+        "Disponibilidad, reserva y entrega",
+        2,
+        "Antes de avanzar, informar lo que esté validado respecto de disponibilidad, reservas y tiempos de entrega.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Informar disponibilidad real cuando esté confirmada.",
+            "Explicar condiciones de reserva cuando apliquen.",
+            "No prometer fechas de entrega que todavía no estén validadas."
+          ]
+        }
+      ),
+      module(
+        "cot-4",
+        "Seguimiento dentro de 24 horas",
+        4,
+        "Una cotización enviada siempre debe tener un seguimiento posterior con propósito.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Retomar contacto dentro de las 24 horas siguientes al envío o entrega de la cotización.",
+            "Preguntar si pudo revisar la alternativa y qué necesita aclarar.",
+            "Buscar un siguiente paso concreto: visita, Test Drive, tasación, otra alternativa, financiamiento o avance del negocio.",
+            "Registrar la gestión y el próximo compromiso en Pilot."
+          ],
+          highlight: "Seguimiento obligatorio dentro de las 24 horas posteriores a la cotización."
+        }
+      )
+    ],
+    relatedPlaybooks: ["primer-contacto", "orientacion"],
+    sourceNote: "Pilot es el CRM oficial: la App Ditalcar apoya el aprendizaje, pero no registra gestiones comerciales en Pilot.",
+  },
+  {
+    id: "convertir-lead",
+    title: "Convertir un lead en una oportunidad",
+    description:
+      "Recursos prácticos para generar avance comercial sin presionar al cliente.",
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    duration: 8,
+    mandatoryFor: [],
+    status: "PILOTO",
+    assignedTo: [],
+    seedProgress: 0,
+    new: true,
+    releaseMode: "TODO",
+    modules: [
+      module(
+        "lead-1",
+        "Invitar al piso",
+        3,
+        "Cuando tenga sentido, mover la conversación desde un contacto remoto hacia una interacción de mayor valor en el local.",
+        true,
+        undefined,
+        { bullets: ["Invitar a conocer el vehículo.", "Comparar alternativas en piso.", "Acordar día y hora cuando el cliente esté disponible."] }
+      ),
+      module(
+        "lead-2",
+        "Ofrecer Test Drive",
+        2,
+        "Usar la prueba de manejo como una forma de transformar interés en experiencia concreta.",
+        true,
+        undefined,
+        { bullets: ["Ofrecerlo de forma proactiva cuando sea pertinente.", "Conectarlo con lo que el cliente quiere validar antes de decidir."] }
+      ),
+      module(
+        "lead-3",
+        "Ofrecer tasación en línea",
+        3,
+        "Si existe vehículo en parte de pago, ofrecer la tasación en línea para avanzar la conversación comercial.",
+        true,
+        undefined,
+        {
+          bullets: [
+            "Preguntar si considera entregar su vehículo actual como parte de pago.",
+            "Ofrecer la tasación en línea cuando corresponda.",
+            "Usar el resultado como insumo para avanzar la alternativa, no como presión de cierre."
+          ],
+          highlight: "Invitación al piso + Test Drive + tasación son herramientas para generar avance, no pasos obligatorios para todos los clientes."
+        }
+      )
+    ],
+  },
   {
     id: "consulta-fundamentos",
     title: "Fundamentos CONSULTA",
@@ -1685,6 +2013,45 @@ export type AcademyEvaluation = {
 
 export const academyEvaluations: AcademyEvaluation[] = [
   {
+    id: "eval-bienvenida",
+    title: "Evaluación · Bienvenida y recepción",
+    type: "CASOS",
+    passing: 80,
+    attempts: 3,
+    questionsPerAttempt: 5,
+    bankSize: 15,
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    assignedTo: ["VENTAS"],
+    duration: 5,
+    relatedCourseIds: ["bienvenida-clientes"],
+  },
+  {
+    id: "eval-test-drive",
+    title: "Evaluación · Test Drive",
+    type: "CASOS",
+    passing: 80,
+    attempts: 3,
+    questionsPerAttempt: 5,
+    bankSize: 15,
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    assignedTo: ["VENTAS"],
+    duration: 5,
+    relatedCourseIds: ["test-drive-piloto"],
+  },
+  {
+    id: "eval-cotizacion",
+    title: "Evaluación · Cotización y seguimiento",
+    type: "CASOS",
+    passing: 80,
+    attempts: 3,
+    questionsPerAttempt: 5,
+    bankSize: 15,
+    audience: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    assignedTo: ["VENTAS"],
+    duration: 5,
+    relatedCourseIds: ["cotizacion-pilot"],
+  },
+  {
     id: "eval-consulta",
     title: "Evaluación CONSULTA",
     type: "CONOCIMIENTO",
@@ -1737,6 +2104,46 @@ export type AcademyUpdate = {
 }
 
 export const academyUpdates: AcademyUpdate[] = [
+  {
+    id: "upd-bienvenida-piloto",
+    title: "Bienvenida y recepción del cliente",
+    detail: "Curso asignado del piloto: atención inicial, motivo de visita y ofrecimiento proactivo de bebestibles.",
+    kind: "ASIGNADO",
+    tab: "CURSOS",
+    audiences: ["VENTAS"],
+    date: "2026-09-21",
+    contentId: "bienvenida-clientes",
+  },
+  {
+    id: "upd-test-drive-piloto",
+    title: "Test Drive",
+    detail: "Curso asignado con documentación, rutas corta/larga, preparación de unidad y cierre de experiencia.",
+    kind: "ASIGNADO",
+    tab: "CURSOS",
+    audiences: ["VENTAS"],
+    date: "2026-09-21",
+    contentId: "test-drive-piloto",
+  },
+  {
+    id: "upd-cotizacion-pilot",
+    title: "Cotización, presentación y seguimiento",
+    detail: "Curso asignado: cotización en Pilot, explicación del presupuesto y seguimiento dentro de 24 horas.",
+    kind: "ASIGNADO",
+    tab: "CURSOS",
+    audiences: ["VENTAS"],
+    date: "2026-09-21",
+    contentId: "cotizacion-pilot",
+  },
+  {
+    id: "upd-convertir-lead",
+    title: "Convertir un lead en una oportunidad",
+    detail: "Nuevo recurso opcional con invitación a piso, Test Drive y tasación en línea de parte de pago.",
+    kind: "NUEVO",
+    tab: "CURSOS",
+    audiences: ["VENTAS", "JEFATURA", "GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA"],
+    date: "2026-09-21",
+    contentId: "convertir-lead",
+  },
   {
     id: "upd-pilot",
     title: "Uso efectivo de CRM Pilot",
