@@ -715,3 +715,5 @@
   }
 
 }
+
+.request-user-action{display:grid;grid-template-columns:auto 1fr;align-items:center;gap:12px;margin:14px 0;padding:14px 16px;border:1px solid #2c2c33;border-radius:13px;background:#101014}.request-user-action>div{display:grid;gap:3px}.request-user-action span{font-size:9px;font-weight:900;letter-spacing:.12em;color:#8d8d96}.request-user-action strong{font-size:13px;color:#fff}.request-user-action small{font-size:9px;line-height:1.45;color:#777781}.request-id-row{display:flex;align-items:center;gap:8px}.pilot-test-alert{border-color:rgba(100,145,255,.25)!important;background:rgba(100,145,255,.055)!important}
