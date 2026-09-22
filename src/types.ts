@@ -39,6 +39,7 @@ export type UserScope = {
   brands?: string[]
   areaFunctional?: string
   active: boolean
+  testingView?: boolean
 }
 
 export type RequestFamily =
@@ -139,6 +140,8 @@ export type ProcessFieldDefinition = {
   order: number
   placeholder?: string
   help?: string
+  exampleImage?: string
+  exampleCaption?: string
   options?: string[]
   source?: string
   readOnly?: boolean
@@ -180,6 +183,7 @@ export type ProcessAssignment = {
   priority?: number
   isPrincipal?: boolean
   active: boolean
+  testingView?: boolean
 }
 
 // Compatibilidad con módulos anteriores del piloto.
@@ -310,6 +314,7 @@ export type RequestItem = {
   originBreachId?: string
 
   internalCheckpoints: InternalCheckpointValue[]
+  isTest?: boolean
 }
 
 export type RequestPermissions = {
