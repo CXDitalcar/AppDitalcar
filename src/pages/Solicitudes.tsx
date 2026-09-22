@@ -6,6 +6,7 @@ import { requestAssignments } from "../data/requestConfig"
 import { canViewRequest } from "../services/permissions"
 import type { RequestItem, UserScope } from "../types"
 import { responsibleLabel, visibleStatusLabel } from "../services/requestPresentation"
+import SignalLight, { signalFromRequest } from "../components/SignalLight"
 
 export default function Solicitudes({
   branch,
@@ -64,7 +65,9 @@ export default function Solicitudes({
           <h1>Seguimiento</h1>
           <p>
             {demoMode
-              ? "Piloto interactivo · flujo por rol y SLA"
+              ? currentUser.role === "EXPERIENCIA_CLIENTES"
+                ? "Piloto interactivo · flujo por rol y SLA"
+                : "Piloto interactivo · flujo por rol y seguimiento de plazos"
               : "Fuente real · Tablero General Solicitudes + seguimiento Lists"}
           </p>
         </div>
@@ -112,6 +115,7 @@ export default function Solicitudes({
                 <span>#{request.id}</span>
               </div>
               <h3>{request.processName}</h3>
+              {request.isTest && <span className="pilot-test-tag">PRUEBA</span>}
               <div className="request-meta">
                 <span>{request.local}</span>
                 <span>{request.requesterName}</span>
@@ -119,7 +123,7 @@ export default function Solicitudes({
               </div>
               {request.slaPausedReason && (
                 <div className="request-paused">
-                  SLA pausado · {request.slaPausedReason}
+                  {currentUser.role === "EXPERIENCIA_CLIENTES" ? "SLA" : "Plazo"} pausado · {request.slaPausedReason}
                 </div>
               )}
               <div className="request-foot">
@@ -142,18 +146,21 @@ export default function Solicitudes({
 function PilotStatus({ request }: { request: RequestItem }) {
   const value = request.status
   return (
-    <span
-      className={`status ${
-        value === "RESUELTA"
-          ? "ok"
-          : value === "RECHAZADA"
-            ? "bad"
-            : value === "PENDIENTE_APROBACION"
-              ? "requested"
-              : "neutral"
-      }`}
-    >
-      {visibleStatusLabel(request)}
+    <span className="request-status-signal">
+      <SignalLight tone={signalFromRequest(request)} compact />
+      <span
+        className={`status ${
+          value === "RESUELTA"
+            ? "ok"
+            : value === "RECHAZADA"
+              ? "bad"
+              : value === "PENDIENTE_APROBACION"
+                ? "requested"
+                : "neutral"
+        }`}
+      >
+        {visibleStatusLabel(request)}
+      </span>
     </span>
   )
 }
