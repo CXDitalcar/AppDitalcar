@@ -156,6 +156,8 @@ export default function NuevaSolicitud({
     [currentUser]
   )
 
+  const unitsInDevelopment = currentUser.role !== "EXPERIENCIA_CLIENTES"
+
   useEffect(() => {
     if (!processFromUrl) return
 
@@ -197,10 +199,12 @@ export default function NuevaSolicitud({
   }, [sourceBreach, currentUser])
 
   const visibleFamilies = useMemo(() => {
-    return (Object.keys(familyInfo) as RequestFamily[]).filter((family) =>
-      availableProcesses.some((process) => process.family === family)
+    return (Object.keys(familyInfo) as RequestFamily[]).filter(
+      (family) =>
+        availableProcesses.some((process) => process.family === family) ||
+        (family === "UNIDADES" && unitsInDevelopment)
     )
-  }, [availableProcesses])
+  }, [availableProcesses, unitsInDevelopment])
 
   const familyProcesses = useMemo(() => {
     if (!selectedFamily) return []
@@ -610,20 +614,34 @@ export default function NuevaSolicitud({
             {visibleFamilies.map((family) => {
               const config = familyInfo[family]
               const Icon = config.icon
+              const development = family === "UNIDADES" && unitsInDevelopment
               return (
                 <button
                   key={family}
-                  className="request-family-card"
-                  onClick={() => selectFamily(family)}
+                  className={`request-family-card ${development ? "in-development" : ""}`}
+                  onClick={() => !development && selectFamily(family)}
+                  disabled={development}
+                  aria-disabled={development}
                 >
                   <div className="request-family-icon">
                     <Icon size={25} />
                   </div>
                   <div>
-                    <h3>{config.label}</h3>
-                    <p>{config.description}</p>
+                    <div className="request-family-title-row">
+                      <h3>{config.label}</h3>
+                      {development && <span className="request-development-badge">EN DESARROLLO</span>}
+                    </div>
+                    <p>
+                      {development
+                        ? "Las solicitudes asociadas a unidades se están preparando y todavía no están habilitadas para este perfil."
+                        : config.description}
+                    </p>
                   </div>
-                  <ArrowRight className="family-arrow" size={20} />
+                  {development ? (
+                    <span className="request-development-label">Próximamente</span>
+                  ) : (
+                    <ArrowRight className="family-arrow" size={20} />
+                  )}
                 </button>
               )
             })}
@@ -1025,6 +1043,7 @@ function DynamicField({
     return (
       <label className="dynamic-field">
         <FieldLabel field={field} />
+        <FieldExample field={field} />
         <textarea
           value={value}
           placeholder={field.placeholder}
@@ -1039,6 +1058,7 @@ function DynamicField({
     return (
       <label className="dynamic-field">
         <FieldLabel field={field} />
+        <FieldExample field={field} />
         <select value={value} onChange={(event) => onChange(event.target.value)}>
           <option value="">Seleccionar</option>
           {field.options?.map((option) => (
@@ -1056,6 +1076,7 @@ function DynamicField({
     return (
       <label className="dynamic-field">
         <FieldLabel field={field} />
+        <FieldExample field={field} />
         <select value={value} onChange={(event) => onChange(event.target.value)}>
           <option value="">Seleccionar local</option>
           {localOptions.map((local) => (
@@ -1072,6 +1093,7 @@ function DynamicField({
     return (
       <label className="dynamic-field">
         <FieldLabel field={field} />
+        <FieldExample field={field} />
         <select value={value} onChange={(event) => onChange(event.target.value)}>
           <option value="">Seleccionar insumo</option>
           {catalog.map((item) => (
@@ -1098,6 +1120,7 @@ function DynamicField({
   return (
     <label className="dynamic-field">
       <FieldLabel field={field} />
+      <FieldExample field={field} />
       <input
         type={inputType}
         value={value}
@@ -1113,6 +1136,16 @@ function DynamicField({
       />
       {field.help && <small>{field.help}</small>}
     </label>
+  )
+}
+
+function FieldExample({ field }: { field: ProcessFieldDefinition }) {
+  if (!field.exampleImage) return null
+  return (
+    <figure className="field-example">
+      <img src={field.exampleImage} alt={field.exampleCaption ?? `Ejemplo ${field.label}`} />
+      {field.exampleCaption && <figcaption>{field.exampleCaption}</figcaption>}
+    </figure>
   )
 }
 
