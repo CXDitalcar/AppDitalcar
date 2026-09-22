@@ -1,8 +1,8 @@
-import { mockRequests } from "../data/mockData"
+import { mockRequests, mockRequestTimeline } from "../data/mockData"
 import type { RequestItem, RequestTimelineItem } from "../types"
 
-const REQUESTS_KEY = "ditalcar-pilot-stellantis-nt-requests-v1"
-const TIMELINE_KEY = "ditalcar-pilot-stellantis-nt-timeline-v1"
+const REQUESTS_KEY = "ditalcar-pilot-stellantis-nt-requests-v2"
+const TIMELINE_KEY = "ditalcar-pilot-stellantis-nt-timeline-v2"
 
 function cloneSeed(): RequestItem[] {
   return JSON.parse(JSON.stringify(mockRequests)) as RequestItem[]
@@ -47,23 +47,26 @@ export function updateDemoRequest(id: string, patch: Partial<RequestItem>) {
 export function getDemoTimeline(requestId: string): RequestTimelineItem[] {
   try {
     const raw = localStorage.getItem(TIMELINE_KEY)
-    if (!raw) return []
-    const items = JSON.parse(raw) as RequestTimelineItem[]
+    const items = raw
+      ? (JSON.parse(raw) as RequestTimelineItem[])
+      : (JSON.parse(JSON.stringify(mockRequestTimeline)) as RequestTimelineItem[])
     return items
       .filter((item) => item.requestId === requestId)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   } catch {
-    return []
+    return mockRequestTimeline
+      .filter((item) => item.requestId === requestId)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
   }
 }
 
 export function appendDemoTimeline(item: RequestTimelineItem) {
-  let items: RequestTimelineItem[] = []
+  let items: RequestTimelineItem[] = JSON.parse(JSON.stringify(mockRequestTimeline))
   try {
     const raw = localStorage.getItem(TIMELINE_KEY)
     if (raw) items = JSON.parse(raw) as RequestTimelineItem[]
   } catch {
-    items = []
+    items = JSON.parse(JSON.stringify(mockRequestTimeline))
   }
   localStorage.setItem(TIMELINE_KEY, JSON.stringify([item, ...items]))
 }
