@@ -45,6 +45,8 @@ import {
   juniorPlaybooks,
   salesPlaybooks,
   selloExperiencia,
+  PILOT_VISIBLE_COURSE_IDS,
+  PILOT_VISIBLE_EVALUATION_IDS,
   type AcademyAudience,
   type AcademyCourse,
   type AcademyEvaluation,
@@ -56,6 +58,7 @@ import {
   evaluationNeedsReinforcement,
   getAcademyObservations,
   getAcademyState,
+  hasAcademyFeedback,
   getCompletedModules,
   getCourseProgress,
   getEvaluationAttempts,
@@ -70,6 +73,8 @@ import {
   toggleAcademyFavorite,
   type ObservableValue,
 } from "../services/academyStore"
+import AcademyFeedbackPanel from "../components/AcademyFeedbackPanel"
+import SignalLight, { signalFromPercent } from "../components/SignalLight"
 import "./Academia.css"
 
 const CONSULTA_CODES = ["C", "O", "N", "S", "U", "L", "T", "A"]
@@ -191,6 +196,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const [libraryBrand, setLibraryBrand] = useState("Todas")
   const [libraryRoute, setLibraryRoute] = useState("TODOS")
   const [storeVersion, setStoreVersion] = useState(0)
+  const [assignedOverviewOpen, setAssignedOverviewOpen] = useState(true)
+  const [optionalOverviewOpen, setOptionalOverviewOpen] = useState(false)
 
   const [quizEvaluation, setQuizEvaluation] = useState<AcademyEvaluation | null>(null)
   const [quizQuestions, setQuizQuestions] = useState<AcademyQuestion[]>([])
@@ -240,6 +247,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
       (course) =>
         course.audience.includes(audience) &&
         isContentVisible(course.status, admin) &&
+        (admin || PILOT_VISIBLE_COURSE_IDS.includes(course.id as (typeof PILOT_VISIBLE_COURSE_IDS)[number])) &&
         (!query ||
           `${course.title} ${course.description} ${course.modules
             .map((item) => item.title)
@@ -259,9 +267,25 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const zeroAssignedCourses = assignedCourses.filter(
     (course) => getCourseProgress(course) === 0
   )
+  const completedAssignedCourses = assignedCourses.filter(
+    (course) =>
+      getCourseProgress(course) >= 100 &&
+      hasAcademyFeedback(course.id, currentUser.email)
+  )
+  const pendingAssignedCourses = assignedCourses.filter(
+    (course) => !completedAssignedCourses.some((item) => item.id === course.id)
+  )
+  const optionalCourses = visibleCourses.filter(
+    (course) => !course.assignedTo.includes(audience)
+  )
 
-  const visibleEvaluations = academyEvaluations.filter((evaluation) =>
-    evaluation.audience.includes(audience)
+  const visibleEvaluations = academyEvaluations.filter(
+    (evaluation) =>
+      evaluation.audience.includes(audience) &&
+      (admin ||
+        PILOT_VISIBLE_EVALUATION_IDS.includes(
+          evaluation.id as (typeof PILOT_VISIBLE_EVALUATION_IDS)[number]
+        ))
   )
   const pendingEvaluations = visibleEvaluations.filter((evaluation) => {
     if (!evaluation.assignedTo.includes(audience)) return false
@@ -450,63 +474,104 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
           <span className="academy-pulse">Actualizado</span>
         </div>
 
-        <div className="academy-now-grid academy-now-grid-six">
-          <QuickCard
-            icon={PlayCircle}
-            label="Continuar"
-            value={continuingCourses.length}
-            detail={
-              continuingCourses[0]
-                ? `${continuingCourses[0].title} · ${getCourseProgress(
-                    continuingCourses[0]
-                  )}%`
-                : "Sin cursos en progreso"
-            }
-            onClick={() => changeTab("CURSOS")}
-          />
-          <QuickCard
-            icon={Layers3}
-            label="Asignado"
-            value={zeroAssignedCourses.length}
-            detail={
-              zeroAssignedCourses[0]
-                ? `${zeroAssignedCourses[0].title} · 0%`
-                : "Sin nuevos asignados"
-            }
-            onClick={() => changeTab("CURSOS")}
-          />
-          <QuickCard
-            icon={ClipboardCheck}
-            label="Evaluaciones pendientes"
-            value={pendingEvaluations.length}
-            detail={pendingEvaluations[0]?.title ?? "Sin evaluaciones pendientes"}
-            onClick={() => changeTab("EVALUACIONES")}
-          />
-          <QuickCard
-            icon={Sparkles}
-            label="Novedades"
-            value={unseenUpdates.length}
-            detail="Nuevo, actualizado o recién asignado"
-            onClick={() =>
-              document.getElementById("academy-updates")?.scrollIntoView({
-                behavior: "smooth",
-              })
-            }
-          />
-          <QuickCard
-            icon={Bookmark}
-            label="Favoritos"
-            value={favoritesCount}
-            detail="Playbooks, cursos y documentos guardados"
-            onClick={() => changeTab("BIBLIOTECA")}
-          />
-          <QuickCard
-            icon={Target}
-            label="Recomendado"
-            value={recommendedCourse ? 1 : 0}
-            detail={recommendedCourse?.title ?? "Sin recomendación pendiente"}
-            onClick={() => changeTab("CURSOS")}
-          />
+        <div className="academy-route-overview">
+          <article className={`academy-route-box assigned ${assignedOverviewOpen ? "open" : ""}`}>
+            <button
+              type="button"
+              className="academy-route-box-head"
+              onClick={() => setAssignedOverviewOpen((value) => !value)}
+            >
+              <div className="academy-route-box-title">
+                <SignalLight tone="green" compact />
+                <div>
+                  <span className="academy-eyebrow">TU APRENDIZAJE</span>
+                  <h3>Cursos asignados</h3>
+                  <p>Lo que tienes que comenzar, continuar o cerrar.</p>
+                </div>
+              </div>
+              <ChevronRight size={19} className={assignedOverviewOpen ? "open" : ""} />
+            </button>
+            <div className="academy-route-stats">
+              <div><strong>{assignedCourses.length}</strong><span>Asignados</span></div>
+              <div><strong>{pendingAssignedCourses.length}</strong><span>Pendientes</span></div>
+              <div><strong>{continuingCourses.length}</strong><span>En curso</span></div>
+              <div><strong>{completedAssignedCourses.length}</strong><span>Completados</span></div>
+            </div>
+            {assignedOverviewOpen && (
+              <div className="academy-route-list">
+                {assignedCourses.length ? assignedCourses.map((course) => {
+                  const progress = getCourseProgress(course)
+                  const feedbackDone = hasAcademyFeedback(course.id, currentUser.email)
+                  const completed = progress >= 100 && feedbackDone
+                  return (
+                    <button
+                      type="button"
+                      key={course.id}
+                      onClick={() => { setSelectedCourse(course.id); changeTab("CURSOS") }}
+                    >
+                      <SignalLight tone={completed ? "neutral" : "green"} compact />
+                      <div>
+                        <strong>{course.title}</strong>
+                        <span>
+                          {completed
+                            ? "Completado"
+                            : progress >= 100
+                              ? "Encuesta final pendiente"
+                              : progress > 0
+                                ? `En curso · ${progress}%`
+                                : "Asignado · 0%"}
+                        </span>
+                      </div>
+                      <b>{progress}%</b>
+                    </button>
+                  )
+                }) : (
+                  <div className="academy-route-empty">Sin cursos asignados por ahora.</div>
+                )}
+                {pendingEvaluations.length > 0 && (
+                  <button type="button" onClick={() => changeTab("EVALUACIONES")}>
+                    <SignalLight tone="green" compact />
+                    <div>
+                      <strong>Evaluaciones pendientes</strong>
+                      <span>{pendingEvaluations.length} por completar</span>
+                    </div>
+                    <ChevronRight size={16} />
+                  </button>
+                )}
+              </div>
+            )}
+          </article>
+
+          <article className={`academy-route-box optional ${optionalOverviewOpen ? "open" : ""}`}>
+            <button
+              type="button"
+              className="academy-route-box-head"
+              onClick={() => setOptionalOverviewOpen((value) => !value)}
+            >
+              <div className="academy-route-box-title">
+                <BookOpen size={19} />
+                <div>
+                  <span className="academy-eyebrow">PARA CONSULTAR</span>
+                  <h3>Recursos opcionales</h3>
+                  <p>Playbooks, biblioteca y cursos que puedes revisar cuando los necesites.</p>
+                </div>
+              </div>
+              <ChevronRight size={19} className={optionalOverviewOpen ? "open" : ""} />
+            </button>
+            <div className="academy-route-stats compact">
+              <div><strong>{optionalCourses.length}</strong><span>Cursos</span></div>
+              <div><strong>{salesPlaybookAudience ? salesPlaybooks.length : juniorPlaybooks.length}</strong><span>Playbooks</span></div>
+              <div><strong>{visibleLibrary.length}</strong><span>Materiales</span></div>
+              <div><strong>{favoritesCount}</strong><span>Guardados</span></div>
+            </div>
+            {optionalOverviewOpen && (
+              <div className="academy-optional-actions">
+                <button type="button" onClick={() => changeTab("PLAYBOOKS")}>Playbooks <ArrowRight size={14} /></button>
+                <button type="button" onClick={() => changeTab("BIBLIOTECA")}>Biblioteca <ArrowRight size={14} /></button>
+                <button type="button" onClick={() => changeTab("CURSOS")}>Cursos opcionales <ArrowRight size={14} /></button>
+              </div>
+            )}
+          </article>
         </div>
 
         {unseenUpdates.length > 0 && (
@@ -553,7 +618,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
 
       {tab === "MODELO" &&
         (salesModelAudience ? (
-          <section className="academy-panel">
+          <section className={`academy-panel ${!admin ? "academy-model-limited" : ""}`}>
             <div className="academy-panel-head">
               <div>
                 <span className="academy-eyebrow">MODELO CONSULTA</span>
@@ -566,6 +631,16 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
               </div>
               <RouteToggle value={vehicleRoute} onChange={setVehicleRoute} />
             </div>
+
+            {!admin && (
+              <div className="academy-model-compact-note">
+                <Target size={18} />
+                <div>
+                  <strong>Modelo CONSULTA · resumen visible</strong>
+                  <span>Durante el piloto se muestran los 8 principios como referencia. El detalle completo se mantiene disponible para Experiencia de Clientes.</span>
+                </div>
+              </div>
+            )}
 
             <div className="consulta-strip">
               {consultaDetailed.map((item) => (
@@ -816,20 +891,25 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                     </div>
                   </div>
 
-                  <div className="playbook-sections">
+                  <div className="playbook-sections playbook-accordions">
                     {currentPlaybook.sections.map((section) => (
-                      <article key={section.id}>
-                        <div className="playbook-section-head">
-                          <h4>{section.title}</h4>
-                          {section.consulta?.length ? (
-                            <span>{section.consulta.join(" · ")}</span>
-                          ) : null}
+                      <details key={section.id} className="playbook-section-accordion">
+                        <summary>
+                          <div>
+                            <h4>{section.title}</h4>
+                            {section.consulta?.length ? (
+                              <span>{section.consulta.join(" · ")}</span>
+                            ) : null}
+                          </div>
+                          <ChevronRight size={17} />
+                        </summary>
+                        <div className="playbook-section-body">
+                          {section.bullets.map((item) => (
+                            <p key={item}>• {item}</p>
+                          ))}
+                          {section.note && <small>{section.note}</small>}
                         </div>
-                        {section.bullets.map((item) => (
-                          <p key={item}>• {item}</p>
-                        ))}
-                        {section.note && <small>{section.note}</small>}
-                      </article>
+                      </details>
                     ))}
                   </div>
 
@@ -842,6 +922,13 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                       Ver cursos relacionados <ArrowRight size={15} />
                     </button>
                   </div>
+
+                  <AcademyFeedbackPanel
+                    contentId={currentPlaybook.id}
+                    contentType="PLAYBOOK"
+                    currentUser={currentUser}
+                    onSaved={refreshStore}
+                  />
                 </div>
               )}
             </>
@@ -876,6 +963,14 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                     ))}
                   </div>
                 </div>
+              )}
+              {currentJuniorPlaybook && (
+                <AcademyFeedbackPanel
+                  contentId={currentJuniorPlaybook.id}
+                  contentType="PLAYBOOK"
+                  currentUser={currentUser}
+                  onSaved={refreshStore}
+                />
               )}
               <div className="academy-callout">
                 <ShieldCheck size={22} />
@@ -922,6 +1017,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
               const completedModules = getCompletedModules(course.id)
               const assigned = course.assignedTo.includes(audience)
               const mandatory = course.mandatoryFor.includes(audience)
+              const feedbackDone = hasAcademyFeedback(course.id, currentUser.email)
               const open = selectedCourse === course.id
 
               return (
@@ -972,19 +1068,31 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                       {course.modules.map((module, index) => {
                         const completed = completedModules.includes(module.id)
                         return (
-                          <div
+                          <details
                             key={module.id}
-                            className={`${completed ? "completed" : ""} ${
+                            className={`course-module-accordion ${completed ? "completed" : ""} ${
                               !module.available ? "locked" : ""
                             }`}
                           >
-                            <span>{completed ? <Check size={14} /> : index + 1}</span>
-                            <div>
+                            <summary>
+                              <span>{completed ? <Check size={14} /> : index + 1}</span>
                               <div className="course-module-title">
                                 <strong>{module.title}</strong>
                                 <small>{module.duration} min</small>
                               </div>
+                              <ChevronRight size={15} />
+                            </summary>
+                            <div className="course-module-content">
                               <p>{module.detail}</p>
+                              {module.highlight && (
+                                <div className="course-module-highlight">{module.highlight}</div>
+                              )}
+                              {module.bullets?.length ? (
+                                <ul>
+                                  {module.bullets.map((item) => <li key={item}>{item}</li>)}
+                                </ul>
+                              ) : null}
+                              {module.note && <small className="course-module-note">{module.note}</small>}
                               {!module.available && (
                                 <em>
                                   <LockKeyhole size={12} /> {module.releaseLabel ?? "Próximamente"}
@@ -1000,10 +1108,22 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                               )}
                               {completed && <em className="module-done">Completado</em>}
                             </div>
-                          </div>
+                          </details>
                         )
                       })}
                     </div>
+                  )}
+                  {open && (
+                    <AcademyFeedbackPanel
+                      contentId={course.id}
+                      contentType="CURSO"
+                      currentUser={currentUser}
+                      required={assigned}
+                      onSaved={refreshStore}
+                    />
+                  )}
+                  {assigned && getCourseProgress(course) >= 100 && !feedbackDone && (
+                    <div className="course-feedback-pending">Encuesta final pendiente para completar el curso.</div>
                   )}
                 </article>
               )
@@ -1254,6 +1374,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                 resource={resource}
                 favorite={state.favorites.includes(resource.id)}
                 onFavorite={() => toggleFavorite(resource.id)}
+                currentUser={currentUser}
+                onFeedbackSaved={refreshStore}
               />
             ))}
           </div>
@@ -1679,10 +1801,14 @@ function LibraryCard({
   resource,
   favorite,
   onFavorite,
+  currentUser,
+  onFeedbackSaved,
 }: {
   resource: LibraryResource
   favorite: boolean
   onFavorite: () => void
+  currentUser: UserScope
+  onFeedbackSaved: () => void
 }) {
   const available = Boolean(resource.url)
   return (
@@ -1728,6 +1854,12 @@ function LibraryCard({
       {resource.sharePointPath && (
         <small className="library-path">Destino: {resource.sharePointPath}</small>
       )}
+      <AcademyFeedbackPanel
+        contentId={resource.id}
+        contentType="MATERIAL"
+        currentUser={currentUser}
+        onSaved={onFeedbackSaved}
+      />
     </article>
   )
 }
@@ -1743,22 +1875,18 @@ function AcademyKPIs({ rows }: { rows: typeof academyTeamProgress }) {
     .map((row) => row.consultaObserved)
     .filter((value) => value > 0)
 
+  const mandatoryProgress = average(rows.map((row) => row.mandatoryProgress))
+  const evaluationPass = average(rows.map((row) => row.evaluationPass))
+  const consultaObserved = consultaValues.length ? average(consultaValues) : undefined
+
   const metrics = [
-    {
-      label: "Avance obligatorio",
-      value: `${average(rows.map((row) => row.mandatoryProgress))}%`,
-    },
-    {
-      label: "Aprobación evaluaciones",
-      value: `${average(rows.map((row) => row.evaluationPass))}%`,
-    },
-    {
-      label: "Con refuerzo",
-      value: String(rows.filter((row) => row.reinforcement).length),
-    },
+    { label: "Avance obligatorio", value: `${mandatoryProgress}%`, percent: mandatoryProgress },
+    { label: "Aprobación evaluaciones", value: `${evaluationPass}%`, percent: evaluationPass },
+    { label: "Con refuerzo", value: String(rows.filter((row) => row.reinforcement).length) },
     {
       label: "CONSULTA observado",
-      value: consultaValues.length ? `${average(consultaValues)}%` : "—",
+      value: consultaObserved === undefined ? "—" : `${consultaObserved}%`,
+      percent: consultaObserved,
     },
     {
       label: "Evaluaciones pendientes",
@@ -1770,7 +1898,10 @@ function AcademyKPIs({ rows }: { rows: typeof academyTeamProgress }) {
     <div className="academy-kpis">
       {metrics.map((metric) => (
         <article key={metric.label}>
-          <BarChart3 size={17} />
+          <SignalLight
+            tone={metric.percent === undefined ? "neutral" : signalFromPercent(metric.percent)}
+            compact
+          />
           <span>{metric.label}</span>
           <strong>{metric.value}</strong>
         </article>
