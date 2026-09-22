@@ -5,6 +5,7 @@ import {
 
 import {
   BadgeCheck,
+  BarChart3,
   BookOpen,
   Building2,
   ClipboardCheck,
@@ -21,6 +22,7 @@ import {
 } from "react-router-dom"
 
 import Brand from "./Brand"
+import PilotFeedback from "./PilotFeedback"
 
 import "./Shell.css"
 
@@ -41,6 +43,7 @@ type ShellProps = {
   children?: ReactNode
 
   currentUser?: UserScope
+  authenticatedUser?: UserScope
 
   // Compatibilidad con App.tsx actual
   userName?: string
@@ -49,8 +52,15 @@ type ShellProps = {
   demoMode?: boolean
 
   onDemoLogout?: () => void
+  onLogout?: () => void | Promise<void>
 
   showApprovals?: boolean
+
+  viewAsOptions?: UserScope[]
+  viewAsEmail?: string
+  onViewAs?: (email: string) => void
+
+  showPilotFeedback?: boolean
 }
 
 
@@ -63,6 +73,7 @@ type NavigationItem = {
   to: string
   icon: typeof LayoutDashboard
   module: PilotModule
+  badge?: string
 }
 
 
@@ -97,6 +108,14 @@ const mainNavigation: NavigationItem[] = [
   },
 
   {
+    label: "KPI",
+    to: "/kpi",
+    icon: BarChart3,
+    module: "KPI",
+    badge: "EN DESARROLLO",
+  },
+
+  {
     label: "Formularios",
     to: "/formularios",
     icon: ClipboardCheck,
@@ -112,11 +131,17 @@ const mainNavigation: NavigationItem[] = [
 export default function Shell({
   children,
   currentUser,
+  authenticatedUser,
   userName,
   branch,
   demoMode = false,
   onDemoLogout,
+  onLogout,
   showApprovals = false,
+  viewAsOptions,
+  viewAsEmail,
+  onViewAs,
+  showPilotFeedback = false,
 }: ShellProps) {
   const [
     mobileMenuOpen,
@@ -247,10 +272,12 @@ export default function Shell({
 
 
                     <span className="app-sidebar-link-text">
-                      {
-                        item.label
-                      }
+                      {item.label}
                     </span>
+
+                    {item.badge && (
+                      <span className="app-sidebar-link-badge">{item.badge}</span>
+                    )}
 
                   </NavLink>
                 )
@@ -328,12 +355,36 @@ export default function Shell({
               />
 
               <span>
-                MODO DEMO
+                DATOS PILOTO
               </span>
 
             </div>
           )}
 
+
+          {viewAsOptions && onViewAs && (
+            <label className="app-view-as">
+              <span>VER COMO</span>
+              <select
+                value={viewAsEmail ?? authenticatedUser?.email ?? currentUser?.email ?? ""}
+                onChange={(event) => onViewAs(event.target.value)}
+              >
+                {authenticatedUser && (
+                  <option value={authenticatedUser.email}>
+                    Mi perfil · {formatRole(authenticatedUser.role)}
+                  </option>
+                )}
+                {viewAsOptions
+                  .filter((user) => user.email !== authenticatedUser?.email)
+                  .map((user) => (
+                    <option key={`${user.role}-${user.email}`} value={user.email}>
+                      {formatRole(user.role)} · {user.name}
+                    </option>
+                  ))}
+              </select>
+              <small>Solo visible para Experiencia durante el piloto.</small>
+            </label>
+          )}
 
           <div className="app-user-card">
 
@@ -375,24 +426,25 @@ export default function Shell({
           </div>
 
 
-          {demoMode &&
-            onDemoLogout && (
+          {demoMode && onDemoLogout && (
             <button
               type="button"
               className="app-demo-logout"
-              onClick={
-                onDemoLogout
-              }
+              onClick={onDemoLogout}
             >
+              <LogOut size={16} />
+              <span>Cambiar perfil</span>
+            </button>
+          )}
 
-              <LogOut
-                size={16}
-              />
-
-              <span>
-                Cambiar perfil
-              </span>
-
+          {!demoMode && onLogout && (
+            <button
+              type="button"
+              className="app-demo-logout"
+              onClick={() => void onLogout()}
+            >
+              <LogOut size={16} />
+              <span>Cerrar sesión</span>
             </button>
           )}
 
@@ -461,6 +513,10 @@ export default function Shell({
         </div>
 
       </main>
+
+      {showPilotFeedback && currentUser && (
+        <PilotFeedback currentUser={currentUser} />
+      )}
 
     </div>
   )
