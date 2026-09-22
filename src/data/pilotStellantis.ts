@@ -8,6 +8,8 @@ export const PILOT_REQUEST_CODES = [
   "EXP-HOR-01",
   "EXP-SEN-01",
   "EXP-ORG-01",
+  "EXP-FEE-01",
+  "EXP-SEG-01",
   "INS-ZEX-01",
   "INS-MOB-01",
   "INS-MAN-01",
@@ -21,6 +23,7 @@ export type PilotModule =
   | "SOLICITUDES"
   | "FORMULARIOS"
   | "INSUMOS"
+  | "KPI"
 
 export const PILOT_ACTIVE_ROLES: UserRole[] = [
   "VENDEDOR",
@@ -30,6 +33,21 @@ export const PILOT_ACTIVE_ROLES: UserRole[] = [
   "JEFATURA_MARKETING",
   "GERENCIA_COMERCIAL",
 ]
+
+// Perfiles visibles en el selector del piloto. Experiencia conserva acceso completo
+// a toda la app para poder revisar módulos que siguen ocultos al resto.
+export const PILOT_DEMO_EMAILS = new Set([
+  "vendedor.demo@ditalcar.cl",
+  "jefe.stellantis.nt@ditalcar.cl",
+  "gerencia.marca.stellantis@ditalcar.cl",
+  "experiencia.clientes@ditalcar.cl",
+  "marketing@ditalcar.cl",
+  "gerencia.comercial@ditalcar.cl",
+])
+
+export function isPilotDemoProfile(user: UserScope) {
+  return PILOT_DEMO_EMAILS.has(user.email.toLowerCase())
+}
 
 export function isPilotFullAccess(user: UserScope) {
   return user.role === "EXPERIENCIA_CLIENTES"
@@ -42,7 +60,58 @@ export function canAccessPilotModule(
   if (!user.active) return false
   if (isPilotFullAccess(user)) return true
 
-  if (module === "HOME" || module === "SOLICITUDES") {
+  // "Ver como" es una herramienta exclusiva de Experiencia durante el piloto.
+  // Permite revisar la experiencia de todos los cargos sin cambiar las reglas
+  // que tendrá un usuario real en el piloto.
+  if (user.testingView) {
+    if (
+      module === "HOME" ||
+      module === "SOLICITUDES" ||
+      module === "ACADEMIA" ||
+      module === "KPI"
+    ) {
+      return true
+    }
+
+    if (module === "FORMULARIOS") {
+      return [
+        "JEFATURA_LOCAL",
+        "GERENCIA_MARCA",
+        "JEFATURA_MARCA",
+        "JEFATURA_ZONAL",
+        "GERENCIA_VENTAS",
+        "EXPERIENCIA_CLIENTES",
+      ].includes(user.role)
+    }
+
+    if (module === "MI_LOCAL") {
+      return [
+        "VENDEDOR",
+        "JEFATURA_LOCAL",
+        "GERENCIA_MARCA",
+        "JEFATURA_MARCA",
+        "JEFATURA_ZONAL",
+        "GERENCIA_VENTAS",
+        "GERENCIA_COMERCIAL",
+        "EXPERIENCIA_CLIENTES",
+      ].includes(user.role)
+    }
+
+    if (module === "INSUMOS") {
+      return (
+        user.role === "EXPERIENCIA_CLIENTES" ||
+        (user.role === "ADMINISTRATIVO" &&
+          (user.areaFunctional ?? "").toLowerCase().includes("junior"))
+      )
+    }
+  }
+
+  if (
+    module === "HOME" ||
+    module === "SOLICITUDES" ||
+    module === "ACADEMIA" ||
+    module === "KPI"
+  ) {
     return PILOT_ACTIVE_ROLES.includes(user.role)
   }
 
@@ -63,6 +132,8 @@ export function getPilotRequestCodesForUser(user: UserScope) {
       "EXP-HOR-01",
       "EXP-SEN-01",
       "EXP-ORG-01",
+      "EXP-FEE-01",
+      "EXP-SEG-01",
     ])
   }
 
@@ -77,6 +148,8 @@ export function getPilotRequestCodesForUser(user: UserScope) {
       "EXP-HOR-01",
       "EXP-SEN-01",
       "EXP-ORG-01",
+      "EXP-FEE-01",
+      "EXP-SEG-01",
     ])
   }
 
