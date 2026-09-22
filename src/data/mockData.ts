@@ -117,6 +117,68 @@ export const mockUsers: UserScope[] = [
 
 
 // ======================================================
+// PERFILES PARA "VER COMO" (SOLO EXPERIENCIA / PILOTO)
+// ======================================================
+
+const additionalDemoUsers: UserScope[] = [
+  {
+    email: "junior.demo@ditalcar.cl",
+    name: "Junior Demo",
+    role: "ADMINISTRATIVO",
+    local: "Stellantis Nueva Tobalaba",
+    localPrincipal: "Stellantis Nueva Tobalaba",
+    assignedLocals: ["Stellantis Nueva Tobalaba"],
+    brands: ["Jeep", "RAM", "Fiat"],
+    scope: "LOCAL",
+    areaFunctional: "Junior / Operación",
+    active: true,
+    testingView: true,
+  },
+  {
+    email: "operaciones.comerciales.demo@ditalcar.cl",
+    name: "Jefatura Operaciones Comerciales Demo",
+    role: "JEFATURA_OPERACIONES_COMERCIALES",
+    scope: "RED",
+    areaFunctional: "Operaciones Comerciales",
+    active: true,
+    testingView: true,
+  },
+  {
+    email: "jefatura.administracion.demo@ditalcar.cl",
+    name: "Jefatura Administración Demo",
+    role: "JEFATURA_ADMINISTRACION",
+    scope: "RED",
+    areaFunctional: "Administración",
+    active: true,
+    testingView: true,
+  },
+  {
+    email: "gerencia.administracion.demo@ditalcar.cl",
+    name: "Gerencia Administración Demo",
+    role: "GERENCIA_ADMINISTRACION",
+    scope: "RED",
+    areaFunctional: "Administración",
+    active: true,
+    testingView: true,
+  },
+  {
+    email: "administrativo.demo@ditalcar.cl",
+    name: "Administrativo Demo",
+    role: "ADMINISTRATIVO",
+    scope: "RED",
+    areaFunctional: "Administración",
+    active: true,
+    testingView: true,
+  },
+]
+
+export const demoViewUsers: UserScope[] = [
+  ...mockUsers,
+  ...additionalDemoUsers,
+].map((user) => ({ ...user, active: true, testingView: true }))
+
+
+// ======================================================
 // PROCESOS
 // ======================================================
 
@@ -1138,7 +1200,7 @@ export const mockProcessAssignments: ProcessAssignment[] = [
 
 export const mockRequests: RequestItem[] = [
   {
-    id: "SOL-001",
+    id: "PRUEBA-001",
     processCode: "COL-CRE-01",
     processName: "Credencial",
     family: "COLABORADORES",
@@ -1155,50 +1217,21 @@ export const mockRequests: RequestItem[] = [
       { fieldId: "COL-CRE-01-CARGO", requestedValue: "Vendedor" },
       { fieldId: "COL-CRE-01-TELEFONO", requestedValue: "+56 9 5555 5555" },
       { fieldId: "COL-CRE-01-EMAIL_CORPORATIVO", requestedValue: "vendedor.demo@ditalcar.cl" },
-      { fieldId: "COL-CRE-01-TIPO_CREDENCIAL", requestedValue: "Nueva" },
     ],
-    createdAt: "2026-09-20T09:15:00-03:00",
+    createdAt: "2026-09-21T09:15:00-03:00",
     acceptanceSLAHours: 24,
-    acceptanceSLAStartedAt: "2026-09-20T09:15:00-03:00",
+    acceptanceSLAStartedAt: "2026-09-21T09:15:00-03:00",
     approvalSLAPausedMinutes: 0,
     resolutionSLAPausedMinutes: 0,
     reopened: false,
     autoClosed: false,
     internalCheckpoints: [],
+    isTest: true,
   },
   {
-    id: "SOL-002",
-    processCode: "COL-FIR-01",
-    processName: "Pie de firma",
-    family: "COLABORADORES",
-    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
-    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
-    requesterRole: "JEFATURA_LOCAL",
-    local: "Stellantis Nueva Tobalaba",
-    status: "RECIBIDA",
-    currentResponsibleEmail: "marketing@ditalcar.cl",
-    currentResponsibleName: "Equipo de Marketing",
-    currentResponsibleLabel: "Equipo Marketing",
-    fields: [
-      { fieldId: "COL-FIR-01-NOMBRE_COLABORADOR", requestedValue: "Jefe Sucursal Piloto" },
-      { fieldId: "COL-FIR-01-CARGO", requestedValue: "Jefe de Sucursal" },
-      { fieldId: "COL-FIR-01-TELEFONO", requestedValue: "+56 9 5555 0000" },
-      { fieldId: "COL-FIR-01-EMAIL_CORPORATIVO", requestedValue: "jefe.stellantis.nt@ditalcar.cl" },
-      { fieldId: "COL-FIR-01-TIPO_SOLICITUD", requestedValue: "Actualización" },
-    ],
-    createdAt: "2026-09-20T10:10:00-03:00",
-    acceptanceSLAHours: 24,
-    acceptanceSLAStartedAt: "2026-09-20T10:10:00-03:00",
-    approvalSLAPausedMinutes: 0,
-    resolutionSLAPausedMinutes: 0,
-    reopened: false,
-    autoClosed: false,
-    internalCheckpoints: [],
-  },
-  {
-    id: "SOL-003",
-    processCode: "INS-MOB-01",
-    processName: "Mobiliario y equipamiento",
+    id: "PRUEBA-002",
+    processCode: "EXP-SEN-01",
+    processName: "Señalizaciones",
     family: "INSUMOS_SHOWROOM",
     requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
     requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
@@ -1208,24 +1241,197 @@ export const mockRequests: RequestItem[] = [
     currentResponsibleEmail: "experiencia.clientes@ditalcar.cl",
     currentResponsibleName: "Experiencia de Clientes",
     currentResponsibleLabel: "Experiencia de Clientes",
+    managementOwnerEmail: "experiencia.clientes@ditalcar.cl",
+    managementOwnerName: "Experiencia de Clientes",
+    managementOwnerLabel: "Experiencia de Clientes",
     fields: [
-      { fieldId: "INS-MOB-01-ELEMENTO", requestedValue: "Mueble / equipamiento showroom" },
-      { fieldId: "INS-MOB-01-CANTIDAD", requestedValue: "1" },
-      { fieldId: "INS-MOB-01-MOTIVO", requestedValue: "Mejora de experiencia del local" },
-      { fieldId: "INS-MOB-01-DESCRIPCION", requestedValue: "Solicitud demostrativa del piloto." },
+      { fieldId: "EXP-SEN-01-TIPO", requestedValue: "Señalización de atención" },
+      { fieldId: "EXP-SEN-01-DESCRIPCION", requestedValue: "Actualizar señalización visible del showroom." },
     ],
-    createdAt: "2026-09-19T15:20:00-03:00",
+    createdAt: "2026-09-20T10:00:00-03:00",
     acceptanceSLAHours: 24,
-    acceptanceSLAStartedAt: "2026-09-19T15:20:00-03:00",
-    managementAcceptedAt: "2026-09-19T16:00:00-03:00",
+    acceptanceSLAStartedAt: "2026-09-20T10:00:00-03:00",
+    managementAcceptedAt: "2026-09-20T12:10:00-03:00",
+    resolutionSLAHours: 72,
+    resolutionSLAStartedAt: "2026-09-20T12:10:00-03:00",
     approvalSLAPausedMinutes: 0,
     resolutionSLAPausedMinutes: 0,
     reopened: false,
     autoClosed: false,
     internalCheckpoints: [],
+    isTest: true,
+  },
+  {
+    id: "PRUEBA-003",
+    processCode: "EXP-ORG-01",
+    processName: "Organigrama del local",
+    family: "INSUMOS_SHOWROOM",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "INFORMACION_REQUERIDA",
+    currentResponsibleEmail: "jefe.stellantis.nt@ditalcar.cl",
+    currentResponsibleName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    currentResponsibleLabel: "Jefatura de Sucursal",
+    returnStatusAfterInfo: "EN_GESTION",
+    returnResponsibleEmail: "experiencia.clientes@ditalcar.cl",
+    returnResponsibleName: "Experiencia de Clientes",
+    returnResponsibleLabel: "Experiencia de Clientes",
+    managementOwnerEmail: "experiencia.clientes@ditalcar.cl",
+    managementOwnerName: "Experiencia de Clientes",
+    fields: [
+      { fieldId: "EXP-ORG-01-MOTIVO", requestedValue: "Actualizar equipo visible del local" },
+    ],
+    createdAt: "2026-09-19T15:30:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-19T15:30:00-03:00",
+    managementAcceptedAt: "2026-09-19T16:15:00-03:00",
+    resolutionSLAHours: 72,
+    resolutionSLAStartedAt: "2026-09-19T16:15:00-03:00",
+    resolutionSLAPausedAt: "2026-09-20T11:00:00-03:00",
+    slaPausedReason: "Falta confirmar nombres y cargos del equipo.",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAPausedMinutes: 0,
+    reopened: false,
+    autoClosed: false,
+    internalCheckpoints: [],
+    isTest: true,
+  },
+  {
+    id: "PRUEBA-004",
+    processCode: "INS-MOB-01",
+    processName: "Mobiliario y equipamiento",
+    family: "INSUMOS_SHOWROOM",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "PENDIENTE_APROBACION",
+    approvalContext: "PRESUPUESTO_COMERCIAL",
+    currentResponsibleEmail: "gerencia.comercial@ditalcar.cl",
+    currentResponsibleName: "Gerencia Comercial",
+    currentResponsibleLabel: "Gerencia Comercial",
+    managementOwnerEmail: "experiencia.clientes@ditalcar.cl",
+    managementOwnerName: "Experiencia de Clientes",
+    managementOwnerLabel: "Experiencia de Clientes",
+    fields: [
+      { fieldId: "INS-MOB-01-ELEMENTO", requestedValue: "Mueble zona de clientes" },
+      { fieldId: "INS-MOB-01-CANTIDAD", requestedValue: "1" },
+      { fieldId: "INS-MOB-01-MONTO_REFERENCIAL", requestedValue: "180000" },
+    ],
+    createdAt: "2026-09-19T09:00:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-19T09:00:00-03:00",
+    managementAcceptedAt: "2026-09-19T10:00:00-03:00",
+    approvalSLAHours: 24,
+    approvalSLAStartedAt: "2026-09-21T09:00:00-03:00",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAHours: 120,
+    resolutionSLAStartedAt: "2026-09-19T10:00:00-03:00",
+    resolutionSLAPausedAt: "2026-09-21T09:00:00-03:00",
+    resolutionSLAPausedMinutes: 0,
+    slaPausedReason: "Aprobación de presupuesto en curso.",
+    reopened: false,
+    autoClosed: false,
+    internalCheckpoints: [],
+    isTest: true,
+  },
+  {
+    id: "PRUEBA-005",
+    processCode: "EXP-HOR-01",
+    processName: "Horarios de atención",
+    family: "INSUMOS_SHOWROOM",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "RESUELTA_POR_CONFIRMAR",
+    currentResponsibleEmail: "jefe.stellantis.nt@ditalcar.cl",
+    currentResponsibleName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    currentResponsibleLabel: "Jefatura de Sucursal",
+    fields: [
+      { fieldId: "EXP-HOR-01-TIPO", requestedValue: "Actualización" },
+      { fieldId: "EXP-HOR-01-DETALLE", requestedValue: "Horario actualizado para exhibición." },
+    ],
+    createdAt: "2026-09-18T10:15:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-18T10:15:00-03:00",
+    managementAcceptedAt: "2026-09-18T11:00:00-03:00",
+    resolutionSLAHours: 72,
+    resolutionSLAStartedAt: "2026-09-18T11:00:00-03:00",
+    resolutionConfirmationDeadline: "2026-09-23T12:00:00-03:00",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAPausedMinutes: 0,
+    reopened: false,
+    autoClosed: false,
+    internalCheckpoints: [],
+    isTest: true,
+  },
+  {
+    id: "PRUEBA-006",
+    processCode: "COL-FIR-01",
+    processName: "Pie de firma",
+    family: "COLABORADORES",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "RESUELTA",
+    currentResponsibleEmail: "marketing@ditalcar.cl",
+    currentResponsibleName: "Equipo de Marketing",
+    currentResponsibleLabel: "Equipo Marketing",
+    fields: [
+      { fieldId: "COL-FIR-01-NOMBRE_COLABORADOR", requestedValue: "Jefe Sucursal Piloto" },
+      { fieldId: "COL-FIR-01-TELEFONO", requestedValue: "+56 9 5555 0000" },
+      { fieldId: "COL-FIR-01-EMAIL_CORPORATIVO", requestedValue: "jefe.stellantis.nt@ditalcar.cl" },
+    ],
+    createdAt: "2026-09-17T09:20:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-17T09:20:00-03:00",
+    managementAcceptedAt: "2026-09-17T10:00:00-03:00",
+    resolutionSLAHours: 24,
+    resolutionSLAStartedAt: "2026-09-17T10:00:00-03:00",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAPausedMinutes: 0,
+    reopened: false,
+    autoClosed: false,
+    internalCheckpoints: [],
+    isTest: true,
+  },
+  {
+    id: "PRUEBA-007",
+    processCode: "INS-MAN-01",
+    processName: "Instalaciones y mantención",
+    family: "INSUMOS_SHOWROOM",
+    requesterEmail: "jefe.stellantis.nt@ditalcar.cl",
+    requesterName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    requesterRole: "JEFATURA_LOCAL",
+    local: "Stellantis Nueva Tobalaba",
+    status: "EN_GESTION",
+    currentResponsibleEmail: "experiencia.clientes@ditalcar.cl",
+    currentResponsibleName: "Experiencia de Clientes",
+    currentResponsibleLabel: "Experiencia de Clientes",
+    managementOwnerEmail: "experiencia.clientes@ditalcar.cl",
+    managementOwnerName: "Experiencia de Clientes",
+    fields: [
+      { fieldId: "INS-MAN-01-TIPO", requestedValue: "Infraestructura" },
+      { fieldId: "INS-MAN-01-DESCRIPCION", requestedValue: "Revisión de reparación menor en área visible del showroom." },
+    ],
+    createdAt: "2026-09-16T08:40:00-03:00",
+    acceptanceSLAHours: 24,
+    acceptanceSLAStartedAt: "2026-09-16T08:40:00-03:00",
+    managementAcceptedAt: "2026-09-16T09:15:00-03:00",
+    resolutionSLAHours: 24,
+    resolutionSLAStartedAt: "2026-09-16T09:15:00-03:00",
+    approvalSLAPausedMinutes: 0,
+    resolutionSLAPausedMinutes: 0,
+    reopened: false,
+    autoClosed: false,
+    internalCheckpoints: [],
+    isTest: true,
   },
 ]
-
 
 // ======================================================
 // HISTORIAL DEMO
@@ -1233,74 +1439,78 @@ export const mockRequests: RequestItem[] = [
 
 export const mockRequestTimeline: RequestTimelineItem[] = [
   {
-    id: "SEG-001",
-    requestId: "SOL-001",
+    id: "SEG-PRUEBA-001",
+    requestId: "PRUEBA-001",
     type: "CREATED",
-
-    authorEmail:
-      "vendedor.demo@ditalcar.cl",
-    authorName:
-      "Vendedor Demo",
-
-    createdAt:
-      "2026-08-31T09:10:00-04:00",
-
-    comment:
-      "Solicitud creada.",
+    authorEmail: "vendedor.demo@ditalcar.cl",
+    authorName: "Vendedor Piloto",
+    createdAt: "2026-09-21T09:15:00-03:00",
+    comment: "Solicitud de prueba creada para revisar el estado Nueva.",
   },
-
   {
-    id: "SEG-002",
-    requestId: "SOL-002",
+    id: "SEG-PRUEBA-002A",
+    requestId: "PRUEBA-002",
     type: "CREATED",
-
-    authorEmail:
-      "jefatura.local@ditalcar.cl",
-    authorName:
-      "Jefatura Local Demo",
-
-    createdAt:
-      "2026-08-31T08:30:00-04:00",
-
-    comment:
-      "Solicitud de traslado creada.",
+    authorEmail: "jefe.stellantis.nt@ditalcar.cl",
+    authorName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    createdAt: "2026-09-20T10:00:00-03:00",
+    comment: "Solicitud de prueba creada.",
   },
-
   {
-    id: "SEG-003",
-    requestId: "SOL-003",
-    type: "CREATED",
-
-    authorEmail:
-      "jefatura.local@ditalcar.cl",
-    authorName:
-      "Jefatura Local Demo",
-
-    createdAt:
-      "2026-08-30T16:20:00-04:00",
-
-    comment:
-      "Solicitud de credencial registrada.",
-  },
-
-  {
-    id: "SEG-004",
-    requestId: "SOL-003",
+    id: "SEG-PRUEBA-002B",
+    requestId: "PRUEBA-002",
     type: "MANAGEMENT",
-
-    authorEmail:
-      "experiencia.clientes@ditalcar.cl",
-    authorName:
-      "Experiencia de Clientes",
-
-    createdAt:
-      "2026-08-31T09:00:00-04:00",
-
-    comment:
-      "Solicitud recibida para gestión.",
+    authorEmail: "experiencia.clientes@ditalcar.cl",
+    authorName: "Experiencia de Clientes",
+    createdAt: "2026-09-20T12:10:00-03:00",
+    comment: "Experiencia tomó la gestión de la solicitud.",
+  },
+  {
+    id: "SEG-PRUEBA-003A",
+    requestId: "PRUEBA-003",
+    type: "INFORMATION_REQUESTED",
+    authorEmail: "experiencia.clientes@ditalcar.cl",
+    authorName: "Experiencia de Clientes",
+    createdAt: "2026-09-20T11:00:00-03:00",
+    comment: "Falta confirmar nombres y cargos del equipo antes de preparar el organigrama.",
+  },
+  {
+    id: "SEG-PRUEBA-004A",
+    requestId: "PRUEBA-004",
+    type: "BUDGET_REQUESTED",
+    authorEmail: "experiencia.clientes@ditalcar.cl",
+    authorName: "Experiencia de Clientes",
+    createdAt: "2026-09-21T09:00:00-03:00",
+    comment: "Se solicita aprobación del monto referencial a Gerencia Comercial.",
+  },
+  {
+    id: "SEG-PRUEBA-005A",
+    requestId: "PRUEBA-005",
+    type: "RESOLUTION_REPORTED",
+    authorEmail: "experiencia.clientes@ditalcar.cl",
+    authorName: "Experiencia de Clientes",
+    createdAt: "2026-09-21T12:00:00-03:00",
+    comment: "Horario actualizado. Pendiente confirmación del local.",
+  },
+  {
+    id: "SEG-PRUEBA-006A",
+    requestId: "PRUEBA-006",
+    type: "RESOLUTION_CONFIRMED",
+    authorEmail: "jefe.stellantis.nt@ditalcar.cl",
+    authorName: "Jefe Sucursal · Stellantis Nueva Tobalaba",
+    createdAt: "2026-09-18T15:00:00-03:00",
+    comment: "Pie de firma recibido y confirmado.",
+  },
+  {
+    id: "SEG-PRUEBA-007A",
+    requestId: "PRUEBA-007",
+    type: "MANAGEMENT",
+    authorEmail: "experiencia.clientes@ditalcar.cl",
+    authorName: "Experiencia de Clientes",
+    createdAt: "2026-09-16T09:15:00-03:00",
+    comment: "Caso en gestión para probar señalización de vencido.",
   },
 ]
-
 
 // ======================================================
 // ADJUNTOS DEMO
