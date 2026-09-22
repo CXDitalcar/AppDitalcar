@@ -692,3 +692,18 @@
       34px;
   }
 }
+
+/* ======================================================
+   PILOTO · VER COMO (solo Experiencia)
+====================================================== */
+.app-view-as{display:grid;gap:6px;margin-bottom:10px;padding:10px;border:1px solid rgba(200,16,46,.22);border-radius:10px;background:rgba(200,16,46,.055)}
+.app-view-as>span{font-size:9px;font-weight:900;letter-spacing:.12em;color:#ef5a67}
+.app-view-as select{width:100%;min-width:0;border:1px solid #303038;border-radius:8px;background:#0d0d10;color:#fff;padding:8px 9px;font-size:9px;outline:none}
+.app-view-as select:focus{border-color:rgba(200,16,46,.58)}
+.app-view-as small{font-size:8px;line-height:1.35;color:#74747e}
+
+/* ======================================================
+   BADGES DE NAVEGACIÓN · PILOTO
+====================================================== */
+.app-sidebar-link-text{min-width:0}
+.app-sidebar-link-badge{margin-left:auto;flex:0 0 auto;padding:4px 6px;border:1px solid rgba(243,168,59,.28);border-radius:999px;background:rgba(243,168,59,.08);color:#f3bd6b;font-size:7px;font-weight:900;letter-spacing:.05em;white-space:nowrap}
