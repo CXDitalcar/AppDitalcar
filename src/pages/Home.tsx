@@ -85,7 +85,7 @@ export default function Home({
   useEffect(() => {
     let active = true
     getKpiData()
-      .then((result) => {
+      .then((result: KpiData) => {
         if (active) setKpiData(result)
       })
       .catch(() => {
