@@ -1,134 +1,285 @@
-import { AlertTriangle, BarChart3, Clock3, Database, Filter, ShieldCheck } from "lucide-react"
-import SignalLight from "../components/SignalLight"
+import { useEffect, useMemo, useState } from "react"
+import {
+  AlertTriangle,
+  BarChart3,
+  CheckCircle2,
+  Clock3,
+  FileSpreadsheet,
+  Link2,
+  RefreshCw,
+  Save,
+  XCircle,
+} from "lucide-react"
 import type { UserScope } from "../types"
+import {
+  getKpiData,
+  getKpiSource,
+  saveKpiSource,
+  type KpiData,
+  type KpiDetailRow,
+} from "../services/kpiApi"
 import "./KPI.css"
 
-const KPI_ITEMS = [
-  { id: "ventas", label: "Ventas vs meta", detail: "Resultado comercial versus meta del periodo." },
-  { id: "facturacion", label: "Facturación vs meta", detail: "Facturación versus meta del periodo." },
-  { id: "financiamiento", label: "Financiamiento", detail: "Indicador comercial de financiamiento." },
-  { id: "mpp", label: "MPP", detail: "Indicador MPP según la fuente comercial validada." },
-  { id: "ci", label: "CI", detail: "Indicador CI según la fuente comercial validada." },
-] as const
+function dateLabel(value?: string | null) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date)
+}
+
+function numberLabel(value: number | string) {
+  if (typeof value === "string") return value || "—"
+  return new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(value)
+}
+
+function percentLabel(value: number) {
+  return new Intl.NumberFormat("es-CL", {
+    style: "percent",
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1,
+  }).format(value || 0)
+}
 
 export default function KPI({ currentUser }: { currentUser: UserScope }) {
   const experienceView = currentUser.role === "EXPERIENCIA_CLIENTES"
+  const [url, setUrl] = useState("")
+  const [data, setData] = useState<KpiData | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const [brandFilter, setBrandFilter] = useState("TODAS")
+
+  async function load() {
+    setLoading(true)
+    setError("")
+    try {
+      if (experienceView) {
+        const source = await getKpiSource()
+        setUrl(source.url || "")
+      }
+      const result = await getKpiData()
+      setData(result)
+    } catch (err) {
+      setData(null)
+      setError(err instanceof Error ? err.message : "No fue posible cargar KPI.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [experienceView])
+
+  async function handleSave() {
+    setSaving(true)
+    setMessage("")
+    setError("")
+    try {
+      const result = await saveKpiSource(url.trim())
+      setData(result.data)
+      setMessage(result.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No fue posible conectar el Excel KPI.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const brands = useMemo(() => {
+    const result = new Set<string>()
+    data?.detail.forEach((row) => {
+      if (row.brand) result.add(row.brand)
+    })
+    return [...result]
+  }, [data])
+
+  const detail = useMemo(() => {
+    if (!data) return []
+    if (brandFilter === "TODAS") return data.detail
+    return data.detail.filter((row) => row.brand === brandFilter)
+  }, [data, brandFilter])
 
   return (
     <div className="kpi-page">
       <section className="kpi-head">
         <div>
-          <span className="kpi-eyebrow">KPI · EN DESARROLLO</span>
-          <h1>Indicadores comerciales</h1>
+          <span className="kpi-eyebrow">KPI COMERCIALES · EXCEL ONLINE</span>
+          <h1>Resumen y detalle comercial</h1>
           <p>
-            Esta vista queda preparada para la futura conexión del archivo KPI alojado en
-            SharePoint. Hasta que exista una fuente conectada y validada, no se publican
-            resultados numéricos.
+            La app no recalcula indicadores: lee y muestra los resultados ya guardados en las hojas
+            DASHBOARD y GRAFICOS del archivo conectado.
           </p>
         </div>
-        <span className="kpi-dev-badge"><AlertTriangle size={14} /> EN DESARROLLO</span>
-      </section>
-
-      <section className="kpi-warning">
-        <AlertTriangle size={19} />
-        <div>
-          <strong>Fuente KPI aún no conectada</strong>
-          <span>
-            Los resultados se mostrarán solo desde una actualización válida. Si una futura
-            lectura contiene errores, la app mantendrá el último snapshot válido publicado.
-          </span>
-        </div>
-      </section>
-
-      <section className="kpi-toolbar">
-        <div className="kpi-filter-title"><Filter size={15} /> Filtros preparados</div>
-        <label>
-          <span>Marca</span>
-          <select disabled><option>Todas</option></select>
-        </label>
-        <label>
-          <span>Local</span>
-          <select disabled><option>Todos</option></select>
-        </label>
-        <label>
-          <span>Periodo</span>
-          <select disabled><option>Sin conexión</option></select>
-        </label>
-        <div className="kpi-last-update">
-          <Clock3 size={15} />
-          <div>
-            <span>Última actualización válida</span>
-            <strong>Sin conexión</strong>
-          </div>
-        </div>
-      </section>
-
-      <section className="kpi-grid" aria-label="Indicadores preparados">
-        {KPI_ITEMS.map((item) => (
-          <article className="kpi-card" key={item.id}>
-            <div className="kpi-card-top">
-              <SignalLight tone="neutral" label="Sin datos" compact />
-              <BarChart3 size={17} />
-            </div>
-            <span>{item.label}</span>
-            <strong>—</strong>
-            <p>{item.detail}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="kpi-semaphore-guide">
-        <div>
-          <span className="kpi-eyebrow">SEMÁFORO GENERAL</span>
-          <strong>La misma lectura visual se usará en toda la app.</strong>
-        </div>
-        <div className="kpi-semaphore-items">
-          <SignalLight tone="green" label="≥ 90% · correcto / dentro de estándar" />
-          <SignalLight tone="orange" label="60–89% · requiere atención" />
-          <SignalLight tone="red" label="< 60% · brecha crítica" />
-        </div>
+        <button className="kpi-refresh" type="button" onClick={() => void load()} disabled={loading}>
+          <RefreshCw size={16} /> {loading ? "Actualizando…" : "Actualizar"}
+        </button>
       </section>
 
       {experienceView && (
-        <section className="kpi-technical">
-          <div className="kpi-technical-head">
-            <ShieldCheck size={18} />
+        <section className="kpi-source-card">
+          <div className="kpi-source-title">
+            <div className="kpi-source-icon"><FileSpreadsheet size={22} /></div>
             <div>
               <span className="kpi-eyebrow">SOLO EXPERIENCIA</span>
-              <strong>Estado técnico de la fuente</strong>
+              <strong>Fuente KPI · Excel Online</strong>
+              <small>Cambia el link aquí cuando cambie el archivo. No requiere modificar código.</small>
+            </div>
+            <div className={`kpi-source-state ${data ? "ok" : "pending"}`}>
+              {data ? <CheckCircle2 size={15} /> : <Link2 size={15} />}
+              {data ? "CONECTADO" : "SIN CONEXIÓN"}
             </div>
           </div>
-          <div className="kpi-technical-grid">
-            <TechnicalItem icon={Database} label="Archivo fuente" value="Pendiente de conexión SharePoint" />
-            <TechnicalItem icon={Clock3} label="Última lectura" value="Sin conexión" />
-            <TechnicalItem icon={ShieldCheck} label="Última publicación válida" value="Sin conexión" />
-            <TechnicalItem icon={AlertTriangle} label="Errores / observaciones" value="Aún no evaluados" />
+          <label className="kpi-url-field">
+            <span>LINK DEL ARCHIVO KPI</span>
+            <input
+              type="url"
+              value={url}
+              onChange={(event) => setUrl(event.target.value)}
+              placeholder="https://.../dashboard.xlsm"
+            />
+            <small>
+              Debe mantener la misma estructura del archivo modelo: hojas DASHBOARD y GRAFICOS.
+            </small>
+          </label>
+          <div className="kpi-source-actions">
+            <button type="button" className="kpi-save" onClick={() => void handleSave()} disabled={saving || !url.trim()}>
+              <Save size={16} /> {saving ? "Probando archivo…" : "Guardar y probar"}
+            </button>
+            {data?.meta.checkedAt && <span>Última lectura válida: {dateLabel(data.meta.checkedAt)}</span>}
           </div>
-          <p>
-            La próxima integración guardará la fecha real de modificación del archivo y la
-            fecha de la última publicación válida. Una lectura con errores no reemplazará un
-            snapshot anterior correcto.
-          </p>
         </section>
+      )}
+
+      {message && <div className="kpi-alert success"><CheckCircle2 size={17} /> {message}</div>}
+      {error && <div className="kpi-alert error"><XCircle size={17} /> {error}</div>}
+      {data?.warning && <div className="kpi-alert warning"><AlertTriangle size={17} /> {data.warning}</div>}
+
+      {!data ? (
+        <section className="kpi-empty">
+          <BarChart3 size={28} />
+          <strong>{loading ? "Leyendo Excel KPI…" : "Todavía no hay datos KPI disponibles"}</strong>
+          <span>{experienceView ? "Pega el link arriba y usa Guardar y probar." : "Experiencia debe conectar primero la fuente KPI."}</span>
+        </section>
+      ) : (
+        <>
+          <section className="kpi-period-bar">
+            <div>
+              <span>PERIODO DEL ARCHIVO</span>
+              <strong>{data.summary.period.month} {data.summary.period.year}</strong>
+            </div>
+            <div>
+              <span>ARCHIVO</span>
+              <strong>{data.meta.fileName || "Excel KPI"}</strong>
+            </div>
+            <div>
+              <Clock3 size={15} />
+              <span>Última lectura</span>
+              <strong>{dateLabel(data.meta.checkedAt)}</strong>
+            </div>
+            {data.stale && <b>ÚLTIMO SNAPSHOT VÁLIDO</b>}
+          </section>
+
+          <section className="kpi-main-grid">
+            <MetricCard label="Notas de venta" value={data.summary.notesSales} detail={`VN ${numberLabel(data.summary.newVehicleSales)} · VU ${numberLabel(data.summary.usedVehicleSales)}`} />
+            <MetricCard label="Ventas vigentes" value={data.summary.validSalesTotal} detail={`VN ${numberLabel(data.summary.newVehicleValid)} · VU ${numberLabel(data.summary.usedVehicleValid)}`} />
+            <MetricCard label="Facturación del mes" value={data.summary.billingCurrentTotal} detail={`VN ${numberLabel(data.summary.billingCurrentNew)} · VU ${numberLabel(data.summary.billingCurrentUsed)}`} featured />
+            <MetricCard label="Meta del mes" value={data.summary.goal} detail={`Cumplimiento ${percentLabel(data.summary.compliance)}`} featured />
+            <MetricCard label="Fact. mes pasado" value={data.summary.billingPreviousTotal} detail={`Variación total ${percentLabel(data.summary.variationTotal)}`} />
+            <MetricCard label="Restante meta" value={percentLabel(data.summary.remaining)} detail={`Meta ${numberLabel(data.summary.goal)}`} />
+          </section>
+
+          <section className="kpi-breakdown-grid">
+            <Breakdown title="Vehículos nuevos" rows={[
+              ["Notas de venta", data.summary.newVehicleSales],
+              ["Vigentes", data.summary.newVehicleValid],
+              ["Nulas", data.summary.newVehicleCancelled],
+              ["Fact. asociada a NV del mes", data.summary.newVehicleOrdersBilled],
+              ["Facturación del mes", data.summary.billingCurrentNew],
+              ["Facturación mes pasado", data.summary.billingPreviousNew],
+              ["Pendiente de facturar", data.summary.pendingInvoiceNew],
+              ["Variación", percentLabel(data.summary.variationNew)],
+            ]} />
+            <Breakdown title="Vehículos usados" rows={[
+              ["Notas de venta", data.summary.usedVehicleSales],
+              ["Vigentes", data.summary.usedVehicleValid],
+              ["Nulas", data.summary.usedVehicleCancelled],
+              ["Fact. asociada a NV del mes", data.summary.usedVehicleOrdersBilled],
+              ["Facturación del mes", data.summary.billingCurrentUsed],
+              ["Facturación mes pasado", data.summary.billingPreviousUsed],
+              ["Pendiente de facturar", data.summary.pendingInvoiceUsed],
+              ["Variación", percentLabel(data.summary.variationUsed)],
+            ]} />
+          </section>
+
+          <section className="kpi-evolution-card">
+            <div className="kpi-section-head">
+              <div><span className="kpi-eyebrow">GRAFICOS</span><strong>Evolución mensual · {data.summary.period.year}</strong></div>
+              <small>Valores ya calculados en el archivo.</small>
+            </div>
+            <div className="kpi-evolution-table-wrap">
+              <table className="kpi-evolution-table">
+                <thead><tr><th>Serie</th>{data.evolution.total.map((point) => <th key={point.month}>{point.month.slice(0, 3)}</th>)}</tr></thead>
+                <tbody>
+                  <EvolutionRow label="Total" points={data.evolution.total} />
+                  <EvolutionRow label="VN" points={data.evolution.newVehicles} />
+                  <EvolutionRow label="VU" points={data.evolution.usedVehicles} />
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className="kpi-detail-card">
+            <div className="kpi-section-head">
+              <div><span className="kpi-eyebrow">DETALLE DASHBOARD</span><strong>Marca y sucursal</strong></div>
+              <label className="kpi-brand-filter">
+                <span>Marca</span>
+                <select value={brandFilter} onChange={(event) => setBrandFilter(event.target.value)}>
+                  <option value="TODAS">Todas</option>
+                  {brands.map((brand) => <option value={brand} key={brand}>{brand}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="kpi-detail-table-wrap">
+              <table className="kpi-detail-table">
+                <thead><tr><th>Marca</th><th>Sucursal</th><th>Ventas</th><th>Facturadas</th><th>Meta</th><th>% meta</th></tr></thead>
+                <tbody>
+                  {detail.map((row) => <DetailRow row={row} key={`${row.row}-${row.brand}-${row.local}`} />)}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </>
       )}
     </div>
   )
 }
 
-function TechnicalItem({
-  icon: Icon,
-  label,
-  value,
-}: {
-  icon: typeof Database
-  label: string
-  value: string
-}) {
+function MetricCard({ label, value, detail, featured = false }: { label: string; value: number | string; detail: string; featured?: boolean }) {
+  return <article className={`kpi-metric-card ${featured ? "featured" : ""}`}><span>{label}</span><strong>{typeof value === "number" ? numberLabel(value) : value}</strong><small>{detail}</small></article>
+}
+
+function Breakdown({ title, rows }: { title: string; rows: Array<[string, number | string]> }) {
+  return <article className="kpi-breakdown"><strong>{title}</strong>{rows.map(([label, value]) => <div key={label}><span>{label}</span><b>{typeof value === "number" ? numberLabel(value) : value}</b></div>)}</article>
+}
+
+function EvolutionRow({ label, points }: { label: string; points: Array<{ month: string; value: number }> }) {
+  return <tr><th>{label}</th>{points.map((point) => <td key={`${label}-${point.month}`}>{numberLabel(point.value)}</td>)}</tr>
+}
+
+function DetailRow({ row }: { row: KpiDetailRow }) {
   return (
-    <article>
-      <Icon size={16} />
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+    <tr className={row.type === "summary" ? "kpi-detail-summary" : ""}>
+      <td>{row.brand || "—"}</td>
+      <td>{row.local || (row.type === "summary" ? "TOTAL MARCA" : "—")}</td>
+      <td>{numberLabel(row.sales)}</td>
+      <td>{numberLabel(row.billed)}</td>
+      <td>{numberLabel(row.goal)}</td>
+      <td>{percentLabel(row.compliance)}</td>
+    </tr>
   )
 }
