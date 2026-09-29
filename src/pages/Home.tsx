@@ -19,6 +19,7 @@ import {
 } from "../services/academyStore"
 import { getRequestPermissions } from "../services/permissions"
 import { listRequests } from "../services/requestRepository"
+import { getKpiData, type KpiData } from "../services/kpiApi"
 import type { RequestItem, UserScope } from "../types"
 import "./Home.css"
 
@@ -64,6 +65,7 @@ export default function Home({
 }) {
   const firstName = userName.split(" ")[0] || userName
   const [requests, setRequests] = useState<RequestItem[]>([])
+  const [kpiData, setKpiData] = useState<KpiData | null>(null)
 
   useEffect(() => {
     let active = true
@@ -79,6 +81,18 @@ export default function Home({
       active = false
     }
   }, [currentUser.email, currentUser.role, currentUser.local])
+
+  useEffect(() => {
+    let active = true
+    getKpiData()
+      .then((result) => {
+        if (active) setKpiData(result)
+      })
+      .catch(() => {
+        if (active) setKpiData(null)
+      })
+    return () => { active = false }
+  }, [])
 
   const { needsAction, pendingItems } = useMemo(() => {
     const actions: ActivityItem[] = []
@@ -280,11 +294,21 @@ export default function Home({
           <Link to="/kpi">Ver KPI <ArrowRight size={14} /></Link>
         </div>
         <div className="home-kpi-mini-grid">
-          <KPIPlaceholder label="Ventas vs meta" />
-          <KPIPlaceholder label="Facturación vs meta" />
+          <KPIMini
+            label="Ventas vigentes"
+            value={kpiData ? kpiData.summary.validSalesTotal : undefined}
+            detail={kpiData ? `Meta dashboard: ${formatKpiValue(kpiData.summary.goal)}` : "Sin conexión"}
+          />
+          <KPIMini
+            label="Facturación vs meta"
+            value={kpiData ? kpiData.summary.billingCurrentTotal : undefined}
+            detail={kpiData ? `Cumplimiento: ${formatPercent(kpiData.summary.compliance)}` : "Sin conexión"}
+          />
         </div>
         <div className="home-kpi-source-note">
-          <BarChart3 size={14} /> Fuente KPI aún no conectada · última actualización: sin conexión.
+          <BarChart3 size={14} /> {kpiData
+            ? `${kpiData.stale ? "Último snapshot válido" : "Excel KPI conectado"} · última lectura: ${formatKpiDate(kpiData.meta.checkedAt)}`
+            : "Fuente KPI aún no conectada · última actualización: sin conexión."}
         </div>
       </section>
     </div>
@@ -331,17 +355,33 @@ function ActivityPanel({
   )
 }
 
-function KPIPlaceholder({ label }: { label: string }) {
+function KPIMini({ label, value, detail }: { label: string; value?: number | string; detail: string }) {
   return (
     <article className="home-kpi-mini-card">
       <div>
-        <SignalLight tone="neutral" compact />
+        <SignalLight tone={value === undefined ? "neutral" : "green"} compact />
         <span>{label}</span>
       </div>
-      <strong>—</strong>
-      <small>Sin conexión</small>
+      <strong>{value === undefined ? "—" : formatKpiValue(value)}</strong>
+      <small>{detail}</small>
     </article>
   )
+}
+
+function formatKpiValue(value: number | string) {
+  if (typeof value === "string") return value || "—"
+  return new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 }).format(value)
+}
+
+function formatPercent(value: number) {
+  return new Intl.NumberFormat("es-CL", { style: "percent", minimumFractionDigits: 1, maximumFractionDigits: 1 }).format(value || 0)
+}
+
+function formatKpiDate(value?: string) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("es-CL", { dateStyle: "short", timeStyle: "short" }).format(date)
 }
 
 function dedupeActivities(items: ActivityItem[]) {
