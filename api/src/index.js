@@ -22,6 +22,10 @@ import {
 } from "./lib/store.js"
 import { eligibleUser, publicUser, refreshProfileFromSharePoint } from "./lib/profile.js"
 import { sendAuthMail } from "./lib/mailer.js"
+import { loadUsersFromExcel } from "./lib/usersExcel.js"
+import { getUsersExcelUrl, saveUsersExcelUrl } from "./lib/usersSource.js"
+import { loadKpiFromExcel } from "./lib/kpiExcel.js"
+import { getKpiExcelUrl, getKpiSnapshot, saveKpiExcelUrl, saveKpiSnapshot } from "./lib/kpiSource.js"
 
 const SESSION_DAYS = Number(process.env.AUTH_SESSION_DAYS || 1)
 const APP_URL = String(process.env.APP_PUBLIC_URL || "").replace(/\/$/, "")
@@ -38,6 +42,127 @@ async function currentUser(request) {
   if (!user || user.active === false) return null
   return publicUser(user)
 }
+
+
+
+function isExperienceUser(user) {
+  return user?.role === "EXPERIENCIA_CLIENTES"
+}
+
+app.http("users-source-config", {
+  methods: ["GET", "POST"], authLevel: "anonymous", route: "users/source",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+
+    if (request.method === "GET") {
+      const url = await getUsersExcelUrl()
+      return json(200, {
+        configured: Boolean(url),
+        url,
+        sheet: process.env.USERS_EXCEL_SHEET || "Usuarios",
+      })
+    }
+
+    const data = await body(request)
+    const url = String(data.url || "").trim()
+    if (!url) return json(400, { message: "Pega el enlace del Excel online." })
+
+    try {
+      const test = await loadUsersFromExcel(url, { force: true })
+      await saveUsersExcelUrl(url, user.email)
+      return json(200, {
+        message: "Excel conectado correctamente.",
+        meta: test.meta,
+      })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible leer el Excel." })
+    }
+  },
+})
+
+app.http("users-directory", {
+  methods: ["GET"], authLevel: "anonymous", route: "users/directory",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+
+    const url = await getUsersExcelUrl()
+    if (!url) return json(503, { message: "Todavía no hay un Excel de usuarios conectado." })
+
+    try {
+      const result = await loadUsersFromExcel(url)
+      return json(200, result)
+    } catch (error) {
+      return json(502, { message: error?.message || "No fue posible leer el Excel de usuarios." })
+    }
+  },
+})
+
+app.http("kpi-source-config", {
+  methods: ["GET", "POST"], authLevel: "anonymous", route: "kpi/source",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+
+    if (request.method === "GET") {
+      const url = await getKpiExcelUrl()
+      const snapshot = await getKpiSnapshot()
+      return json(200, {
+        configured: Boolean(url),
+        url,
+        lastSnapshotAt: snapshot?.meta?.checkedAt || null,
+      })
+    }
+
+    const data = await body(request)
+    const url = String(data.url || "").trim()
+    if (!url) return json(400, { message: "Pega el enlace del Excel KPI online." })
+
+    try {
+      const result = await loadKpiFromExcel(url, { force: true })
+      await saveKpiExcelUrl(url, user.email)
+      await saveKpiSnapshot(result, user.email)
+      return json(200, {
+        message: "Fuente KPI conectada correctamente.",
+        data: result,
+      })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible leer el Excel KPI." })
+    }
+  },
+})
+
+app.http("kpi-data", {
+  methods: ["GET"], authLevel: "anonymous", route: "kpi/data",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!user) return json(401, { message: "Sesión no válida." })
+
+    const url = await getKpiExcelUrl()
+    if (!url) {
+      const snapshot = await getKpiSnapshot()
+      if (snapshot) return json(200, { ...snapshot, stale: true, warning: "La fuente KPI no está configurada; mostrando el último snapshot válido." })
+      return json(503, { message: "Todavía no hay un Excel KPI conectado." })
+    }
+
+    try {
+      const result = await loadKpiFromExcel(url)
+      await saveKpiSnapshot(result, user.email).catch(() => {})
+      return json(200, { ...result, stale: false })
+    } catch (error) {
+      const snapshot = await getKpiSnapshot()
+      if (snapshot) {
+        return json(200, {
+          ...snapshot,
+          stale: true,
+          warning: error?.message || "No fue posible actualizar el Excel KPI; mostrando el último snapshot válido.",
+        })
+      }
+      return json(502, { message: error?.message || "No fue posible leer el Excel KPI." })
+    }
+  },
+})
 
 app.http("auth-me", {
   methods: ["GET"], authLevel: "anonymous", route: "auth/me",
