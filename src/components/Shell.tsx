@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   ShieldCheck,
+  UsersRound,
   X,
 } from "lucide-react"
 
@@ -55,6 +56,7 @@ type ShellProps = {
   onLogout?: () => void | Promise<void>
 
   showApprovals?: boolean
+  showUsersAdmin?: boolean
 
   viewAsOptions?: UserScope[]
   viewAsEmail?: string
@@ -112,7 +114,6 @@ const mainNavigation: NavigationItem[] = [
     to: "/kpi",
     icon: BarChart3,
     module: "KPI",
-    badge: "EN DESARROLLO",
   },
 
   {
@@ -138,6 +139,7 @@ export default function Shell({
   onDemoLogout,
   onLogout,
   showApprovals = false,
+  showUsersAdmin = false,
   viewAsOptions,
   viewAsEmail,
   onViewAs,
@@ -291,7 +293,7 @@ export default function Shell({
               GESTIÓN
           ================================================== */}
 
-          {showApprovals && (
+          {(showApprovals || showUsersAdmin) && (
             <div className="app-sidebar-management">
 
               <div className="app-sidebar-section-label">
@@ -301,6 +303,7 @@ export default function Shell({
 
               <div className="app-sidebar-links">
 
+                {showApprovals && (
                 <NavLink
                   to="/aprobaciones"
                   onClick={
@@ -332,6 +335,23 @@ export default function Shell({
                   </span>
 
                 </NavLink>
+                )}
+
+                {showUsersAdmin && (
+                  <NavLink
+                    to="/usuarios"
+                    onClick={closeMobileMenu}
+                    className={({ isActive }) =>
+                      `app-sidebar-link ${isActive ? "app-sidebar-link-active" : ""}`
+                    }
+                  >
+                    <span className="app-sidebar-link-icon">
+                      <UsersRound size={18} strokeWidth={1.9} />
+                    </span>
+                    <span className="app-sidebar-link-text">Usuarios</span>
+                  </NavLink>
+                )}
+
 
               </div>
 
