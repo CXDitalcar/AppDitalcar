@@ -11,6 +11,7 @@ import Brand from "./Brand"
 import {
   activateAccount,
   loginWithPassword,
+  manualActivateAccount,
   requestActivation,
   requestPasswordReset,
   resetPassword,
@@ -18,7 +19,7 @@ import {
 import type { UserScope } from "../types"
 import "./AuthScreen.css"
 
-type AuthView = "LOGIN" | "ACTIVATE" | "ACTIVATE_REQUEST" | "RESET_REQUEST" | "RESET"
+type AuthView = "LOGIN" | "ACTIVATE" | "ACTIVATE_REQUEST" | "RESET_REQUEST" | "RESET" | "MANUAL_SETUP"
 
 export default function AuthScreen({
   onAuthenticated,
@@ -28,17 +29,21 @@ export default function AuthScreen({
   const params = useMemo(() => new URLSearchParams(window.location.search), [])
   const activationToken = params.get("activation") ?? ""
   const resetToken = params.get("reset") ?? ""
+  const manualSetup = params.get("setup") === "1"
 
   const initialView: AuthView = activationToken
     ? "ACTIVATE"
     : resetToken
       ? "RESET"
-      : "LOGIN"
+      : manualSetup
+        ? "MANUAL_SETUP"
+        : "LOGIN"
 
   const [view, setView] = useState<AuthView>(initialView)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
+  const [setupKey, setSetupKey] = useState("")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
   const [success, setSuccess] = useState(false)
@@ -59,6 +64,41 @@ export default function AuthScreen({
       setMessage(result.message ?? "No fue posible iniciar sesión.")
       return
     }
+    onAuthenticated(result.data)
+  }
+
+  async function handleManualSetup(event: FormEvent) {
+    event.preventDefault()
+    if (password.length < 10) {
+      setMessage("La contraseña debe tener al menos 10 caracteres.")
+      return
+    }
+    if (password !== confirmPassword) {
+      setMessage("Las contraseñas no coinciden.")
+      return
+    }
+    if (setupKey.length < 16) {
+      setMessage("La clave temporal de instalación debe tener al menos 16 caracteres.")
+      return
+    }
+
+    setBusy(true)
+    setMessage("")
+    const result = await manualActivateAccount(
+      email.trim().toLowerCase(),
+      password,
+      setupKey
+    )
+    setBusy(false)
+
+    if (!result.ok || !result.data) {
+      setMessage(result.message ?? "No fue posible activar el acceso manual.")
+      return
+    }
+
+    setSuccess(true)
+    setMessage("Acceso activado correctamente.")
+    window.history.replaceState({}, "", window.location.pathname)
     onAuthenticated(result.data)
   }
 
@@ -199,6 +239,42 @@ export default function AuthScreen({
                 Olvidé mi contraseña
               </button>
             </div>
+          </form>
+        )}
+
+        {view === "MANUAL_SETUP" && (
+          <form className="auth-form" onSubmit={handleManualSetup}>
+            <EmailField email={email} onEmail={setEmail} />
+            <label>
+              <span>Clave temporal de instalación</span>
+              <div className="auth-input">
+                <ShieldCheck size={16} />
+                <input
+                  type="password"
+                  autoComplete="off"
+                  value={setupKey}
+                  onChange={(event) => setSetupKey(event.target.value)}
+                  placeholder="La misma clave configurada en Azure"
+                  required
+                />
+              </div>
+            </label>
+            <PasswordFields
+              password={password}
+              confirmPassword={confirmPassword}
+              onPassword={setPassword}
+              onConfirm={setConfirmPassword}
+            />
+            <button className="auth-primary" disabled={busy}>
+              {busy ? "Activando…" : "Activar mi acceso"}
+              <ArrowRight size={16} />
+            </button>
+            <small className="auth-password-help">
+              Esta vía es temporal. Después de activar tu cuenta, elimina AUTH_SETUP_KEY y AUTH_SETUP_EMAIL de Azure.
+            </small>
+            <button className="auth-back" type="button" onClick={() => setView("LOGIN")}>
+              Volver al ingreso
+            </button>
           </form>
         )}
 
@@ -344,6 +420,7 @@ function PasswordFields({
 }
 
 function titleFor(view: AuthView) {
+  if (view === "MANUAL_SETUP") return "Activación manual"
   if (view === "ACTIVATE_REQUEST") return "Activa tu cuenta"
   if (view === "ACTIVATE") return "Crea tu contraseña"
   if (view === "RESET_REQUEST") return "Recupera tu acceso"
@@ -352,6 +429,7 @@ function titleFor(view: AuthView) {
 }
 
 function descriptionFor(view: AuthView) {
+  if (view === "MANUAL_SETUP") return "Crea tu acceso de Experiencia sin depender del correo de invitación."
   if (view === "ACTIVATE_REQUEST") return "Ingresa tu correo corporativo para recibir tu enlace personal."
   if (view === "ACTIVATE") return "Crea una contraseña personal para tu cuenta Ditalcar."
   if (view === "RESET_REQUEST") return "Te enviaremos un enlace personal para crear una nueva contraseña."
