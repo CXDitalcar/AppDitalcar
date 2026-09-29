@@ -72,6 +72,58 @@ app.http("auth-login", {
   },
 })
 
+
+app.http("auth-manual-activate", {
+  methods: ["POST"], authLevel: "anonymous", route: "auth/manual-activate",
+  handler: async (request) => {
+    const data = await body(request)
+    const email = normalizeEmail(data.email)
+    const password = String(data.password || "")
+    const setupKey = String(data.setupKey || "")
+    const allowedEmail = normalizeEmail(process.env.AUTH_SETUP_EMAIL || "")
+    const expectedKey = String(process.env.AUTH_SETUP_KEY || "")
+
+    if (!allowedEmail || !expectedKey) {
+      return json(503, { message: "La activación manual no está habilitada." })
+    }
+    if (!validCorporateEmail(email) || email !== allowedEmail) {
+      return json(403, { message: "Este correo no está autorizado para la activación manual." })
+    }
+    if (!setupKey || setupKey.length < 16 || setupKey !== expectedKey) {
+      return json(403, { message: "La clave temporal de instalación no es válida." })
+    }
+    if (!validPassword(password)) {
+      return json(400, { message: "La contraseña debe tener al menos 10 caracteres, letras y números." })
+    }
+
+    const existing = await getUser(email)
+    if (existing?.passwordHash) {
+      return json(409, { message: "La cuenta ya está activada. Ingresa normalmente con tu correo y contraseña." })
+    }
+    const passwordHash = await hashPassword(password)
+    const updated = await upsertUser({
+      ...(existing || {}),
+      email,
+      name: process.env.AUTH_SETUP_NAME || existing?.name || email.split("@")[0],
+      role: "EXPERIENCIA_CLIENTES",
+      scope: "RED",
+      areaFunctional: "Experiencia de Clientes",
+      active: true,
+      passwordHash,
+      activatedAt: existing?.activatedAt || new Date().toISOString(),
+      passwordChangedAt: new Date().toISOString(),
+      failedLoginCount: 0,
+      lockedUntil: undefined,
+    })
+
+    const session = await createSession(email, SESSION_DAYS)
+    return json(200, {
+      user: publicUser(updated),
+      message: "Acceso activado. Ya puedes ingresar con tu correo y contraseña.",
+    }, { "Set-Cookie": sessionCookie(session, SESSION_DAYS * 86400) })
+  },
+})
+
 app.http("auth-request-activation", {
   methods: ["POST"], authLevel: "anonymous", route: "auth/request-activation",
   handler: async (request) => {
