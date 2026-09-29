@@ -19,6 +19,7 @@ import {
   getSession,
   getUser,
   upsertUser,
+  ensureTables,
 } from "./lib/store.js"
 import { eligibleUser, publicUser, refreshProfileFromSharePoint } from "./lib/profile.js"
 import { sendAuthMail } from "./lib/mailer.js"
@@ -198,54 +199,107 @@ app.http("auth-login", {
 })
 
 
+app.http("auth-setup-status", {
+  methods: ["GET"], authLevel: "anonymous", route: "auth/setup-status",
+  handler: async () => {
+    const setupEmailConfigured = Boolean(normalizeEmail(process.env.AUTH_SETUP_EMAIL || ""))
+    const setupKeyConfigured = String(process.env.AUTH_SETUP_KEY || "").length >= 16
+    const storageConfigured = Boolean(process.env.AUTH_STORAGE_CONNECTION_STRING || process.env.AzureWebJobsStorage)
+
+    let storageOk = false
+    let storageCode = "NOT_TESTED"
+    if (storageConfigured) {
+      try {
+        await ensureTables()
+        storageOk = true
+        storageCode = "OK"
+      } catch (error) {
+        const code = String(error?.code || "")
+        const status = Number(error?.statusCode || 0)
+        if (code === "KeyBasedAuthenticationNotPermitted") storageCode = "KEY_AUTH_DISABLED"
+        else if (status === 403) storageCode = "STORAGE_FORBIDDEN"
+        else if (status === 404) storageCode = "STORAGE_NOT_FOUND"
+        else storageCode = "STORAGE_ERROR"
+        console.error("auth/setup-status storage check failed", { code, status })
+      }
+    }
+
+    return json(200, {
+      setupEmailConfigured,
+      setupKeyConfigured,
+      storageConfigured,
+      storageOk,
+      storageCode,
+      ready: setupEmailConfigured && setupKeyConfigured && storageConfigured && storageOk,
+    })
+  },
+})
+
 app.http("auth-manual-activate", {
   methods: ["POST"], authLevel: "anonymous", route: "auth/manual-activate",
   handler: async (request) => {
-    const data = await body(request)
-    const email = normalizeEmail(data.email)
-    const password = String(data.password || "")
-    const setupKey = String(data.setupKey || "")
-    const allowedEmail = normalizeEmail(process.env.AUTH_SETUP_EMAIL || "")
-    const expectedKey = String(process.env.AUTH_SETUP_KEY || "")
+    try {
+      const data = await body(request)
+      const email = normalizeEmail(data.email)
+      const password = String(data.password || "")
+      const setupKey = String(data.setupKey || "")
+      const allowedEmail = normalizeEmail(process.env.AUTH_SETUP_EMAIL || "")
+      const expectedKey = String(process.env.AUTH_SETUP_KEY || "")
 
-    if (!allowedEmail || !expectedKey) {
-      return json(503, { message: "La activación manual no está habilitada." })
-    }
-    if (!validCorporateEmail(email) || email !== allowedEmail) {
-      return json(403, { message: "Este correo no está autorizado para la activación manual." })
-    }
-    if (!setupKey || setupKey.length < 16 || setupKey !== expectedKey) {
-      return json(403, { message: "La clave temporal de instalación no es válida." })
-    }
-    if (!validPassword(password)) {
-      return json(400, { message: "La contraseña debe tener al menos 10 caracteres, letras y números." })
-    }
+      if (!allowedEmail || !expectedKey) {
+        return json(503, { message: "La activación manual no está habilitada en Azure. Revisa AUTH_SETUP_EMAIL y AUTH_SETUP_KEY.", code: "SETUP_DISABLED" })
+      }
+      if (!validCorporateEmail(email) || email !== allowedEmail) {
+        return json(403, { message: "Este correo no está autorizado para la activación manual.", code: "EMAIL_NOT_ALLOWED" })
+      }
+      if (!setupKey || setupKey.length < 16 || setupKey !== expectedKey) {
+        return json(403, { message: "La clave temporal de instalación no es válida.", code: "SETUP_KEY_INVALID" })
+      }
+      if (!validPassword(password)) {
+        return json(400, { message: "La contraseña debe tener al menos 10 caracteres, letras y números.", code: "PASSWORD_INVALID" })
+      }
 
-    const existing = await getUser(email)
-    if (existing?.passwordHash) {
-      return json(409, { message: "La cuenta ya está activada. Ingresa normalmente con tu correo y contraseña." })
-    }
-    const passwordHash = await hashPassword(password)
-    const updated = await upsertUser({
-      ...(existing || {}),
-      email,
-      name: process.env.AUTH_SETUP_NAME || existing?.name || email.split("@")[0],
-      role: "EXPERIENCIA_CLIENTES",
-      scope: "RED",
-      areaFunctional: "Experiencia de Clientes",
-      active: true,
-      passwordHash,
-      activatedAt: existing?.activatedAt || new Date().toISOString(),
-      passwordChangedAt: new Date().toISOString(),
-      failedLoginCount: 0,
-      lockedUntil: undefined,
-    })
+      const existing = await getUser(email)
+      if (existing?.passwordHash) {
+        return json(409, { message: "La cuenta ya está activada. Ingresa normalmente con tu correo y contraseña.", code: "ALREADY_ACTIVE" })
+      }
+      const passwordHash = await hashPassword(password)
+      const updated = await upsertUser({
+        ...(existing || {}),
+        email,
+        name: process.env.AUTH_SETUP_NAME || existing?.name || email.split("@")[0],
+        role: "EXPERIENCIA_CLIENTES",
+        scope: "RED",
+        areaFunctional: "Experiencia de Clientes",
+        active: true,
+        passwordHash,
+        activatedAt: existing?.activatedAt || new Date().toISOString(),
+        passwordChangedAt: new Date().toISOString(),
+        failedLoginCount: 0,
+        lockedUntil: undefined,
+      })
 
-    const session = await createSession(email, SESSION_DAYS)
-    return json(200, {
-      user: publicUser(updated),
-      message: "Acceso activado. Ya puedes ingresar con tu correo y contraseña.",
-    }, { "Set-Cookie": sessionCookie(session, SESSION_DAYS * 86400) })
+      const session = await createSession(email, SESSION_DAYS)
+      return json(200, {
+        user: publicUser(updated),
+        message: "Acceso activado. Ya puedes ingresar con tu correo y contraseña.",
+      }, { "Set-Cookie": sessionCookie(session, SESSION_DAYS * 86400) })
+    } catch (error) {
+      const code = String(error?.code || "")
+      const status = Number(error?.statusCode || 0)
+      console.error("Manual activation failed", { code, status, name: error?.name })
+
+      if (code === "KeyBasedAuthenticationNotPermitted") {
+        return json(503, { message: "Azure Storage está creado, pero rechaza el acceso por Connection String. Habilita el acceso mediante claves en la cuenta de Storage o usa una cuenta que lo permita.", code: "KEY_AUTH_DISABLED" })
+      }
+      if (status === 403) {
+        return json(503, { message: "La API no tiene acceso al Storage. Revisa la Connection String y la configuración de red/acceso de la cuenta de almacenamiento.", code: "STORAGE_FORBIDDEN" })
+      }
+      if (status === 404) {
+        return json(503, { message: "No fue posible encontrar el servicio de Storage configurado. Revisa AUTH_STORAGE_CONNECTION_STRING.", code: "STORAGE_NOT_FOUND" })
+      }
+      return json(500, { message: "La activación llegó al backend, pero falló al guardar la cuenta. Revisa el diagnóstico en /api/auth/setup-status.", code: "SETUP_STORAGE_ERROR" })
+    }
   },
 })
 
