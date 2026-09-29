@@ -57,6 +57,17 @@ export async function loginWithPassword(
   })
 }
 
+export async function manualActivateAccount(
+  email: string,
+  password: string,
+  setupKey: string
+): Promise<ApiResult<UserScope>> {
+  return apiRequest<UserScope>("/api/auth/manual-activate", {
+    method: "POST",
+    body: JSON.stringify({ email, password, setupKey }),
+  })
+}
+
 export async function requestActivation(
   email: string
 ): Promise<ApiResult<unknown>> {
