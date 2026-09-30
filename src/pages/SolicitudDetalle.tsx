@@ -28,8 +28,8 @@ import {
 import "./SolicitudDetalle.css"
 import SignalLight, { signalFromRequest } from "../components/SignalLight"
 
-import { requestAssignments } from "../data/requestConfig"
 import {
+  getAllRequestAssignments,
   getFieldDefinition,
   getRequestProcess,
 } from "../services/requestCatalog"
@@ -218,19 +218,19 @@ function RequestDetailContent({
   const canView = canViewRequest(
     currentUser,
     request,
-    requestAssignments
+    getAllRequestAssignments()
   )
 
   const canApprove = canApproveRequest(
     currentUser,
     request,
-    requestAssignments
+    getAllRequestAssignments()
   )
 
   const canManage = canManageRequest(
     currentUser,
     request,
-    requestAssignments
+    getAllRequestAssignments()
   )
 
   const canConfirm = canConfirmResolution(
