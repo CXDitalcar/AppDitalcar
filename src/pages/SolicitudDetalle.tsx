@@ -703,7 +703,7 @@ function RequestDetailContent({
         resolutionConfirmationDeadline:
           new Date(
             Date.now() +
-            48 * 3600000
+            (request.confirmationSLAHours ?? 48) * 3600000
           ).toISOString(),
         slaPausedReason:
           undefined,
