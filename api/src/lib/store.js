@@ -10,6 +10,7 @@ const clients = {
   users: TableClient.fromConnectionString(connectionString, "DitalcarAuthUsers"),
   tokens: TableClient.fromConnectionString(connectionString, "DitalcarAuthTokens"),
   sessions: TableClient.fromConnectionString(connectionString, "DitalcarAuthSessions"),
+  config: TableClient.fromConnectionString(connectionString, "DitalcarAppConfig"),
 }
 
 let initialized = false
@@ -111,4 +112,28 @@ export async function deleteSession(raw) {
   if (!raw) return
   await ensureTables()
   await clients.sessions.deleteEntity("SESSION", hashToken(raw)).catch(() => {})
+}
+
+
+export async function getAppConfig(key) {
+  await ensureTables()
+  try {
+    return await clients.config.getEntity("CONFIG", String(key))
+  } catch (error) {
+    if (error?.statusCode === 404) return null
+    throw error
+  }
+}
+
+export async function setAppConfig(key, value, extra = {}) {
+  await ensureTables()
+  const entity = {
+    partitionKey: "CONFIG",
+    rowKey: String(key),
+    value: String(value ?? ""),
+    updatedAt: new Date().toISOString(),
+    ...extra,
+  }
+  await clients.config.upsertEntity(entity, "Replace")
+  return entity
 }
