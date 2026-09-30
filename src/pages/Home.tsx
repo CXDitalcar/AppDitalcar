@@ -10,7 +10,6 @@ import {
   PILOT_VISIBLE_EVALUATION_IDS,
   type AcademyAudience,
 } from "../data/academiaData"
-import { requestAssignments } from "../data/requestConfig"
 import { isPilotLocal } from "../data/pilotStellantis"
 import {
   getCourseProgress,
@@ -19,6 +18,7 @@ import {
 } from "../services/academyStore"
 import { getRequestPermissions } from "../services/permissions"
 import { listRequests } from "../services/requestRepository"
+import { getAllRequestAssignments } from "../services/requestCatalog"
 import type { RequestItem, UserScope } from "../types"
 import "./Home.css"
 
@@ -128,7 +128,7 @@ export default function Home({
     }
 
     requests.forEach((request) => {
-      const permissions = getRequestPermissions(currentUser, request, requestAssignments)
+      const permissions = getRequestPermissions(currentUser, request, getAllRequestAssignments())
       if (!permissions.canView) return
 
       const to = `/solicitudes/${request.id}`
