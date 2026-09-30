@@ -8,6 +8,7 @@ import {
   Link2,
   RefreshCw,
   Save,
+  Upload,
   XCircle,
 } from "lucide-react"
 import type { UserScope } from "../types"
@@ -70,6 +71,8 @@ type KpiData = {
     dashboardSheet: string
     graphsSheet: string
     fileName?: string
+    sourceType?: "url" | "upload"
+    uploadedAt?: string
   }
   stale?: boolean
   warning?: string
@@ -89,15 +92,43 @@ async function apiJson<T>(input: RequestInfo | URL, init?: RequestInit): Promise
   return payload as T
 }
 
+type KpiSourceInfo = {
+  configured: boolean
+  url: string
+  activeMode: "url" | "upload" | null
+  uploadedFile?: { fileName: string; uploadedAt?: string | null; size?: number } | null
+  lastSnapshotAt?: string | null
+}
+
 async function getKpiSource() {
-  return apiJson<{ configured: boolean; url: string; lastSnapshotAt?: string | null }>("/api/kpi/source")
+  return apiJson<KpiSourceInfo>("/api/kpi/source")
 }
 
 async function saveKpiSource(url: string) {
-  return apiJson<{ message: string; data: KpiData }>("/api/kpi/source", {
+  return apiJson<{ message: string; data: KpiData; activeMode: "url" }>("/api/kpi/source", {
     method: "POST",
     body: JSON.stringify({ url }),
   })
+}
+
+async function uploadKpiFile(file: File) {
+  const response = await fetch("/api/kpi/upload", {
+    method: "POST",
+    credentials: "include",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+      "x-file-name": encodeURIComponent(file.name),
+    },
+    body: file,
+  })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(payload?.message || `Error ${response.status}`)
+  return payload as {
+    message: string
+    data: KpiData
+    activeMode: "upload"
+    uploadedFile: { fileName: string; uploadedAt?: string; size?: number }
+  }
 }
 
 async function getKpiData() {
@@ -133,6 +164,8 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
   const [data, setData] = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const [sourceInfo, setSourceInfo] = useState<KpiSourceInfo | null>(null)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
   const [brandFilter, setBrandFilter] = useState("TODAS")
@@ -143,6 +176,7 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
     try {
       if (experienceView) {
         const source = await getKpiSource()
+        setSourceInfo(source)
         setUrl(source.url || "")
       }
       const result = await getKpiData()
@@ -166,11 +200,42 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
     try {
       const result = await saveKpiSource(url.trim())
       setData(result.data)
+      setSourceInfo((previous) => ({
+        configured: true,
+        url: url.trim(),
+        activeMode: "url",
+        uploadedFile: previous?.uploadedFile || null,
+        lastSnapshotAt: result.data.meta.checkedAt,
+      }))
       setMessage(result.message)
     } catch (err) {
       setError(err instanceof Error ? err.message : "No fue posible conectar el Excel KPI.")
     } finally {
       setSaving(false)
+    }
+  }
+
+
+  async function handleUpload(file?: File) {
+    if (!file) return
+    setUploading(true)
+    setMessage("")
+    setError("")
+    try {
+      const result = await uploadKpiFile(file)
+      setData(result.data)
+      setSourceInfo((previous) => ({
+        configured: true,
+        url: previous?.url || url,
+        activeMode: "upload",
+        uploadedFile: result.uploadedFile,
+        lastSnapshotAt: result.data.meta.checkedAt,
+      }))
+      setMessage(result.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No fue posible subir el archivo KPI.")
+    } finally {
+      setUploading(false)
     }
   }
 
@@ -209,32 +274,86 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
           <div className="kpi-source-title">
             <div className="kpi-source-icon"><FileSpreadsheet size={22} /></div>
             <div>
-              <span className="kpi-eyebrow">SOLO EXPERIENCIA</span>
-              <strong>Fuente KPI · Excel Online</strong>
-              <small>Cambia el link aquí cuando cambie el archivo. No requiere modificar código.</small>
+              <span className="kpi-eyebrow">SOLO TU PERFIL · EXPERIENCIA</span>
+              <strong>Administrar fuente KPI</strong>
+              <small>Elige la opción que te acomode. La última que uses queda como fuente activa.</small>
             </div>
             <div className={`kpi-source-state ${data ? "ok" : "pending"}`}>
               {data ? <CheckCircle2 size={15} /> : <Link2 size={15} />}
-              {data ? "CONECTADO" : "SIN CONEXIÓN"}
+              {sourceInfo?.activeMode === "upload" ? "ARCHIVO ACTIVO" : sourceInfo?.activeMode === "url" ? "LINK ACTIVO" : "SIN CONEXIÓN"}
             </div>
           </div>
-          <label className="kpi-url-field">
-            <span>LINK DEL ARCHIVO KPI</span>
-            <input
-              type="url"
-              value={url}
-              onChange={(event) => setUrl(event.target.value)}
-              placeholder="https://.../dashboard.xlsm"
-            />
-            <small>
-              Debe mantener la misma estructura del archivo modelo: hojas DASHBOARD y GRAFICOS.
-            </small>
-          </label>
-          <div className="kpi-source-actions">
-            <button type="button" className="kpi-save" onClick={() => void handleSave()} disabled={saving || !url.trim()}>
-              <Save size={16} /> {saving ? "Probando archivo…" : "Guardar y probar"}
-            </button>
-            {data?.meta.checkedAt && <span>Última lectura válida: {dateLabel(data.meta.checkedAt)}</span>}
+
+          <div className="kpi-source-options">
+            <article className={`kpi-source-option ${sourceInfo?.activeMode === "upload" ? "active" : ""}`}>
+              <div className="kpi-option-heading">
+                <div className="kpi-option-number">1</div>
+                <div>
+                  <strong>Subir desde mi computador</strong>
+                  <small>Recomendado mientras Graph sigue pendiente.</small>
+                </div>
+                {sourceInfo?.activeMode === "upload" && <b>FUENTE ACTIVA</b>}
+              </div>
+              <div className="kpi-upload-zone">
+                <Upload size={21} />
+                <div>
+                  <strong>{uploading ? "Subiendo y validando…" : "Reemplazar archivo KPI"}</strong>
+                  <span>Admite .xlsm y .xlsx · misma estructura DASHBOARD / GRAFICOS</span>
+                </div>
+                <label className={`kpi-upload-button ${uploading ? "disabled" : ""}`}>
+                  {uploading ? "Procesando…" : "Seleccionar archivo"}
+                  <input
+                    type="file"
+                    accept=".xlsm,.xlsx,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    disabled={uploading}
+                    onChange={(event) => {
+                      const file = event.currentTarget.files?.[0]
+                      void handleUpload(file)
+                      event.currentTarget.value = ""
+                    }}
+                  />
+                </label>
+              </div>
+              {sourceInfo?.uploadedFile && (
+                <div className="kpi-option-meta">
+                  <span>Último archivo</span>
+                  <strong>{sourceInfo.uploadedFile.fileName}</strong>
+                  <small>{sourceInfo.uploadedFile.uploadedAt ? `Subido ${dateLabel(sourceInfo.uploadedFile.uploadedAt)}` : "Guardado en Azure"}</small>
+                </div>
+              )}
+            </article>
+
+            <article className={`kpi-source-option ${sourceInfo?.activeMode === "url" ? "active" : ""}`}>
+              <div className="kpi-option-heading">
+                <div className="kpi-option-number">2</div>
+                <div>
+                  <strong>Usar enlace Excel Online</strong>
+                  <small>Déjalo preparado para SharePoint / OneDrive.</small>
+                </div>
+                {sourceInfo?.activeMode === "url" && <b>FUENTE ACTIVA</b>}
+              </div>
+              <label className="kpi-url-field">
+                <span>LINK DEL ARCHIVO KPI</span>
+                <input
+                  type="url"
+                  value={url}
+                  onChange={(event) => setUrl(event.target.value)}
+                  placeholder="https://.../dashboard.xlsm"
+                />
+                <small>Si Microsoft exige inicio de sesión, usa por mientras la opción 1.</small>
+              </label>
+              <div className="kpi-source-actions">
+                <button type="button" className="kpi-save" onClick={() => void handleSave()} disabled={saving || !url.trim()}>
+                  <Save size={16} /> {saving ? "Probando enlace…" : "Guardar, probar y activar"}
+                </button>
+              </div>
+            </article>
+          </div>
+
+          <div className="kpi-source-footer">
+            <span>Fuente actual</span>
+            <strong>{sourceInfo?.activeMode === "upload" ? "Archivo subido desde tu equipo" : sourceInfo?.activeMode === "url" ? "Excel Online por link" : "Sin definir"}</strong>
+            {data?.meta.checkedAt && <small>Última lectura válida: {dateLabel(data.meta.checkedAt)}</small>}
           </div>
         </section>
       )}
@@ -247,7 +366,7 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
         <section className="kpi-empty">
           <BarChart3 size={28} />
           <strong>{loading ? "Leyendo Excel KPI…" : "Todavía no hay datos KPI disponibles"}</strong>
-          <span>{experienceView ? "Pega el link arriba y usa Guardar y probar." : "Experiencia debe conectar primero la fuente KPI."}</span>
+          <span>{experienceView ? "Sube el archivo desde tu equipo o conecta un link arriba." : "Experiencia debe conectar primero la fuente KPI."}</span>
         </section>
       ) : (
         <>
