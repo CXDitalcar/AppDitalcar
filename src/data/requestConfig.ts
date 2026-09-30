@@ -1,6 +1,6 @@
 import type { ProcessAssignment, ProcessConfig, ProcessFieldDefinition, UserRole } from "../types"
-// Snapshot DEMO de las Lists oficiales: 22_Procesos, 23_CamposProceso y 11_AsignacionesProceso.
-// Cuando Microsoft Graph quede habilitado, requestCatalog.ts podrá reemplazar esta fuente sin cambiar las pantallas.
+// Snapshot de respaldo temporal. La fuente maestra en producción son las LISTs 22_Procesos, 23_CamposProceso y 24_AsignacionesProceso (con compatibilidad para el nombre legado 11_AsignacionesProceso).
+// requestCatalog.ts carga las LISTs por API y usa este archivo sólo si Graph/List no está disponible.
 
 export const requestProcesses: ProcessConfig[] = [
   {
