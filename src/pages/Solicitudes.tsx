@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react"
 import { AlertCircle, Plus, RefreshCcw, Search } from "lucide-react"
 import { Link, useNavigate } from "react-router-dom"
 import { listRequests } from "../services/requestRepository"
-import { requestAssignments } from "../data/requestConfig"
+import { getAllRequestAssignments } from "../services/requestCatalog"
 import { canViewRequest } from "../services/permissions"
 import type { RequestItem, UserScope } from "../types"
 import { responsibleLabel, visibleStatusLabel } from "../services/requestPresentation"
@@ -43,7 +43,7 @@ export default function Solicitudes({
     const q = query.trim().toLowerCase()
     return rows
       .filter((request) =>
-        canViewRequest(currentUser, request, requestAssignments)
+        canViewRequest(currentUser, request, getAllRequestAssignments())
       )
       .filter((request) => {
         if (!q) return true
