@@ -306,6 +306,16 @@ export type RequestItem = {
   managementOwnerLabel?: string
 
   resolutionConfirmationDeadline?: string
+  confirmationSLAHours?: number
+
+  slaReviewCode?: string
+  slaAcceptanceCode?: string
+  slaResolutionCode?: string
+  slaConfirmationCode?: string
+  slaSource?: "SHAREPOINT_LIST" | "CACHE" | "FALLBACK"
+  slaListName?: string
+  slaCheckedAt?: string
+
   reopened: boolean
   autoClosed: boolean
 
