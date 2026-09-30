@@ -34,6 +34,7 @@ import {
   isDemoUser,
 } from "../services/requestCatalog"
 import { initialRequestRouting } from "../services/workflow"
+import { resolveProcessSla, type SlaResolved } from "../services/slaApi"
 import type {
   ProcessConfig,
   ProcessFieldDefinition,
@@ -98,6 +99,13 @@ export default function NuevaSolicitud({
 
   const processFromUrl = searchParams.get("process")
   const breachFromUrl = searchParams.get("breach")
+  const originFormFromUrl = searchParams.get("originForm")
+  const originExecutionFromUrl = searchParams.get("originExecution")
+  const originLocalFromUrl = searchParams.get("originLocal")
+  const originSectionFromUrl = searchParams.get("originSection")
+  const originQuestionFromUrl = searchParams.get("originQuestion")
+  const originDetailFromUrl = searchParams.get("originDetail")
+  const returnTo = searchParams.get("returnTo")
 
   const [step, setStep] = useState(1)
   const [selectedFamily, setSelectedFamily] =
@@ -113,32 +121,57 @@ export default function NuevaSolicitud({
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [warnings, setWarnings] = useState<string[]>([])
+  const [resolvedSla, setResolvedSla] = useState<SlaResolved | null>(null)
 
-  const sourceBreach = useMemo(
-    () =>
-      breachFromUrl
-        ? mockFormBreaches.find((breach) => breach.id === breachFromUrl)
-        : undefined,
-    [breachFromUrl]
-  )
+  const sourceBreach = useMemo(() => {
+    if (!breachFromUrl) return undefined
+    const existing = mockFormBreaches.find((breach) => breach.id === breachFromUrl)
+    if (existing) return existing
+    if (!originExecutionFromUrl || !originFormFromUrl) return undefined
+    return {
+      id: breachFromUrl,
+      executionId: originExecutionFromUrl,
+      formCode: originFormFromUrl,
+      local: originLocalFromUrl || currentUser.local || currentUser.localPrincipal || "",
+      section: originSectionFromUrl || "Ruta de Experiencia",
+      question: originQuestionFromUrl || "Hallazgo de Ruta de Experiencia",
+      status: "NO_CUMPLE" as const,
+      mappedProcessCode: processFromUrl || undefined,
+    }
+  }, [breachFromUrl, originExecutionFromUrl, originFormFromUrl, originLocalFromUrl, originSectionFromUrl, originQuestionFromUrl, processFromUrl, currentUser.local, currentUser.localPrincipal])
 
-  const sourceExecution = useMemo(
-    () =>
-      sourceBreach
-        ? mockFormExecutions.find(
-            (execution) => execution.id === sourceBreach.executionId
-          )
-        : undefined,
-    [sourceBreach]
-  )
+  const sourceExecution = useMemo(() => {
+    if (!sourceBreach) return undefined
+    const existing = mockFormExecutions.find((execution) => execution.id === sourceBreach.executionId)
+    if (existing) return existing
+    return {
+      id: sourceBreach.executionId,
+      formCode: sourceBreach.formCode,
+      local: sourceBreach.local,
+      completedByName: currentUser.name,
+      completedByEmail: currentUser.email,
+      completedAt: new Date().toISOString(),
+      compliant: 0,
+      nonCompliant: 1,
+      requested: 0,
+    }
+  }, [sourceBreach, currentUser.name, currentUser.email])
 
-  const sourceForm = useMemo(
-    () =>
-      sourceExecution
-        ? mockForms.find((form) => form.code === sourceExecution.formCode)
-        : undefined,
-    [sourceExecution]
-  )
+  const sourceForm = useMemo(() => {
+    if (!sourceExecution) return undefined
+    const existing = mockForms.find((form) => form.code === sourceExecution.formCode)
+    if (existing) return existing
+    return {
+      code: sourceExecution.formCode,
+      name: sourceExecution.formCode === "FOR-AUD-RUTA-01" ? "Auditoría Ruta Experiencia" : "Ruta de Experiencia",
+      description: "Hallazgo generado dentro de Ditalcar Colaboradores.",
+      url: "",
+      frequency: "SEMANAL" as const,
+      roles: [currentUser.role],
+      stellantisOnly: false,
+      active: true,
+    }
+  }, [sourceExecution, currentUser.role])
 
   const localConfig = useMemo(
     () => getLocalOptions(currentUser, sourceBreach?.local),
@@ -171,6 +204,18 @@ export default function NuevaSolicitud({
     setSelectedProcess(process)
     setStep(3)
   }, [processFromUrl, availableProcesses])
+
+  useEffect(() => {
+    let active = true
+    if (!selectedProcess) {
+      setResolvedSla(null)
+      return () => { active = false }
+    }
+    resolveProcessSla(selectedProcess)
+      .then((result) => { if (active) setResolvedSla(result) })
+      .catch(() => { if (active) setResolvedSla(null) })
+    return () => { active = false }
+  }, [selectedProcess])
 
   useEffect(() => {
     let active = true
@@ -227,7 +272,14 @@ export default function NuevaSolicitud({
   useEffect(() => {
     if (!selectedProcess) return
 
-    setValues({})
+    const initialValues: FormValues = {}
+    if (originDetailFromUrl) {
+      const detailField = allProcessFields.find((field) =>
+        /detalle|descripci[oó]n|observaci[oó]n|motivo|solicitud/i.test(`${field.label} ${field.key || ""}`)
+      )
+      if (detailField) initialValues[detailField.id] = originDetailFromUrl
+    }
+    setValues(initialValues)
     setAttachments([])
     setError("")
 
@@ -256,7 +308,7 @@ export default function NuevaSolicitud({
     } else {
       setRepeatRows([{}])
     }
-  }, [selectedProcess, allProcessFields])
+  }, [selectedProcess, allProcessFields, originDetailFromUrl])
 
   function selectFamily(family: RequestFamily) {
     setSelectedFamily(family)
@@ -411,11 +463,20 @@ export default function NuevaSolicitud({
     setWarnings([])
 
     try {
+      const sla = resolvedSla ?? await resolveProcessSla(selectedProcess).catch(() => null)
       const routing = initialRequestRouting(
         currentUser,
         selectedProcess.code,
-        selectedLocal
+        selectedLocal,
+        {
+          reviewHours: sla?.review?.hours,
+          acceptanceHours: sla?.acceptance?.hours,
+        }
       )
+
+      const routingApprovalStartedAt = "approvalSLAStartedAt" in routing ? routing.approvalSLAStartedAt : undefined
+      const routingApprovalHours = "approvalSLAHours" in routing ? routing.approvalSLAHours : undefined
+      const routingAcceptanceHours = "acceptanceSLAHours" in routing ? routing.acceptanceSLAHours : undefined
 
       const request: Omit<RequestItem, "id"> = {
         processCode: selectedProcess.code,
@@ -442,9 +503,25 @@ export default function NuevaSolicitud({
               ]
             : [],
         ...routing,
+        approvalSLAHours: routingApprovalStartedAt
+          ? (sla?.review?.hours ?? routingApprovalHours)
+          : routingApprovalHours,
+        acceptanceSLAHours: sla?.acceptance?.hours ?? routingAcceptanceHours,
+        resolutionSLAHours: sla?.resolution?.hours,
+        confirmationSLAHours: sla?.confirmation?.hours ?? selectedProcess.confirmationHours,
+        slaReviewCode: selectedProcess.slaReviewCode,
+        slaAcceptanceCode: selectedProcess.slaAcceptanceCode,
+        slaResolutionCode: selectedProcess.slaResolutionCode,
+        slaConfirmationCode: selectedProcess.slaConfirmationCode,
+        slaSource: sla?.source ?? "FALLBACK",
+        slaListName: sla?.listName ?? undefined,
+        slaCheckedAt: sla?.checkedAt,
       }
 
       const result = await createRequest(currentUser, request)
+      if (breachFromUrl && originExecutionFromUrl) {
+        localStorage.setItem(`ditalcar.route.request.${breachFromUrl}`, result.request.id)
+      }
       setCreatedId(result.request.id)
       setCreatedStatus(result.request.status)
       setWarnings(result.warnings)
@@ -488,7 +565,7 @@ export default function NuevaSolicitud({
             </div>
             <div>
               <span>Fuente</span>
-              <strong>{isDemoUser(currentUser) ? "Piloto Demo" : "Tablero General Solicitudes"}</strong>
+              <strong>{isDemoUser(currentUser) ? "Piloto Demo" : "Registro externo Azure"}</strong>
             </div>
           </div>
 
@@ -529,6 +606,14 @@ export default function NuevaSolicitud({
           )}
 
           <div className="request-actions">
+            {returnTo && (
+              <button
+                className="secondary-btn"
+                onClick={() => navigate(returnTo)}
+              >
+                Volver a Ruta de Experiencia
+              </button>
+            )}
             <button
               className="secondary-btn"
               onClick={() => navigate("/solicitudes")}
@@ -837,8 +922,17 @@ export default function NuevaSolicitud({
               />
               <SummaryRow
                 label="Confirmación"
-                value={`${selectedProcess.confirmationHours} h`}
+                value={`${resolvedSla?.confirmation?.hours ?? selectedProcess.confirmationHours} h`}
               />
+              {resolvedSla?.resolution?.hours !== undefined && (
+                <SummaryRow label="Plazo de resolución" value={`${resolvedSla.resolution.hours} h`} />
+              )}
+              {currentUser.role === "EXPERIENCIA_CLIENTES" && (
+                <SummaryRow
+                  label="Fuente de SLA"
+                  value={resolvedSla?.source === "SHAREPOINT_LIST" ? `LIST ${resolvedSla.listName || "SLA"}` : resolvedSla?.source === "CACHE" ? "Último SLA sincronizado" : "Respaldo temporal"}
+                />
+              )}
             </aside>
           </div>
 
