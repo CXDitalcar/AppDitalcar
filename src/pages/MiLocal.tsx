@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react"
 import {
   AlertTriangle,
   BadgeCheck,
@@ -19,6 +20,7 @@ import {
 import type {
   UserScope,
 } from "../types"
+import { getRouteMetrics, type RouteMetrics } from "../services/routeExperienceApi"
 
 
 const standards = [
@@ -84,6 +86,22 @@ export default function MiLocal({
     getVisiblePilotLocals(
       currentUser
     )
+
+
+  const metricsLocalName = local?.name ?? (visibleLocals.length === 1 ? visibleLocals[0]?.name : "")
+  const [routeMetrics, setRouteMetrics] = useState<RouteMetrics | null>(null)
+
+  useEffect(() => {
+    let active = true
+    if (!metricsLocalName) {
+      setRouteMetrics(null)
+      return () => { active = false }
+    }
+    getRouteMetrics(metricsLocalName)
+      .then((result) => { if (active) setRouteMetrics(result) })
+      .catch(() => { if (active) setRouteMetrics(null) })
+    return () => { active = false }
+  }, [metricsLocalName])
 
 
   // ======================================================
@@ -306,7 +324,9 @@ export default function MiLocal({
         <div className="kpi-grid kpi-grid-local">
 
           {activeLocal.kpis.map(
-            (kpi) => (
+            (kpi) => {
+              const liveValue = kpi.id === "exactitud" && routeMetrics?.latest ? routeMetrics.latest.exactitude : kpi.value
+              return (
               <article
                 className={`kpi-card kpi-${kpi.state.toLowerCase()}`}
                 key={
@@ -325,7 +345,7 @@ export default function MiLocal({
 
                   <div className="kpi-signal-row">
                     {kpi.unit === "%" && (
-                      <SignalLight tone={signalFromPercent(kpi.value)} compact />
+                      <SignalLight tone={signalFromPercent(liveValue)} compact />
                     )}
                   {kpi.target !==
                     undefined && (
@@ -348,8 +368,8 @@ export default function MiLocal({
                 <strong className="kpi-value">
                   {kpi.unit ===
                   "%"
-                    ? `${kpi.value}%`
-                    : kpi.value}
+                    ? `${liveValue}%`
+                    : liveValue}
                 </strong>
 
 
@@ -367,7 +387,7 @@ export default function MiLocal({
                     <span
                       style={{
                         width: `${Math.min(
-                          kpi.value,
+                          liveValue,
                           100
                         )}%`,
                       }}
@@ -377,13 +397,54 @@ export default function MiLocal({
                 )}
 
               </article>
-            )
+              )
+            }
           )}
 
         </div>
 
       </section>
 
+
+      {/* ==================================================
+          EVOLUTIVO RUTA VS AUDITORÍA
+      ================================================== */}
+
+      <section className="section local-route-evolution">
+        <div className="section-head local-standard-head">
+          <div>
+            <span className="eyebrow">EXACTITUD DE LA REVISIÓN</span>
+            <h2>Evolutivo Ruta vs Auditoría</h2>
+          </div>
+          {routeMetrics?.latest && (
+            <span className="local-breach-pill" style={{ borderColor: "rgba(55,189,112,.28)", color: "#7fe0a7" }}>
+              <CheckCircle2 size={14} /> {routeMetrics.latest.exactitude}% última comparación
+            </span>
+          )}
+        </div>
+
+        {routeMetrics?.monthly?.length ? (
+          <div className="local-route-evolution-grid">
+            {routeMetrics.monthly.slice(0, 6).map((item) => (
+              <article key={`${item.period}-${item.routeId}-${item.auditId}`}>
+                <div className="local-route-evolution-head">
+                  <span>{new Intl.DateTimeFormat("es-CL", { month: "short", year: "numeric" }).format(new Date(`${item.period}-01T12:00:00`))}</span>
+                  <strong>{item.exactitude}%</strong>
+                </div>
+                <div className="local-route-evolution-bar"><i style={{ width: `${Math.max(0, Math.min(100, item.exactitude))}%` }} /></div>
+                <small>
+                  Ruta {new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "2-digit" }).format(new Date(item.routeDate))}
+                  {" · "}
+                  Auditoría {new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "2-digit" }).format(new Date(item.auditDate))}
+                  {" · "}{item.differences.length} diferencias
+                </small>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <div className="activity-empty">El evolutivo aparecerá cuando exista al menos un mes con Ruta y Auditoría finalizadas.</div>
+        )}
+      </section>
 
       {/* ==================================================
           ESTÁNDARES
