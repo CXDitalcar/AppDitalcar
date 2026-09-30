@@ -117,6 +117,13 @@ const mainNavigation: NavigationItem[] = [
   },
 
   {
+    label: "Ruta Experiencia",
+    to: "/ruta-experiencia",
+    icon: ClipboardCheck,
+    module: "FORMULARIOS",
+  },
+
+  {
     label: "Formularios",
     to: "/formularios",
     icon: ClipboardCheck,
