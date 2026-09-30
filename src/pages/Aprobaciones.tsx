@@ -12,8 +12,8 @@ import {
 import { useNavigate } from "react-router-dom"
 import "./Aprobaciones.css"
 import SignalLight, { signalFromRequest } from "../components/SignalLight"
-import { requestAssignments } from "../data/requestConfig"
 import { listRequests } from "../services/requestRepository"
+import { getAllRequestAssignments } from "../services/requestCatalog"
 import {
   canApproveRequest,
   canConfirmResolution,
@@ -67,19 +67,19 @@ export default function Aprobaciones({
   }, [currentUser.email, currentUser.role])
 
   const accessible = requests.filter((request) =>
-    canViewRequest(currentUser, request, requestAssignments)
+    canViewRequest(currentUser, request, getAllRequestAssignments())
   )
 
   function matchesView(request: RequestItem, target: ManagementView) {
     const canApprove = canApproveRequest(
       currentUser,
       request,
-      requestAssignments
+      getAllRequestAssignments()
     )
     const canManage = canManageRequest(
       currentUser,
       request,
-      requestAssignments
+      getAllRequestAssignments()
     )
     const canConfirm = canConfirmResolution(currentUser, request)
     const oversight = [
