@@ -19,9 +19,28 @@ import {
 } from "../services/academyStore"
 import { getRequestPermissions } from "../services/permissions"
 import { listRequests } from "../services/requestRepository"
-import { getKpiData, type KpiData } from "../services/kpiApi"
 import type { RequestItem, UserScope } from "../types"
 import "./Home.css"
+
+type KpiData = {
+  summary: {
+    validSalesTotal: number
+    goal: number | string
+    billingCurrentTotal: number
+    compliance: number
+  }
+  meta: { checkedAt: string }
+  stale?: boolean
+}
+
+async function getKpiData(): Promise<KpiData> {
+  const response = await fetch("/api/kpi/data", { credentials: "include" })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(payload?.message || `Error ${response.status}`)
+  }
+  return payload as KpiData
+}
 
 type ActivityItem = {
   id: string
@@ -85,7 +104,7 @@ export default function Home({
   useEffect(() => {
     let active = true
     getKpiData()
-      .then((result: KpiData) => {
+      .then((result) => {
         if (active) setKpiData(result)
       })
       .catch(() => {
