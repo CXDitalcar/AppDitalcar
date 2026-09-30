@@ -20,11 +20,16 @@ import RutaExperiencia from "./pages/RutaExperiencia"
 
 import { appConfig } from "./config"
 import { demoViewUsers } from "./data/mockData"
-import { requestAssignments } from "./data/requestConfig"
 import { canAccessPilotModule } from "./data/pilotStellantis"
 import { canAccessApprovalInbox } from "./services/permissions"
 import { getApiSession, logoutApiSession } from "./services/auth"
 import { getUsersDirectory } from "./services/usersDirectoryApi"
+import {
+  getAllOperationalUsers,
+  getAllRequestAssignments,
+  loadOperationalCatalog,
+  setRuntimeUsers,
+} from "./services/requestCatalog"
 import type { UserScope } from "./types"
 
 export default function App() {
@@ -32,6 +37,7 @@ export default function App() {
   const [viewAsUser, setViewAsUser] = useState<UserScope | null>(null)
   const [authLoading, setAuthLoading] = useState(true)
   const [directoryUsers, setDirectoryUsers] = useState<UserScope[]>([])
+  const [catalogVersion, setCatalogVersion] = useState(0)
 
   useEffect(() => {
     let active = true
@@ -48,6 +54,24 @@ export default function App() {
     }
   }, [])
 
+
+  useEffect(() => {
+    if (!apiUser) return
+    let active = true
+    const refreshCatalog = () => {
+      loadOperationalCatalog()
+        .finally(() => {
+          if (active) setCatalogVersion((value) => value + 1)
+        })
+    }
+    refreshCatalog()
+    const timer = window.setInterval(refreshCatalog, 60_000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [apiUser?.email])
+
   useEffect(() => {
     if (apiUser?.role !== "EXPERIENCIA_CLIENTES") {
       setDirectoryUsers([])
@@ -58,7 +82,12 @@ export default function App() {
     const refresh = () => {
       getUsersDirectory()
         .then((result) => {
-          if (active) setDirectoryUsers(result.users.filter((user) => user.active))
+          if (active) {
+            const activeUsers = result.users.filter((user) => user.active)
+            setDirectoryUsers(activeUsers)
+            setRuntimeUsers(result.users, result.meta)
+            setCatalogVersion((value) => value + 1)
+          }
         })
         .catch(() => {
           if (active) setDirectoryUsers([])
@@ -104,7 +133,7 @@ export default function App() {
     currentUser.zone ??
     "Red Ditalcar"
 
-  const showApprovals = canAccessApprovalInbox(currentUser, requestAssignments)
+  const showApprovals = canAccessApprovalInbox(currentUser, getAllRequestAssignments())
   const canSeeAcademia = canAccessPilotModule(currentUser, "ACADEMIA")
   const canSeeMiLocal = canAccessPilotModule(currentUser, "MI_LOCAL")
   const canSeeFormularios = canAccessPilotModule(currentUser, "FORMULARIOS")
@@ -112,7 +141,9 @@ export default function App() {
   const canSeeKPI = canAccessPilotModule(currentUser, "KPI")
 
   // “Ver como” es una herramienta administrativa de Experiencia, no una vía de ingreso.
-  const viewAsOptions = (directoryUsers.length ? directoryUsers : demoViewUsers).map((user) => ({
+  const operationalUsers = getAllOperationalUsers().filter((user) => user.active)
+  void catalogVersion
+  const viewAsOptions = (directoryUsers.length ? directoryUsers : operationalUsers.length ? operationalUsers : demoViewUsers).map((user) => ({
     ...user,
     active: true,
     testingView: true,
