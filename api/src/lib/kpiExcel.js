@@ -93,41 +93,7 @@ function readCommercialDetail(graphs) {
   return rows
 }
 
-let cache = null
-const CACHE_MS = 60_000
-
-export async function loadKpiFromExcel(rawUrl, options = {}) {
-  const sourceUrl = String(rawUrl || "").trim()
-  if (!sourceUrl) throw new Error("No hay un enlace KPI configurado.")
-
-  if (!options.force && cache?.key === sourceUrl && Date.now() - cache.loadedAt < CACHE_MS) {
-    return cache.value
-  }
-
-  const downloadUrl = excelDownloadUrl(sourceUrl)
-  const response = await fetch(downloadUrl, {
-    method: "GET",
-    redirect: "follow",
-    headers: {
-      Accept: "application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream;q=0.9,*/*;q=0.1",
-      "User-Agent": "DitalcarColaboradores/1.0",
-    },
-  })
-
-  if (!response.ok) {
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("El Excel KPI exige inicio de sesión. Mientras Graph siga bloqueado, usa un enlace de descarga que pueda abrirse sin autenticación.")
-    }
-    throw new Error(`No fue posible descargar el Excel KPI (HTTP ${response.status}).`)
-  }
-
-  const contentType = String(response.headers.get("content-type") || "").toLowerCase()
-  const buffer = Buffer.from(await response.arrayBuffer())
-  const prefix = buffer.subarray(0, 64).toString("utf8").toLowerCase()
-  if (contentType.includes("text/html") || prefix.includes("<!doctype html") || prefix.includes("<html")) {
-    throw new Error("El enlace abre una página web en vez del archivo Excel. Usa un enlace de descarga directa o compartido sin inicio de sesión.")
-  }
-
+async function parseWorkbook(buffer, sourceMeta = {}) {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
 
@@ -144,11 +110,7 @@ export async function loadKpiFromExcel(rawUrl, options = {}) {
   }
 
   const summary = {
-    period: {
-      monthNumber,
-      month: MONTHS[monthNumber - 1],
-      year,
-    },
+    period: { monthNumber, month: MONTHS[monthNumber - 1], year },
     notesSales: number(dashboard, "C4"),
     newVehicleSales: number(dashboard, "D4"),
     newVehicleValid: number(dashboard, "F4"),
@@ -177,7 +139,7 @@ export async function loadKpiFromExcel(rawUrl, options = {}) {
     remaining: number(dashboard, "BL3"),
   }
 
-  const result = {
+  return {
     summary,
     detail: readCommercialDetail(graphs),
     evolution: {
@@ -186,15 +148,66 @@ export async function loadKpiFromExcel(rawUrl, options = {}) {
       usedVehicles: readEvolution(graphs, year, 14, 17),
     },
     meta: {
-      sourceUrl,
-      finalUrl: response.url,
+      sourceUrl: String(sourceMeta.sourceUrl || ""),
+      finalUrl: sourceMeta.finalUrl || undefined,
       checkedAt: new Date().toISOString(),
-      lastModified: response.headers.get("last-modified") || undefined,
+      lastModified: sourceMeta.lastModified || undefined,
       dashboardSheet: dashboard.name,
       graphsSheet: graphs.name,
-      fileName: decodeURIComponent(response.url.split("/").pop()?.split("?")[0] || "Excel KPI"),
+      fileName: sourceMeta.fileName || "Excel KPI",
+      sourceType: sourceMeta.sourceType || "url",
+      uploadedAt: sourceMeta.uploadedAt || undefined,
     },
   }
+}
+
+let cache = null
+const CACHE_MS = 60_000
+
+export async function loadKpiFromBuffer(buffer, sourceMeta = {}) {
+  if (!Buffer.isBuffer(buffer) || !buffer.length) throw new Error("El archivo KPI está vacío.")
+  return parseWorkbook(buffer, sourceMeta)
+}
+
+export async function loadKpiFromExcel(rawUrl, options = {}) {
+  const sourceUrl = String(rawUrl || "").trim()
+  if (!sourceUrl) throw new Error("No hay un enlace KPI configurado.")
+
+  if (!options.force && cache?.key === sourceUrl && Date.now() - cache.loadedAt < CACHE_MS) {
+    return cache.value
+  }
+
+  const downloadUrl = excelDownloadUrl(sourceUrl)
+  const response = await fetch(downloadUrl, {
+    method: "GET",
+    redirect: "follow",
+    headers: {
+      Accept: "application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream;q=0.9,*/*;q=0.1",
+      "User-Agent": "DitalcarColaboradores/1.0",
+    },
+  })
+
+  if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error("El Excel KPI exige inicio de sesión. Mientras Graph siga bloqueado, usa Subir archivo desde tu computador.")
+    }
+    throw new Error(`No fue posible descargar el Excel KPI (HTTP ${response.status}).`)
+  }
+
+  const contentType = String(response.headers.get("content-type") || "").toLowerCase()
+  const buffer = Buffer.from(await response.arrayBuffer())
+  const prefix = buffer.subarray(0, 64).toString("utf8").toLowerCase()
+  if (contentType.includes("text/html") || prefix.includes("<!doctype html") || prefix.includes("<html")) {
+    throw new Error("El enlace abre una página web en vez del archivo Excel. Usa Subir archivo o un enlace de descarga directa.")
+  }
+
+  const result = await parseWorkbook(buffer, {
+    sourceUrl,
+    finalUrl: response.url,
+    lastModified: response.headers.get("last-modified") || undefined,
+    fileName: decodeURIComponent(response.url.split("/").pop()?.split("?")[0] || "Excel KPI"),
+    sourceType: "url",
+  })
 
   cache = { key: sourceUrl, loadedAt: Date.now(), value: result }
   return result
