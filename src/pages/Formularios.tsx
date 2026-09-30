@@ -530,6 +530,8 @@ function FormCard({
     executionId: string
   ) => void
 }) {
+  const navigate = useNavigate()
+
   const lastExecution =
     getLastExecution(
       form.code,
@@ -561,6 +563,14 @@ function FormCard({
 
 
   function openForm() {
+    if (form.code === "FOR-RUTA-01") {
+      navigate("/ruta-experiencia")
+      return
+    }
+    if (form.code === "FOR-AUD-RUTA-01") {
+      navigate("/ruta-experiencia?mode=AUDITORIA")
+      return
+    }
     window.open(
       form.url,
       "_blank",
@@ -748,7 +758,9 @@ function FormCard({
             className="form-primary-btn"
             onClick={openForm}
           >
-            Realizar formulario
+            {form.code === "FOR-RUTA-01" || form.code === "FOR-AUD-RUTA-01"
+              ? "Realizar en la app"
+              : "Realizar formulario"}
             <ArrowUpRight size={17} />
           </button>
         ) : (
