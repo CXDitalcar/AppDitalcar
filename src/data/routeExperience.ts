@@ -26,7 +26,6 @@ export const routeLocals = [
   "Stellantis Nueva Tobalaba",
   "KGM-JMC Nueva Tobalaba",
   "Seminuevos Nueva Tobalaba",
-  "BYD Nueva Tobalaba",
   "Chery-MMC Tobalaba",
   "Geely Tobalaba",
   "Chery-Renault Vespucio",
