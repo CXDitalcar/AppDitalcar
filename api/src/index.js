@@ -37,7 +37,11 @@ import {
   saveKpiUploadMeta,
 } from "./lib/kpiSource.js"
 import { readKpiUpload, saveKpiUpload } from "./lib/kpiUpload.js"
+import { finalizeLargeUpload, largeUploadLimits, stageLargeUploadChunk, startLargeUpload } from "./lib/chunkedUpload.js"
 import { getSlaCatalog, resolveSlaSet } from "./lib/slaList.js"
+import { getOperationalCatalog } from "./lib/operationalLists.js"
+import { loadUsersFromList } from "./lib/usersList.js"
+import { dataFilesMaxBytes, getAllDataFileStates, getDataFileState, registerDataFileBlob, saveDataFile } from "./lib/dataFiles.js"
 
 import {
   getRouteExecution,
@@ -243,13 +247,28 @@ app.http("sla-status", {
   handler: async (request) => {
     const user = await currentUser(request)
     if (!user) return json(401, { message: "Sesión no válida." })
-    const result = await getSlaCatalog({ force: true })
+    const [result, operations] = await Promise.all([
+      getSlaCatalog({ force: true }),
+      getOperationalCatalog({ force: true }),
+    ])
+    const requiredCodes = [...new Set((operations.processes || []).flatMap((process) => [
+      process.slaReviewCode,
+      process.slaAcceptanceCode,
+      process.slaResolutionCode,
+      process.slaConfirmationCode,
+    ]).filter(Boolean))]
+    const availableCodes = new Set(Object.keys(result.catalog || {}))
+    const missingCodes = requiredCodes.filter((code) => !availableCodes.has(code))
     return json(200, {
       source: result.source,
       listName: result.listName,
       checkedAt: result.checkedAt,
       count: Object.keys(result.catalog || {}).length,
-      warning: result.warning,
+      requiredCount: requiredCodes.length,
+      resolvedCount: requiredCodes.length - missingCodes.length,
+      missingCodes,
+      diagnostics: result.diagnostics,
+      warning: result.warning || (missingCodes.length ? `${missingCodes.length} código(s) SLA usados por 22_Procesos aún no existen en 09_AcuerdosSLA.` : undefined),
     })
   },
 })
@@ -292,15 +311,124 @@ app.http("users-directory", {
     const user = await currentUser(request)
     if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
 
-    const url = await getUsersExcelUrl()
-    if (!url) return json(503, { message: "Todavía no hay un Excel de usuarios conectado." })
-
+    // Fuente maestra: LIST 02_Usuarios. El Excel queda sólo como fallback temporal.
     try {
-      const result = await loadUsersFromExcel(url)
+      const result = await loadUsersFromList({ force: request.query.get("force") === "1" })
       return json(200, result)
-    } catch (error) {
-      return json(502, { message: error?.message || "No fue posible leer el Excel de usuarios." })
+    } catch (listError) {
+      const url = await getUsersExcelUrl()
+      if (!url) {
+        return json(503, {
+          message: listError?.message || "No fue posible leer 02_Usuarios y no hay Excel temporal conectado.",
+          source: "FALLBACK",
+        })
+      }
+      try {
+        const result = await loadUsersFromExcel(url)
+        return json(200, {
+          ...result,
+          meta: {
+            ...result.meta,
+            source: "EXCEL_FALLBACK",
+            listName: "02_Usuarios",
+            warning: listError?.message || "02_Usuarios no disponible; usando Excel temporal.",
+          },
+        })
+      } catch (error) {
+        return json(502, { message: error?.message || "No fue posible leer 02_Usuarios ni el Excel temporal." })
+      }
     }
+  },
+})
+
+app.http("operations-catalog", {
+  methods: ["GET"], authLevel: "anonymous", route: "operations/catalog",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!user) return json(401, { message: "Sesión no válida." })
+    const force = request.query.get("force") === "1"
+    const result = await getOperationalCatalog({ force })
+
+    // El directorio también se entrega a la capa operativa para resolver responsables,
+    // jefaturas, gerencias y permisos sin recurrir a usuarios hardcodeados.
+    let directory = { users: [], meta: { source: "FALLBACK" } }
+    try {
+      directory = await loadUsersFromList({ force })
+    } catch (listError) {
+      try {
+        const url = await getUsersExcelUrl()
+        if (url) {
+          const excel = await loadUsersFromExcel(url)
+          directory = {
+            ...excel,
+            meta: { ...excel.meta, source: "EXCEL_FALLBACK", listName: process.env.SHAREPOINT_USERS_LIST || "02_Usuarios", warning: listError?.message },
+          }
+        }
+      } catch {
+        directory = { users: [], meta: { source: "FALLBACK", listName: process.env.SHAREPOINT_USERS_LIST || "02_Usuarios", warning: listError?.message } }
+      }
+    }
+
+    return json(200, { ...result, users: directory.users, usersMeta: directory.meta })
+  },
+})
+
+app.http("operations-status", {
+  methods: ["GET"], authLevel: "anonymous", route: "operations/status",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    const [catalog, sla] = await Promise.all([
+      getOperationalCatalog({ force: true }),
+      getSlaCatalog({ force: true }),
+    ])
+    let users
+    try {
+      const liveUsers = await loadUsersFromList({ force: true })
+      users = { source: "SHAREPOINT_LIST", listName: liveUsers.meta.listName, count: liveUsers.users.length, checkedAt: liveUsers.meta.checkedAt }
+    } catch (error) {
+      try {
+        const url = await getUsersExcelUrl()
+        if (!url) throw error
+        const excelUsers = await loadUsersFromExcel(url)
+        users = { source: "EXCEL_FALLBACK", listName: process.env.SHAREPOINT_USERS_LIST || "02_Usuarios", count: excelUsers.users.length, checkedAt: excelUsers.meta.checkedAt, warning: error?.message }
+      } catch {
+        users = { source: "FALLBACK", listName: process.env.SHAREPOINT_USERS_LIST || "02_Usuarios", count: 0, warning: error?.message }
+      }
+    }
+    return json(200, {
+      users,
+      processes: { source: catalog.meta?.source, listName: catalog.meta?.lists?.processes, count: catalog.processes?.length || 0 },
+      fields: { source: catalog.meta?.source, listName: catalog.meta?.lists?.fields, count: catalog.fields?.length || 0 },
+      assignments: { source: catalog.meta?.source, listName: catalog.meta?.lists?.assignments, count: catalog.assignments?.length || 0 },
+      sla: (() => {
+        const requiredCodes = [...new Set((catalog.processes || []).flatMap((process) => [
+          process.slaReviewCode,
+          process.slaAcceptanceCode,
+          process.slaResolutionCode,
+          process.slaConfirmationCode,
+        ]).filter(Boolean))]
+        const availableCodes = new Set(Object.keys(sla.catalog || {}))
+        const missingCodes = requiredCodes.filter((code) => !availableCodes.has(code))
+        return {
+          source: sla.source,
+          listName: sla.listName || process.env.SHAREPOINT_SLA_LIST || "09_AcuerdosSLA",
+          count: Object.keys(sla.catalog || {}).length,
+          requiredCount: requiredCodes.length,
+          resolvedCount: requiredCodes.length - missingCodes.length,
+          missingCodes,
+          diagnostics: sla.diagnostics,
+          warning: sla.warning || (missingCodes.length ? `${missingCodes.length} código(s) SLA usados por 22_Procesos aún no existen en 09_AcuerdosSLA.` : undefined),
+        }
+      })(),
+      requestStorage: {
+        source: "AZURE_TABLE",
+        requestsTable: "DitalcarRequests",
+        timelineTable: "DitalcarRequestTimeline",
+        futureSharePointLists: ["Tablero General Solicitudes", "20_ValoresSolicitud", "21_SeguimientoSolicitudes"],
+      },
+      checkedAt: new Date().toISOString(),
+    })
   },
 })
 
@@ -350,6 +478,95 @@ app.http("kpi-source-config", {
   },
 })
 
+app.http("large-upload-start", {
+  methods: ["POST"], authLevel: "anonymous", route: "uploads/start",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    try {
+      const data = await body(request)
+      const session = await startLargeUpload({
+        kind: data.kind,
+        fileName: data.fileName,
+        size: data.size,
+        contentType: data.contentType,
+        createdBy: user.email,
+      })
+      const limits = largeUploadLimits()
+      return json(200, { uploadId: session.id, chunkBytes: limits.chunkBytes, totalChunks: session.totalChunks, maxBytes: limits.maxBytes })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible iniciar la carga." })
+    }
+  },
+})
+
+app.http("large-upload-chunk", {
+  methods: ["POST"], authLevel: "anonymous", route: "uploads/chunk",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    try {
+      const url = new URL(request.url)
+      const uploadId = String(url.searchParams.get("uploadId") || "")
+      const index = Number(url.searchParams.get("index"))
+      const buffer = Buffer.from(await request.arrayBuffer())
+      return json(200, await stageLargeUploadChunk({ uploadId, index, buffer, userEmail: user.email }))
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible guardar este bloque." })
+    }
+  },
+})
+
+app.http("large-upload-finalize", {
+  methods: ["POST"], authLevel: "anonymous", route: "uploads/finalize",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    try {
+      const data = await body(request)
+      const session = await finalizeLargeUpload({ uploadId: data.uploadId, userEmail: user.email })
+      const uploadedAt = session.completedAt || new Date().toISOString()
+
+      if (session.kind === "kpi") {
+        const stored = await readKpiUpload(session.blobName)
+        const validated = await loadKpiFromBuffer(stored.buffer, {
+          sourceUrl: "azure-upload",
+          fileName: session.fileName,
+          fileSize: Number(session.size || stored.buffer.length),
+          sourceType: "upload",
+          uploadedAt,
+          lastModified: stored.lastModified || uploadedAt,
+        })
+        const upload = {
+          blobName: session.blobName,
+          fileName: session.fileName,
+          size: Number(session.size || stored.buffer.length),
+          uploadedAt,
+        }
+        await saveKpiUploadMeta(upload, user.email)
+        await saveKpiSourceMode("upload", user.email)
+        await saveKpiSnapshot(validated, user.email)
+        return json(200, {
+          message: "Archivo KPI subido, validado y activado correctamente.",
+          data: validated,
+          activeMode: "upload",
+          uploadedFile: upload,
+        })
+      }
+
+      const state = await registerDataFileBlob(session.kind, {
+        blobName: session.blobName,
+        fileName: session.fileName,
+        size: session.size,
+        uploadedAt,
+      }, user.email)
+      return json(200, { message: "Archivo cargado y activado correctamente.", state })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible finalizar la carga." })
+    }
+  },
+})
+
 app.http("kpi-upload", {
   methods: ["POST"], authLevel: "anonymous", route: "kpi/upload",
   handler: async (request) => {
@@ -365,13 +582,13 @@ app.http("kpi-upload", {
     }
 
     const declaredLength = Number(request.headers.get("content-length") || 0)
-    const maxBytes = 20 * 1024 * 1024
-    if (declaredLength > maxBytes) return json(413, { message: "El archivo supera el máximo temporal de 20 MB." })
+    const maxBytes = 100 * 1024 * 1024
+    if (declaredLength > maxBytes) return json(413, { message: "El archivo supera el máximo de 100 MB." })
 
     try {
       const buffer = Buffer.from(await request.arrayBuffer())
       if (!buffer.length) return json(400, { message: "El archivo está vacío." })
-      if (buffer.length > maxBytes) return json(413, { message: "El archivo supera el máximo temporal de 20 MB." })
+      if (buffer.length > maxBytes) return json(413, { message: "El archivo supera el máximo de 100 MB." })
 
       // Primero validamos la misma estructura DASHBOARD/GRAFICOS antes de reemplazar el archivo vigente.
       const validated = await loadKpiFromBuffer(buffer, {
@@ -407,49 +624,92 @@ app.http("kpi-data", {
   handler: async (request) => {
     const user = await currentUser(request)
     if (!user) return json(401, { message: "Sesión no válida." })
+    const snapshot = await getKpiSnapshot()
+    if (snapshot) return json(200, { ...snapshot, stale: false })
+    return json(503, { message: "Todavía no existe un snapshot KPI válido. Conecta o sube un archivo desde Gestión → KPI." })
+  },
+})
 
+app.http("kpi-refresh", {
+  methods: ["POST"], authLevel: "anonymous", route: "kpi/refresh",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
     const mode = await getKpiSourceMode()
     try {
+      let result
       if (mode === "upload") {
         const upload = await getKpiUploadMeta()
         if (!upload?.blobName) throw new Error("No hay un archivo KPI subido todavía.")
         const stored = await readKpiUpload(upload.blobName)
-        const result = await loadKpiFromBuffer(stored.buffer, {
+        result = await loadKpiFromBuffer(stored.buffer, {
           sourceUrl: "azure-upload",
           fileName: upload.fileName || "Excel KPI",
+          fileSize: stored.buffer.length,
           sourceType: "upload",
           uploadedAt: upload.uploadedAt,
           lastModified: stored.lastModified || upload.uploadedAt,
         })
-        await saveKpiSnapshot(result, user.email).catch(() => {})
-        return json(200, { ...result, stale: false })
+      } else {
+        const url = await getKpiExcelUrl()
+        if (!url) throw new Error("No hay una fuente KPI configurada.")
+        result = await loadKpiFromExcel(url, { force: true })
       }
-
-      const url = await getKpiExcelUrl()
-      if (!url) {
-        const snapshot = await getKpiSnapshot()
-        if (snapshot) return json(200, { ...snapshot, stale: true, warning: "La fuente KPI no está configurada; mostrando el último snapshot válido." })
-        return json(503, { message: "Todavía no hay un Excel KPI conectado." })
-      }
-
-      const result = await loadKpiFromExcel(url)
-      await saveKpiSnapshot(result, user.email).catch(() => {})
-      return json(200, { ...result, stale: false })
+      await saveKpiSnapshot(result, user.email)
+      return json(200, { message: "KPI actualizado correctamente.", data: result })
     } catch (error) {
       const snapshot = await getKpiSnapshot()
-      if (snapshot) {
-        return json(200, {
-          ...snapshot,
-          stale: true,
-          warning: error?.message || "No fue posible actualizar el Excel KPI; mostrando el último snapshot válido.",
-        })
-      }
-      return json(502, { message: error?.message || "No fue posible leer el Excel KPI." })
+      if (snapshot) return json(200, { message: "No fue posible actualizar; se mantiene el último snapshot válido.", data: { ...snapshot, stale: true, warning: error?.message || "Error de actualización." } })
+      return json(502, { message: error?.message || "No fue posible actualizar KPI." })
     }
   },
 })
 
 
+app.http("data-files-status", {
+  methods: ["GET"], authLevel: "anonymous", route: "data-files/status",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    const sources = await getAllDataFileStates()
+    return json(200, { sources, maxBytes: dataFilesMaxBytes() })
+  },
+})
+
+app.http("data-files-source", {
+  methods: ["GET"], authLevel: "anonymous", route: "data-files/{kind}",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    try {
+      return json(200, await getDataFileState(request.params.kind))
+    } catch (error) {
+      return json(400, { message: error?.message || "Fuente no válida." })
+    }
+  },
+})
+
+app.http("data-files-upload", {
+  methods: ["POST"], authLevel: "anonymous", route: "data-files/{kind}/upload",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    const maxBytes = dataFilesMaxBytes()
+    const declaredLength = Number(request.headers.get("content-length") || 0)
+    if (declaredLength > maxBytes) return json(413, { message: "El archivo supera el máximo de 100 MB." })
+    const rawName = request.headers.get("x-file-name") || "archivo.xlsx"
+    let fileName = rawName
+    try { fileName = decodeURIComponent(rawName) } catch {}
+    try {
+      const buffer = Buffer.from(await request.arrayBuffer())
+      if (buffer.length > maxBytes) return json(413, { message: "El archivo supera el máximo de 100 MB." })
+      const state = await saveDataFile(request.params.kind, buffer, fileName, request.headers.get("content-type") || undefined, user.email)
+      return json(200, { message: "Archivo cargado y activado correctamente.", state })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible guardar el archivo." })
+    }
+  },
+})
 
 app.http("route-metrics", {
   methods: ["GET"], authLevel: "anonymous", route: "route/metrics",
