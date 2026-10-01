@@ -1,5 +1,5 @@
-import { mockUsers } from "../data/mockData"
 import {
+  getAllOperationalUsers,
   getAssignmentVisibleLabel,
   getKnownPersonName,
   getPrimaryAssignment,
@@ -15,6 +15,11 @@ import type {
 
 const LOCAL_APPROVAL_HOURS = 24
 const MANAGER_ACCEPTANCE_HOURS = 24
+
+type RuntimeSla = {
+  reviewHours?: number
+  acceptanceHours?: number
+}
 
 export function roleLabel(role: UserRole) {
   const labels: Record<UserRole, string> = {
@@ -122,7 +127,7 @@ export function requiresLocalReview(
 function getSellerLocalReviewer(local: string) {
   const normalizedLocal = local.trim().toLowerCase()
 
-  const localHead = mockUsers.find(
+  const localHead = getAllOperationalUsers().find(
     (item) =>
       item.active &&
       item.role === "JEFATURA_LOCAL" &&
@@ -140,7 +145,7 @@ function getSellerLocalReviewer(local: string) {
   // Nueva estructura comercial: Gerencia de Marca es el respaldo
   // de Jefatura Local. Durante la migración conservamos compatibilidad
   // con los antiguos perfiles de Jefatura de Marca / Zonal.
-  const brandManager = mockUsers.find(
+  const brandManager = getAllOperationalUsers().find(
     (item) =>
       item.active &&
       item.role === "GERENCIA_MARCA" &&
@@ -161,7 +166,7 @@ function getSellerLocalReviewer(local: string) {
   }
 
   if (normalizedLocal.includes("geely")) {
-    const legacyBrandHead = mockUsers.find(
+    const legacyBrandHead = getAllOperationalUsers().find(
       (item) => item.active && item.role === "JEFATURA_MARCA"
     )
 
@@ -174,7 +179,7 @@ function getSellerLocalReviewer(local: string) {
     }
   }
 
-  const legacyZoneHead = mockUsers.find(
+  const legacyZoneHead = getAllOperationalUsers().find(
     (item) => item.active && item.role === "JEFATURA_ZONAL"
   )
 
@@ -193,7 +198,7 @@ function getSellerLocalReviewer(local: string) {
   }
 }
 
-function routeToManager(processCode: string) {
+function routeToManager(processCode: string, runtimeSla?: RuntimeSla) {
   const manager = assignmentPerson(
     getPrimaryAssignment(processCode, "MANAGER")
   )
@@ -201,7 +206,7 @@ function routeToManager(processCode: string) {
   return {
     status: "RECIBIDA" as const,
     approvalContext: undefined,
-    acceptanceSLAHours: MANAGER_ACCEPTANCE_HOURS,
+    acceptanceSLAHours: runtimeSla?.acceptanceHours ?? MANAGER_ACCEPTANCE_HOURS,
     acceptanceSLAStartedAt: new Date().toISOString(),
     currentResponsibleEmail: manager.email,
     currentResponsibleName: manager.name,
@@ -211,16 +216,17 @@ function routeToManager(processCode: string) {
 
 function routeToProcessApproval(
   user: UserScope,
-  processCode: string
+  processCode: string,
+  runtimeSla?: RuntimeSla
 ) {
   const approver = getPrimaryAssignment(processCode, "APPROVER")
 
   if (!approver || (approver.condition && approver.condition !== "SIEMPRE")) {
-    return routeToManager(processCode)
+    return routeToManager(processCode, runtimeSla)
   }
 
   if (assignmentWouldSelfApprove(user, approver)) {
-    return routeToManager(processCode)
+    return routeToManager(processCode, runtimeSla)
   }
 
   const person = assignmentPerson(approver)
@@ -228,6 +234,7 @@ function routeToProcessApproval(
   return {
     status: "PENDIENTE_APROBACION" as const,
     approvalContext: "PROCESO" as const,
+    approvalSLAHours: runtimeSla?.reviewHours ?? LOCAL_APPROVAL_HOURS,
     approvalSLAStartedAt: new Date().toISOString(),
     currentResponsibleEmail: person.email,
     currentResponsibleName: person.name,
@@ -238,7 +245,8 @@ function routeToProcessApproval(
 export function initialRequestRouting(
   user: UserScope,
   processCode: string,
-  local: string
+  local: string,
+  runtimeSla?: RuntimeSla
 ) {
   if (local && requiresLocalReview(user, processCode)) {
     const reviewer = getSellerLocalReviewer(local)
@@ -248,13 +256,13 @@ export function initialRequestRouting(
       reviewer.email &&
       reviewer.email.toLowerCase() === user.email.toLowerCase()
     ) {
-      return routeToProcessApproval(user, processCode)
+      return routeToProcessApproval(user, processCode, runtimeSla)
     }
 
     return {
       status: "PENDIENTE_APROBACION" as const,
       approvalContext: "JEFATURA_LOCAL" as const,
-      approvalSLAHours: LOCAL_APPROVAL_HOURS,
+      approvalSLAHours: runtimeSla?.reviewHours ?? LOCAL_APPROVAL_HOURS,
       approvalSLAStartedAt: new Date().toISOString(),
       currentResponsibleEmail: reviewer.email,
       currentResponsibleName: reviewer.name,
@@ -262,7 +270,7 @@ export function initialRequestRouting(
     }
   }
 
-  return routeToProcessApproval(user, processCode)
+  return routeToProcessApproval(user, processCode, runtimeSla)
 }
 
 export function routeAfterApproval(request: RequestItem) {
@@ -302,14 +310,19 @@ export function routeAfterApproval(request: RequestItem) {
       active: true,
     }
 
-    return routeToProcessApproval(requester, request.processCode)
+    return routeToProcessApproval(requester, request.processCode, {
+      reviewHours: request.approvalSLAHours,
+      acceptanceHours: request.acceptanceSLAHours,
+    })
   }
 
-  return routeToManager(request.processCode)
+  return routeToManager(request.processCode, {
+    acceptanceHours: request.acceptanceSLAHours,
+  })
 }
 
 export function budgetApprovalRouting(request: RequestItem) {
-  const approver = mockUsers.find(
+  const approver = getAllOperationalUsers().find(
     (item) => item.active && item.role === "GERENCIA_COMERCIAL"
   )
 
