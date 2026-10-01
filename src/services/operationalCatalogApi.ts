@@ -37,7 +37,28 @@ export type OperationsStatus = {
   processes: { source?: string; listName?: string; count?: number }
   fields: { source?: string; listName?: string; count?: number }
   assignments: { source?: string; listName?: string; count?: number }
-  sla: { source?: string; listName?: string; count?: number; warning?: string }
+  sla: {
+    source?: string
+    listName?: string
+    count?: number
+    requiredCount?: number
+    resolvedCount?: number
+    missingCodes?: string[]
+    diagnostics?: {
+      totalRows?: number
+      activeRows?: number
+      validTechnicalRows?: number
+      missingTechnicalCodeRows?: number
+      invalidHoursRows?: number
+    } | null
+    warning?: string
+  }
+  requestStorage?: {
+    source?: string
+    requestsTable?: string
+    timelineTable?: string
+    futureSharePointLists?: string[]
+  }
   checkedAt?: string
 }
 
