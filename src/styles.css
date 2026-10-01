@@ -1,35 +1,3 @@
-:root{
-  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-  color:#f7f7f8;background:#070709;--red:#e1262f;--line:#29292f;--muted:#9d9da7
-}
-*{box-sizing:border-box}html,body,#root{min-height:100%;margin:0}body{background:#070709;color:#f7f7f8}
-button,input{font:inherit}.shell{min-height:100vh;display:flex;background-image:linear-gradient(rgba(7,7,9,.86),rgba(7,7,9,.90)),url('/assets/bg-ditalcar.png');background-size:cover;background-position:center;background-attachment:fixed}
-.sidebar{position:fixed;inset:0 auto 0 0;width:260px;background:rgba(8,8,10,.94);border-right:1px solid var(--line);padding:20px 16px;display:flex;flex-direction:column;z-index:20;backdrop-filter:blur(14px)}
-
-.brand{
-  display:flex;
-  align-items:center;
-  gap:14px;
-  padding:4px 6px 24px
-}
-.brand-logo{
-  width:118px;
-  height:auto;
-  object-fit:contain;
-  display:block
-}
-.brand-large{
-  flex-direction:column;
-  justify-content:center;
-  text-align:center
-}
-.brand-large .brand-logo{
-  width:180px
-}
-.brand-copy strong{
-  display:block;
-  font-size:13px;
-  letter-spacing:.14em;
   font-weight:850
 }
 .brand-copy span{
@@ -87,3 +55,8 @@ button,input{font:inherit}.shell{min-height:100vh;display:flex;background-image:
 
 /* Mi Local · evolutivo de exactitud Ruta vs Auditoría */
 .local-route-evolution-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.local-route-evolution-grid article{padding:14px;border:1px solid #29292f;border-radius:12px;background:#101012}.local-route-evolution-head{display:flex;align-items:center;justify-content:space-between;gap:12px}.local-route-evolution-head span{color:#7d7d86;font-size:9px;text-transform:capitalize}.local-route-evolution-head strong{font-size:18px}.local-route-evolution-bar{height:5px;margin:9px 0 8px;border-radius:999px;background:#25252b;overflow:hidden}.local-route-evolution-bar i{display:block;height:100%;background:linear-gradient(90deg,#d61f29,#ff5b63)}.local-route-evolution-grid small{display:block;color:#73737c;font-size:8px;line-height:1.5}@media(max-width:900px){.local-route-evolution-grid{grid-template-columns:1fr}}
+
+/* ======================================================
+   USUARIOS · GESTIÓN Y FUENTES OPERATIVAS
+====================================================== */
+.users-page{width:100%;max-width:1480px;margin:0 auto;padding:28px 26px 70px;box-sizing:border-box;color:#fff}.users-page *{box-sizing:border-box}.users-page button,.users-page input{font:inherit}.users-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin-bottom:16px}.users-heading h1{margin:4px 0 8px;font-size:34px;line-height:1;letter-spacing:-.03em}.users-heading p{max-width:850px;margin:0;color:#8e8e97;font-size:11px;line-height:1.6}.users-eyebrow{display:block;color:#ef3943;font-size:9px;font-weight:900;letter-spacing:.14em}.users-refresh{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #313138;border-radius:9px;background:#111114;color:#d8d8dd;font-size:9px;font-weight:900;cursor:pointer}.users-refresh:hover{border-color:rgba(239,57,67,.45)}.users-refresh:disabled{opacity:.55;cursor:not-allowed}.users-source-card,.users-table-card{margin-bottom:16px;padding:19px;border:1px solid #29292f;border-radius:15px;background:linear-gradient(145deg,#151518,#0b0b0e)}.users-source-title{display:grid;grid-template-columns:auto 1fr auto;gap:11px;align-items:center;margin-bottom:16px}.users-source-icon{display:grid;place-items:center;width:40px;height:40px;border:1px solid rgba(239,57,67,.23);border-radius:10px;background:rgba(239,57,67,.07);color:#ef3943}.users-source-title strong{display:block;font-size:13px}.users-source-title span{display:block;margin-top:4px;color:#81818a;font-size:9px;line-height:1.45}.users-source-state{display:inline-flex;align-items:center;gap:6px;padding:7px 9px;border:1px solid #323238;border-radius:999px;background:#101013;color:#8e8e97;font-size:8px;font-weight:900;white-space:nowrap}.users-source-state.ok{color:#72dda0;border-color:rgba(55,189,112,.25);background:rgba(55,189,112,.06)}.users-source-state.pending{color:#f1bb64;border-color:rgba(240,176,65,.25);background:rgba(240,176,65,.06)}.users-url-field{display:grid;gap:6px}.users-url-field>span{color:#777780;font-size:8px;font-weight:900;letter-spacing:.09em}.users-url-field input{width:100%;padding:11px 12px;border:1px solid #34343a;border-radius:9px;background:#0c0c0f;color:#fff;outline:none}.users-url-field input:focus{border-color:rgba(239,57,67,.55);box-shadow:0 0 0 2px rgba(239,57,67,.08)}.users-url-field small{color:#74747d;font-size:8px;line-height:1.5}.users-source-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px}.users-source-actions>span{color:#73737c;font-size:8px}.users-save{display:inline-flex;align-items:center;gap:7px;padding:9px 12px;border:1px solid #ef3943;border-radius:9px;background:#d61f29;color:#fff;font-size:9px;font-weight:900;cursor:pointer}.users-save:disabled{opacity:.55;cursor:not-allowed}.users-alert{display:flex;align-items:flex-start;gap:8px;margin-top:11px;padding:10px 11px;border-radius:9px;font-size:9px;line-height:1.45}.users-alert.success{border:1px solid rgba(55,189,112,.25);background:rgba(55,189,112,.06);color:#78dfa4}.users-alert.error{border:1px solid rgba(214,31,41,.26);background:rgba(214,31,41,.06);color:#ff7f86}.users-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-bottom:16px}.users-summary article{min-height:92px;padding:14px;border:1px solid #29292f;border-radius:12px;background:#101013}.users-summary article>svg{margin-bottom:8px;color:#ef3943}.users-summary span{display:block;color:#777780;font-size:8px;font-weight:800}.users-summary strong{display:block;margin:5px 0 2px;font-size:24px;line-height:1}.users-summary small{color:#6f6f78;font-size:8px}.users-table-header{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:13px}.users-table-header strong{display:block;font-size:13px}.users-table-header span{display:block;margin-top:4px;color:#777780;font-size:8px}.users-structure{padding:6px 8px;border:1px solid rgba(239,57,67,.22);border-radius:999px;background:rgba(239,57,67,.05);color:#ff737b!important;font-weight:900;white-space:nowrap}.users-table-wrap{width:100%;overflow:auto;border:1px solid #27272d;border-radius:10px}.users-table-wrap table{width:100%;border-collapse:collapse;min-width:780px;background:#0d0d10}.users-table-wrap th,.users-table-wrap td{padding:10px 11px;border-bottom:1px solid #24242a;text-align:left;vertical-align:middle}.users-table-wrap th{position:sticky;top:0;z-index:1;background:#121216;color:#7c7c85;font-size:8px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.users-table-wrap td{color:#aaaab2;font-size:9px}.users-table-wrap td strong{color:#e3e3e7}.users-table-wrap tbody tr:hover{background:rgba(255,255,255,.015)}.users-table-wrap tbody tr:last-child td{border-bottom:0}.users-status{display:inline-flex;align-items:center;padding:5px 7px;border-radius:999px;border:1px solid #34343a;background:#141417;color:#8c8c95;font-size:7px;font-weight:900;white-space:nowrap}.users-status.active{color:#76dfa4;border-color:rgba(55,189,112,.24);background:rgba(55,189,112,.06)}.users-status.inactive{color:#ff858b;border-color:rgba(214,31,41,.25);background:rgba(214,31,41,.06)}.users-empty{padding:24px!important;color:#777780!important;text-align:center!important}.users-source-card .users-table-wrap{margin-top:4px}@media(max-width:980px){.users-heading,.users-source-actions,.users-table-header{align-items:flex-start;flex-direction:column}.users-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.users-source-title{grid-template-columns:auto 1fr}.users-source-state{grid-column:1/-1;width:max-content}}@media(max-width:620px){.users-page{padding:20px 14px 50px}.users-heading h1{font-size:28px}.users-summary{grid-template-columns:1fr}.users-source-card,.users-table-card{padding:14px}.users-refresh,.users-save{width:100%;justify-content:center}.users-source-title{grid-template-columns:1fr}.users-source-icon{width:36px;height:36px}.users-source-state{grid-column:auto}}
