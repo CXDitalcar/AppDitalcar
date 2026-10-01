@@ -1,9 +1,12 @@
 import { getAppConfig, setAppConfig } from "./store.js"
+import { readNamedList } from "./graphLists.js"
 
 const CACHE_KEY = "SLA_CATALOG_CACHE"
 const MEMORY_TTL_MS = 60_000
-let memory = { checkedAt: 0, catalog: null, source: null, listName: null }
+let memory = { checkedAt: 0, catalog: null, source: null, listName: null, diagnostics: null }
 
+// Sólo quedan como respaldo técnico para etapas transversales conocidas.
+// Los SLA específicos de proceso deben resolverse desde 09_AcuerdosSLA.
 const FALLBACKS = {
   SLA_SOL_REV_LOCAL: 24,
   SLA_SOL_TOMA: 24,
@@ -33,7 +36,7 @@ function truthy(value) {
 }
 
 function asHours(fields) {
-  const direct = Number(pick(fields, ["Horas", "Hours", "SLAHoras", "TiempoHoras", "PlazoHoras", "HorasSLA"]))
+  const direct = Number(pick(fields, ["SLAHoras", "Horas", "Hours", "TiempoHoras", "PlazoHoras", "HorasSLA"]))
   if (Number.isFinite(direct) && direct >= 0) return direct
 
   const raw = pick(fields, ["Valor", "Plazo", "Tiempo", "Cantidad"])
@@ -45,81 +48,74 @@ function asHours(fields) {
   return value
 }
 
-async function graphAccessToken() {
-  const tenant = process.env.GRAPH_TENANT_ID
-  const clientId = process.env.GRAPH_CLIENT_ID
-  const clientSecret = process.env.GRAPH_CLIENT_SECRET
-  if (!tenant || !clientId || !clientSecret) return null
-
-  const response = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: clientId,
-      client_secret: clientSecret,
-      scope: "https://graph.microsoft.com/.default",
-      grant_type: "client_credentials",
-    }),
-  })
-  if (!response.ok) throw new Error("No fue posible autenticar Microsoft Graph para leer SLA.")
-  return (await response.json()).access_token
-}
-
-function preferredListNames() {
-  return [
-    process.env.SHAREPOINT_SLA_LIST,
-    "10_SLA",
-    "SLA",
-    "SLA Ditalcar",
-    "SLA_Gestion",
-    "SLA Gestión",
-  ].filter(Boolean).map(String)
+function configuredListName() {
+  return String(process.env.SHAREPOINT_SLA_LIST || "09_AcuerdosSLA").trim()
 }
 
 async function loadFromSharePoint() {
-  const token = await graphAccessToken()
-  if (!token) throw new Error("Microsoft Graph todavía no está habilitado para leer la LIST de SLA.")
-
-  const host = process.env.SHAREPOINT_HOSTNAME || "ditalcarchile.sharepoint.com"
-  const sitePath = process.env.SHAREPOINT_SITE_PATH || "/sites/DITALCARSA"
-  const headers = { Authorization: `Bearer ${token}` }
-
-  const siteResp = await fetch(`https://graph.microsoft.com/v1.0/sites/${host}:${sitePath}?$select=id`, { headers })
-  if (!siteResp.ok) throw new Error("No fue posible acceder al sitio SharePoint para leer SLA.")
-  const site = await siteResp.json()
-
-  const listsResp = await fetch(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists?$select=id,displayName&$top=999`, { headers })
-  if (!listsResp.ok) throw new Error("No fue posible listar las LIST de SharePoint.")
-  const lists = (await listsResp.json()).value || []
-  const preferred = preferredListNames().map((name) => normalizeKey(name))
-  const list = lists.find((item) => preferred.includes(normalizeKey(item.displayName))) ||
-    lists.find((item) => normalizeKey(item.displayName).includes("sla"))
-  if (!list) throw new Error("No encontré la LIST de SLA en SharePoint. Define SHAREPOINT_SLA_LIST si su nombre no contiene SLA.")
-
-  const itemsResp = await fetch(`https://graph.microsoft.com/v1.0/sites/${site.id}/lists/${list.id}/items?expand=fields&$top=999`, { headers })
-  if (!itemsResp.ok) throw new Error(`No fue posible leer la LIST ${list.displayName}.`)
-  const rows = (await itemsResp.json()).value || []
-
+  // No se adivina el nombre de la LIST: se usa la configurada o 09_AcuerdosSLA.
+  const list = await readNamedList([configuredListName()], { force: true })
   const catalog = {}
-  for (const row of rows) {
+  let activeRows = 0
+  let missingTechnicalCodeRows = 0
+  let invalidHoursRows = 0
+
+  for (const row of list.items || []) {
     const fields = row.fields || {}
     if (!truthy(pick(fields, ["Activo", "Active", "Vigente", "Estado"]))) continue
-    const code = String(pick(fields, ["Codigo", "Código", "Code", "CodigoSLA", "SLA", "Title"]) || "").trim()
+    activeRows += 1
+
+    // CodigoSLA es la llave técnica para cruzar con 22_Procesos.
+    // "Codigo" (SLA01, SLA02, etc.) queda sólo como identificador administrativo de la fila.
+    const code = String(pick(fields, ["CodigoSLA", "CódigoSLA"]) || "").trim()
+    const rowCode = String(pick(fields, ["Codigo", "Código", "Code"]) || "").trim()
     const hours = asHours(fields)
-    if (!code || !Number.isFinite(hours)) continue
+
+    if (!code) {
+      missingTechnicalCodeRows += 1
+      continue
+    }
+    if (!Number.isFinite(hours)) {
+      invalidHoursRows += 1
+      continue
+    }
+
     catalog[code] = {
       code,
+      rowCode: rowCode || undefined,
       hours,
-      label: String(pick(fields, ["Nombre", "Descripcion", "Descripción", "Title"]) || code),
+      title: String(pick(fields, ["Title", "Nombre", "Descripcion", "Descripción"]) || code),
+      flow: String(pick(fields, ["Flujo"]) || ""),
+      request: String(pick(fields, ["Solicitud"]) || ""),
+      requester: String(pick(fields, ["QuienSolicita", "QuiénSolicita"]) || ""),
+      responder: String(pick(fields, ["QuienResponde", "QuiénResponde"]) || ""),
+      processCode: String(pick(fields, ["ProcesoCodigo", "CodigoProceso", "CódigoProceso"]) || ""),
+      stage: String(pick(fields, ["Etapa"]) || ""),
+      slaType: String(pick(fields, ["TipoSLA"]) || ""),
+      pauseAllowed: truthy(pick(fields, ["PausaPermitida"])),
+      businessDays: truthy(pick(fields, ["DiasHabiles", "DíasHábiles"])),
+      priority: pick(fields, ["Prioridad"]),
+      validFrom: String(pick(fields, ["FechaVigenciaDesde"]) || ""),
+      validTo: String(pick(fields, ["FechaVigenciaHasta"]) || ""),
       updatedAt: String(fields.Modified || fields.FechaActualizacion || ""),
     }
   }
 
-  if (!Object.keys(catalog).length) {
-    throw new Error(`La LIST ${list.displayName} no contiene SLA reconocibles. Se espera Código + Horas o Valor/Unidad.`)
+  const diagnostics = {
+    totalRows: (list.items || []).length,
+    activeRows,
+    validTechnicalRows: Object.keys(catalog).length,
+    missingTechnicalCodeRows,
+    invalidHoursRows,
   }
 
-  return { catalog, listName: list.displayName }
+  const warning = missingTechnicalCodeRows > 0
+    ? `${list.listName}: ${missingTechnicalCodeRows} fila(s) activa(s) no tienen CodigoSLA. Esas filas todavía no pueden cruzarse con 22_Procesos.`
+    : invalidHoursRows > 0
+      ? `${list.listName}: ${invalidHoursRows} fila(s) tienen CodigoSLA pero no un SLAHoras válido.`
+      : undefined
+
+  return { catalog, listName: list.listName, diagnostics, warning }
 }
 
 async function cachedCatalog() {
@@ -130,7 +126,13 @@ async function cachedCatalog() {
 
 export async function getSlaCatalog({ force = false } = {}) {
   if (!force && memory.catalog && Date.now() - memory.checkedAt < MEMORY_TTL_MS) {
-    return { catalog: memory.catalog, source: memory.source, listName: memory.listName, checkedAt: new Date(memory.checkedAt).toISOString() }
+    return {
+      catalog: memory.catalog,
+      source: memory.source,
+      listName: memory.listName,
+      diagnostics: memory.diagnostics,
+      checkedAt: new Date(memory.checkedAt).toISOString(),
+    }
   }
 
   try {
@@ -138,21 +140,39 @@ export async function getSlaCatalog({ force = false } = {}) {
     const checkedAt = new Date().toISOString()
     const snapshot = { ...live, checkedAt }
     await setAppConfig(CACHE_KEY, JSON.stringify(snapshot), { source: "SHAREPOINT_LIST" }).catch(() => {})
-    memory = { checkedAt: Date.now(), catalog: live.catalog, source: "SHAREPOINT_LIST", listName: live.listName }
+    memory = {
+      checkedAt: Date.now(),
+      catalog: live.catalog,
+      source: "SHAREPOINT_LIST",
+      listName: live.listName,
+      diagnostics: live.diagnostics,
+    }
     return { ...snapshot, source: "SHAREPOINT_LIST" }
   } catch (error) {
     const cached = await cachedCatalog().catch(() => null)
-    if (cached?.catalog && Object.keys(cached.catalog).length) {
-      memory = { checkedAt: Date.now(), catalog: cached.catalog, source: "CACHE", listName: cached.listName || null }
-      return { ...cached, source: "CACHE", warning: error?.message || "No fue posible actualizar SLA desde SharePoint." }
+    if (cached?.catalog) {
+      memory = {
+        checkedAt: Date.now(),
+        catalog: cached.catalog || {},
+        source: "CACHE",
+        listName: cached.listName || configuredListName(),
+        diagnostics: cached.diagnostics || null,
+      }
+      return {
+        ...cached,
+        source: "CACHE",
+        listName: cached.listName || configuredListName(),
+        warning: error?.message || cached.warning || "No fue posible actualizar SLA desde SharePoint.",
+      }
     }
-    memory = { checkedAt: Date.now(), catalog: {}, source: "FALLBACK", listName: null }
+    memory = { checkedAt: Date.now(), catalog: {}, source: "FALLBACK", listName: configuredListName(), diagnostics: null }
     return {
       catalog: {},
       source: "FALLBACK",
-      listName: null,
+      listName: configuredListName(),
+      diagnostics: null,
       checkedAt: new Date().toISOString(),
-      warning: error?.message || "LIST de SLA no disponible.",
+      warning: error?.message || `LIST ${configuredListName()} no disponible.`,
     }
   }
 }
@@ -161,7 +181,9 @@ function resolved(code, catalog, fallbackHours) {
   if (!code) return undefined
   const live = catalog?.[code]?.hours
   const hours = Number.isFinite(live) ? live : (FALLBACKS[code] ?? fallbackHours)
-  return Number.isFinite(hours) ? { code, hours } : { code, hours: undefined }
+  return Number.isFinite(hours)
+    ? { code, hours, resolvedFromList: Number.isFinite(live) }
+    : { code, hours: undefined, resolvedFromList: false }
 }
 
 export async function resolveSlaSet(codes = {}, options = {}) {
@@ -174,6 +196,7 @@ export async function resolveSlaSet(codes = {}, options = {}) {
     source: result.source,
     listName: result.listName,
     checkedAt: result.checkedAt,
+    diagnostics: result.diagnostics,
     warning: result.warning,
   }
 }
