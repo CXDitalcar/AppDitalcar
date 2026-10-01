@@ -1,3 +1,99 @@
+import { useEffect, useMemo, useState } from "react"
+import { CheckCircle2, Database, FileSpreadsheet, Link2, RefreshCw, Save, UsersRound, XCircle } from "lucide-react"
+import type { UserScope } from "../types"
+import {
+  getUsersDirectory,
+  getUsersSource,
+  saveUsersSource,
+  type UsersDirectoryMeta,
+} from "../services/usersDirectoryApi"
+import { fetchOperationsStatus, type OperationsStatus } from "../services/operationalCatalogApi"
+function roleLabel(role: UserScope["role"]) {
+  return role
+    .toLowerCase()
+    .split("_")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(" ")
+}
+
+function dateLabel(value?: string) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("es-CL", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(date)
+}
+
+export default function Usuarios() {
+  const [url, setUrl] = useState("")
+  const [users, setUsers] = useState<UserScope[]>([])
+  const [meta, setMeta] = useState<UsersDirectoryMeta | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const [operationsStatus, setOperationsStatus] = useState<OperationsStatus | null>(null)
+
+  async function load() {
+    setLoading(true)
+    setError("")
+    try {
+      const [source, directory, status] = await Promise.all([
+        getUsersSource(),
+        getUsersDirectory(),
+        fetchOperationsStatus().catch(() => null),
+      ])
+      setUrl(source.url || "")
+      setUsers(directory.users)
+      setMeta(directory.meta)
+      setOperationsStatus(status)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No fue posible cargar usuarios.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    void load()
+  }, [])
+
+  async function handleSave() {
+    setSaving(true)
+    setMessage("")
+    setError("")
+    try {
+      const result = await saveUsersSource(url.trim())
+      setMessage(result.message)
+      const directory = await getUsersDirectory()
+      setUsers(directory.users)
+      setMeta(directory.meta)
+      window.dispatchEvent(new Event("ditalcar-users-source-updated"))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No fue posible conectar el Excel.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const activeUsers = useMemo(() => users.filter((user) => user.active), [users])
+  const locals = useMemo(() => {
+    const values = new Set<string>()
+    users.forEach((user) => {
+      if (user.localPrincipal) values.add(user.localPrincipal)
+      user.assignedLocals?.forEach((local) => values.add(local))
+    })
+    return values.size
+  }, [users])
+  const roles = useMemo(() => new Set(users.map((user) => user.role)).size, [users])
+
+  return (
+    <div className="users-page">
+      <div className="users-heading">
+        <div>
+          <span className="users-eyebrow">ADMINISTRACIÓN · EXPERIENCIA</span>
           <h1>Usuarios</h1>
           <p>La fuente maestra es la LIST <strong>02_Usuarios</strong>. El Excel queda disponible sólo como respaldo temporal mientras Graph no esté habilitado.</p>
         </div>
