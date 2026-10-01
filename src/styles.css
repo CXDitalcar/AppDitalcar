@@ -1,3 +1,35 @@
+:root{
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  color:#f7f7f8;background:#070709;--red:#e1262f;--line:#29292f;--muted:#9d9da7
+}
+*{box-sizing:border-box}html,body,#root{min-height:100%;margin:0}body{background:#070709;color:#f7f7f8}
+button,input{font:inherit}.shell{min-height:100vh;display:flex;background-image:linear-gradient(rgba(7,7,9,.86),rgba(7,7,9,.90)),url('/assets/bg-ditalcar.png');background-size:cover;background-position:center;background-attachment:fixed}
+.sidebar{position:fixed;inset:0 auto 0 0;width:260px;background:rgba(8,8,10,.94);border-right:1px solid var(--line);padding:20px 16px;display:flex;flex-direction:column;z-index:20;backdrop-filter:blur(14px)}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  padding:4px 6px 24px
+}
+.brand-logo{
+  width:118px;
+  height:auto;
+  object-fit:contain;
+  display:block
+}
+.brand-large{
+  flex-direction:column;
+  justify-content:center;
+  text-align:center
+}
+.brand-large .brand-logo{
+  width:180px
+}
+.brand-copy strong{
+  display:block;
+  font-size:13px;
+  letter-spacing:.14em;
   font-weight:850
 }
 .brand-copy span{
