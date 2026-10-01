@@ -167,6 +167,17 @@ export default function Usuarios() {
             </tbody>
           </table>
         </div>
+        {operationsStatus?.sla && (
+          <div className={`users-alert ${operationsStatus.sla.requiredCount && operationsStatus.sla.resolvedCount === operationsStatus.sla.requiredCount ? "success" : "error"}`}>
+            {operationsStatus.sla.requiredCount && operationsStatus.sla.resolvedCount === operationsStatus.sla.requiredCount ? <CheckCircle2 size={17} /> : <XCircle size={17} />}
+            SLA técnicos resueltos: {operationsStatus.sla.resolvedCount ?? 0}/{operationsStatus.sla.requiredCount ?? 0}. {operationsStatus.sla.warning || "22_Procesos y 09_AcuerdosSLA están sincronizados."}
+          </div>
+        )}
+        {operationsStatus?.requestStorage && (
+          <div className="users-alert success">
+            <Database size={17} /> Solicitudes: Azure Table Storage ({operationsStatus.requestStorage.requestsTable || "DitalcarRequests"}) mientras Graph no esté habilitado. La capa queda preparada para Tablero General Solicitudes + 20_ValoresSolicitud + 21_SeguimientoSolicitudes.
+          </div>
+        )}
       </section>
 
       <section className="users-summary">
