@@ -67,6 +67,7 @@ import type {
   RequestTimelineType,
   UserScope,
 } from "../types"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 
 type DetailAction =
@@ -178,7 +179,7 @@ function RequestDetailContent({
   currentUser: UserScope
 }) {
   const navigate = useNavigate()
-  const showSlaTerm = currentUser.role === "EXPERIENCIA_CLIENTES"
+  const showSlaTerm = hasExperienceAccess(currentUser)
 
   const [request, setRequest] =
     useState<RequestItem>(seed)
