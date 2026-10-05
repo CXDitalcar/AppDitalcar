@@ -13,6 +13,7 @@ import {
 } from "lucide-react"
 import type { UserScope } from "../types"
 import "./KPI.css"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 type KpiPeriod = { monthNumber: number; month: string; year: number }
 type KpiSummary = {
@@ -159,7 +160,7 @@ function percentLabel(value: number) {
 }
 
 export default function KPI({ currentUser }: { currentUser: UserScope }) {
-  const experienceView = currentUser.role === "EXPERIENCIA_CLIENTES"
+  const experienceView = hasExperienceAccess(currentUser)
   const [url, setUrl] = useState("")
   const [data, setData] = useState<KpiData | null>(null)
   const [loading, setLoading] = useState(true)
