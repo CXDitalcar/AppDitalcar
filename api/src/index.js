@@ -75,13 +75,17 @@ async function currentUser(request) {
 
 
 
+// Acceso nivel Experiencia: Experiencia de Clientes y Project Manager (mismo alcance).
+// Debe coincidir con src/services/experienceAccess.ts.
+const EXPERIENCE_ACCESS_ROLES = ["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER"]
+
 function isExperienceUser(user) {
-  return user?.role === "EXPERIENCIA_CLIENTES"
+  return EXPERIENCE_ACCESS_ROLES.includes(user?.role)
 }
 
 function canSeeStoredRequest(user, item) {
   if (!user || !item) return false
-  if (["EXPERIENCIA_CLIENTES", "GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)) return true
+  if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)) return true
   const email = String(user.email || "").toLowerCase()
   if (String(item.requesterEmail || "").toLowerCase() === email) return true
   if (String(item.currentResponsibleEmail || "").toLowerCase() === email) return true
@@ -120,7 +124,7 @@ function normalizedRouteValue(value) {
 
 function canAccessRouteLocal(user, local) {
   if (!user || !local) return false
-  if (["EXPERIENCIA_CLIENTES", "JEFATURA_COMERCIAL_CLIENTES", "GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS"].includes(user.role)) return true
+  if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "JEFATURA_COMERCIAL_CLIENTES", "GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS"].includes(user.role)) return true
 
   const localKey = normalizedRouteValue(local)
   const explicitLocals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])]
@@ -747,7 +751,7 @@ app.http("route-executions", {
     if (previous?.status === "SUBMITTED") return json(409, { message: "Esta Ruta ya fue enviada y quedó cerrada." })
 
     const mode = data.mode === "AUDITORIA" ? "AUDITORIA" : "RUTA"
-    if (mode === "AUDITORIA" && !["EXPERIENCIA_CLIENTES", "JEFATURA_COMERCIAL_CLIENTES", "GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user.role)) {
+    if (mode === "AUDITORIA" && !["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "JEFATURA_COMERCIAL_CLIENTES", "GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user.role)) {
       return json(403, { message: "La Auditoría Ruta está reservada para Experiencia y Gerencias de Marca." })
     }
     const targetLocal = String(data.local || previous?.local || "").trim()
