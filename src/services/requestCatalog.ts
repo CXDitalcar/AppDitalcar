@@ -98,6 +98,8 @@ export function getRequestProcess(code: string) { return runtime.processes.find(
 function migratedRoleMatches(userRole: UserScope["role"], configuredRole?: UserScope["role"]) {
   if (!configuredRole) return false
   if (configuredRole === userRole) return true
+  // Project Manager puede solicitar todo lo que puede solicitar Experiencia.
+  if (userRole === "PROJECT_MANAGER") return configuredRole === "EXPERIENCIA_CLIENTES"
   if (userRole === "GERENCIA_MARCA") return ["JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(configuredRole)
   return false
 }
@@ -184,7 +186,7 @@ export function getLocalOptions(user: UserScope, forcedLocal?: string) {
     const options = ditalcarLocals.filter((local) => local.operation !== "GEELY" && local.operation !== "STELLANTIS").map((local) => local.name)
     return { mode: "SELECT" as const, options, selected: options[0] ?? "" }
   }
-  const redRoles: UserScope["role"][] = ["GERENCIA_VENTAS","GERENCIA_COMERCIAL","GERENCIA_ADMINISTRACION","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES","JEFATURA_ADMINISTRACION","JEFATURA_MARKETING","EXPERIENCIA_CLIENTES"]
+  const redRoles: UserScope["role"][] = ["GERENCIA_VENTAS","GERENCIA_COMERCIAL","GERENCIA_ADMINISTRACION","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES","JEFATURA_ADMINISTRACION","JEFATURA_MARKETING","EXPERIENCIA_CLIENTES", "PROJECT_MANAGER"]
   if (user.scope === "RED" || redRoles.includes(user.role)) {
     const options = ditalcarLocals.map((local) => local.name)
     return { mode: "SELECT" as const, options, selected: options[0] ?? "" }
