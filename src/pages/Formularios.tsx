@@ -26,6 +26,7 @@ import {
 import type {
   UserScope,
 } from "../types"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 
 // ======================================================
@@ -838,7 +839,7 @@ function getFormsToComplete(
 
   // Experiencia mantiene visualización completa durante el piloto para
   // poder revisar en paralelo módulos todavía ocultos al resto de perfiles.
-  if (currentUser.role === "EXPERIENCIA_CLIENTES") {
+  if (hasExperienceAccess(currentUser)) {
     return mockForms.filter((form) => form.active)
   }
 
@@ -869,7 +870,7 @@ function canUserSeeTracking(
     "GERENCIA_MARCA",
     "GERENCIA_VENTAS",
     "JEFATURA_COMERCIAL_CLIENTES",
-    "EXPERIENCIA_CLIENTES",
+    "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
   ].includes(
     currentUser.role
   )
@@ -912,8 +913,7 @@ function canViewExecution(
   execution: MockFormExecution
 ) {
   if (
-    currentUser.role ===
-    "EXPERIENCIA_CLIENTES"
+    hasExperienceAccess(currentUser)
   ) {
     return true
   }
@@ -1111,6 +1111,8 @@ function getTrackingDescription(
     case "JEFATURA_COMERCIAL_CLIENTES":
       return "Vista general de revisiones y brechas de toda la red."
 
+    case "PROJECT_MANAGER":
+
     case "EXPERIENCIA_CLIENTES":
       return "Control de revisiones, cumplimiento y brechas de toda la red."
 
@@ -1196,6 +1198,11 @@ function formatRole(
 
     EXPERIENCIA_CLIENTES:
       "Experiencia de Clientes",
+
+
+    PROJECT_MANAGER:
+
+      "Project Manager",
 
     ADMINISTRATIVO:
       "Administrativo",
