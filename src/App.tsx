@@ -17,6 +17,7 @@ import PedidoInsumos from "./pages/PedidoInsumos"
 import KPI from "./pages/KPI"
 import Usuarios from "./pages/Usuarios"
 import RutaExperiencia from "./pages/RutaExperiencia"
+import Gestion from "./pages/Gestion"
 
 import { appConfig } from "./config"
 import { demoViewUsers } from "./data/mockData"
@@ -31,6 +32,7 @@ import {
   setRuntimeUsers,
 } from "./services/requestCatalog"
 import type { UserScope } from "./types"
+import { hasExperienceAccess } from "./services/experienceAccess"
 
 export default function App() {
   const [apiUser, setApiUser] = useState<UserScope | null>(null)
@@ -73,7 +75,7 @@ export default function App() {
   }, [apiUser?.email])
 
   useEffect(() => {
-    if (apiUser?.role !== "EXPERIENCIA_CLIENTES") {
+    if (!hasExperienceAccess(apiUser)) {
       setDirectoryUsers([])
       return
     }
@@ -122,7 +124,7 @@ export default function App() {
   }
 
   const baseUser = apiUser
-  const experienceCanViewAs = baseUser.role === "EXPERIENCIA_CLIENTES"
+  const experienceCanViewAs = hasExperienceAccess(baseUser)
   const baseUserEmail = baseUser.email
   const currentUser = viewAsUser ?? baseUser
   const dataPilotMode = appConfig.data.mode === "pilot"
@@ -139,6 +141,10 @@ export default function App() {
   const canSeeFormularios = canAccessPilotModule(currentUser, "FORMULARIOS")
   const canSeeInsumos = canAccessPilotModule(currentUser, "INSUMOS")
   const canSeeKPI = canAccessPilotModule(currentUser, "KPI")
+  const canSeeSolicitudes = canAccessPilotModule(currentUser, "SOLICITUDES")
+  // Gestión aparece si el perfil tiene al menos una herramienta dentro.
+  // Usuarios/fuentes dependen del perfil REAL (experienceCanViewAs), no de "Ver como".
+  const showGestion = showApprovals || canSeeSolicitudes || canSeeKPI || experienceCanViewAs
 
   // “Ver como” es una herramienta administrativa de Experiencia, no una vía de ingreso.
   const operationalUsers = getAllOperationalUsers().filter((user) => user.active)
@@ -168,8 +174,7 @@ export default function App() {
         branch={currentBranch}
         demoMode={false}
         onLogout={exitApi}
-        showApprovals={showApprovals}
-        showUsersAdmin={experienceCanViewAs}
+        showGestion={showGestion}
         viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
         viewAsEmail={viewAsUser?.email ?? baseUserEmail}
         onViewAs={experienceCanViewAs ? handleViewAs : undefined}
@@ -193,6 +198,22 @@ export default function App() {
             element={
               canSeeAcademia ? (
                 <Academia currentUser={currentUser} />
+              ) : (
+                <Navigate to="/" replace />
+              )
+            }
+          />
+
+          <Route
+            path="/gestion"
+            element={
+              showGestion ? (
+                <Gestion
+                  showApprovals={showApprovals}
+                  showRequests={canSeeSolicitudes}
+                  showKpi={canSeeKPI}
+                  showAdmin={experienceCanViewAs}
+                />
               ) : (
                 <Navigate to="/" replace />
               )
