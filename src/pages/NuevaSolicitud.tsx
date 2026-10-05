@@ -43,6 +43,7 @@ import type {
   RequestStatus,
   UserScope,
 } from "../types"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 type FormValues = Record<string, string>
 
@@ -189,7 +190,7 @@ export default function NuevaSolicitud({
     [currentUser]
   )
 
-  const unitsInDevelopment = currentUser.role !== "EXPERIENCIA_CLIENTES"
+  const unitsInDevelopment = !hasExperienceAccess(currentUser)
 
   useEffect(() => {
     if (!processFromUrl) return
@@ -927,7 +928,7 @@ export default function NuevaSolicitud({
               {resolvedSla?.resolution?.hours !== undefined && (
                 <SummaryRow label="Plazo de resolución" value={`${resolvedSla.resolution.hours} h`} />
               )}
-              {currentUser.role === "EXPERIENCIA_CLIENTES" && (
+              {hasExperienceAccess(currentUser) && (
                 <SummaryRow
                   label="Fuente de SLA"
                   value={resolvedSla?.source === "SHAREPOINT_LIST" ? `LIST ${resolvedSla.listName || "SLA"}` : resolvedSla?.source === "CACHE" ? "Último SLA sincronizado" : "Respaldo temporal"}
