@@ -58,7 +58,7 @@ function newId() {
 
 function canAudit(user: UserScope) {
   return [
-    "EXPERIENCIA_CLIENTES",
+    "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
     "JEFATURA_COMERCIAL_CLIENTES",
     "GERENCIA_MARCA",
     "JEFATURA_MARCA",
@@ -67,7 +67,7 @@ function canAudit(user: UserScope) {
 }
 
 function broadRouteAccess(user: UserScope) {
-  return ["EXPERIENCIA_CLIENTES", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)
+  return ["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)
 }
 
 function emptyDraft(user: UserScope, mode: "RUTA" | "AUDITORIA" = "RUTA"): Draft {
