@@ -5,13 +5,14 @@ import type {
   RequestPermissions,
   UserScope,
 } from "../types"
+import { hasExperienceAccess } from "./experienceAccess"
 
 const broadVisibilityRoles: UserScope["role"][] = [
   "GERENCIA_VENTAS",
   "GERENCIA_COMERCIAL",
   "GERENCIA_ADMINISTRACION",
   "JEFATURA_COMERCIAL_CLIENTES",
-  "EXPERIENCIA_CLIENTES",
+  "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
 ]
 
 function normalized(value?: string) {
@@ -227,7 +228,7 @@ export function canViewLocalDetail(user: UserScope, local: string): boolean {
     user.role === "GERENCIA_VENTAS" ||
     user.role === "GERENCIA_COMERCIAL" ||
     user.role === "JEFATURA_COMERCIAL_CLIENTES" ||
-    user.role === "EXPERIENCIA_CLIENTES"
+    hasExperienceAccess(user)
   ) {
     return true
   }
