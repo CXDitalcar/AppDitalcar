@@ -1,4 +1,5 @@
 import type { UserScope } from "../types"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 export type KPIState = "OK" | "WATCH" | "ALERT"
 
@@ -108,7 +109,7 @@ export function getPilotLocal(name?: string) {
 }
 
 export function getVisiblePilotLocals(user: UserScope) {
-  if (user.role === "GERENCIA_VENTAS" || user.role === "GERENCIA_GENERAL" || user.role === "GERENCIA_COMERCIAL" || user.role === "JEFATURA_COMERCIAL_CLIENTES" || user.role === "EXPERIENCIA_CLIENTES") {
+  if (user.role === "GERENCIA_VENTAS" || user.role === "GERENCIA_GENERAL" || user.role === "GERENCIA_COMERCIAL" || user.role === "JEFATURA_COMERCIAL_CLIENTES" || hasExperienceAccess(user)) {
     return pilotLocals
   }
 
