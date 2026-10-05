@@ -5,7 +5,13 @@ const validRoles = new Set([
   "VENDEDOR","JEFATURA_LOCAL","JEFATURA_MARCA","JEFATURA_ZONAL","GERENCIA_MARCA",
   "GERENCIA_VENTAS","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES",
   "JEFATURA_ADMINISTRACION","GERENCIA_ADMINISTRACION","GERENCIA_COMERCIAL",
-  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
+  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
+])
+
+const NETWORK_ROLES = new Set([
+  "GERENCIA_VENTAS","GERENCIA_COMERCIAL","GERENCIA_ADMINISTRACION","GERENCIA_GENERAL",
+  "JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES","JEFATURA_ADMINISTRACION",
+  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER"
 ])
 
 export function publicUser(entity) {
@@ -96,14 +102,17 @@ export async function refreshProfileFromSharePoint(email) {
   if (!active) return null
 
   const existing = await getUser(normalized)
+  const role = String(pick(fields, ["RolApp", "Rol"]) || existing?.role || "VENDEDOR").toUpperCase().replace(/\s+/g, "_")
+  // Sin columna Alcance, los roles de red (Experiencia, Project Manager, gerencias) quedan con alcance RED.
+  const defaultScope = NETWORK_ROLES.has(role) ? "RED" : (existing?.scope || "LOCAL")
   const user = {
     email: normalized,
     name: String(pick(fields, ["Nombre", "Title"]) || existing?.name || normalized),
-    role: String(pick(fields, ["RolApp", "Rol"]) || existing?.role || "VENDEDOR").toUpperCase().replace(/\s+/g, "_"),
+    role,
     local: String(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]) || "") || undefined,
     localPrincipal: String(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]) || "") || undefined,
     assignedLocals: JSON.stringify(split(pick(fields, ["LocalesAsignados"]))),
-    scope: String(pick(fields, ["Alcance"]) || existing?.scope || "LOCAL").toUpperCase(),
+    scope: String(pick(fields, ["Alcance"]) || defaultScope).toUpperCase(),
     zone: String(pick(fields, ["Zona"]) || "") || undefined,
     brands: JSON.stringify(split(pick(fields, ["Marcas"]))),
     areaFunctional: String(pick(fields, ["AreaFuncional", "ÁreaFuncional"]) || "") || undefined,
