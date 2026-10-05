@@ -190,6 +190,7 @@ function formatRole(role: UserScope["role"]) {
     GERENCIA_COMERCIAL: "Gerencia Comercial",
     JEFATURA_MARKETING: "Equipo de Marketing",
     EXPERIENCIA_CLIENTES: "Experiencia de Clientes",
+    PROJECT_MANAGER: "Project Manager",
     ADMINISTRATIVO: "Administrativo",
     EQUIPO_COMERCIAL: "Equipo Comercial",
     GERENCIA_GENERAL: "Gerencia General",
