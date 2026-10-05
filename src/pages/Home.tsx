@@ -21,6 +21,7 @@ import { listRequests } from "../services/requestRepository"
 import { getAllRequestAssignments } from "../services/requestCatalog"
 import type { RequestItem, UserScope } from "../types"
 import "./Home.css"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 type KpiData = {
   summary: {
@@ -55,7 +56,7 @@ function normalize(value?: string) {
 }
 
 function academyAudience(user: UserScope): AcademyAudience {
-  if (user.role === "EXPERIENCIA_CLIENTES") return "EXPERIENCIA"
+  if (hasExperienceAccess(user)) return "EXPERIENCIA"
   if (user.role === "GERENCIA_VENTAS") return "GERENCIA_VENTAS"
   if (["GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user.role)) {
     return "GERENCIA_MARCA"
@@ -132,7 +133,7 @@ export default function Home({
       if (!permissions.canView) return
 
       const to = `/solicitudes/${request.id}`
-      const oversight = ["GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA_CLIENTES"].includes(
+      const oversight = ["GERENCIA_MARCA", "GERENCIA_VENTAS", "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER"].includes(
         currentUser.role
       )
 
