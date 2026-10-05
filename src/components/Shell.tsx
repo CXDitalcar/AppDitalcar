@@ -5,21 +5,19 @@ import {
 
 import {
   BadgeCheck,
-  BarChart3,
   BookOpen,
+  Briefcase,
   Building2,
   ClipboardCheck,
-  ClipboardList,
   LayoutDashboard,
   LogOut,
   Menu,
-  ShieldCheck,
-  UsersRound,
   X,
 } from "lucide-react"
 
 import {
   NavLink,
+  useLocation,
 } from "react-router-dom"
 
 import Brand from "./Brand"
@@ -55,8 +53,10 @@ type ShellProps = {
   onDemoLogout?: () => void
   onLogout?: () => void | Promise<void>
 
+  // Compatibilidad: estas dos ya no generan menú propio; todo vive en /gestion.
   showApprovals?: boolean
   showUsersAdmin?: boolean
+  showGestion?: boolean
 
   viewAsOptions?: UserScope[]
   viewAsEmail?: string
@@ -74,9 +74,15 @@ type NavigationItem = {
   label: string
   to: string
   icon: typeof LayoutDashboard
-  module: PilotModule
+  // Sin module = acceso a Gestión (se resuelve con showGestion).
+  module?: PilotModule
+  // Rutas internas que también marcan este ítem como activo.
+  activePaths?: string[]
   badge?: string
 }
+
+// Menú acordado: Inicio · Academia · Formularios · Gestión.
+// "Mi local" se mantiene TEMPORALMENTE hasta que Inicio pase a ser Mi Local.
 
 
 const mainNavigation: NavigationItem[] = [
@@ -86,48 +92,30 @@ const mainNavigation: NavigationItem[] = [
     icon: LayoutDashboard,
     module: "HOME",
   },
-
   {
     label: "Academia",
     to: "/academia",
     icon: BookOpen,
     module: "ACADEMIA",
   },
-
-
   {
     label: "Mi local",
     to: "/mi-local",
     icon: Building2,
     module: "MI_LOCAL",
   },
-
-  {
-    label: "Solicitudes",
-    to: "/solicitudes",
-    icon: ClipboardList,
-    module: "SOLICITUDES",
-  },
-
-  {
-    label: "KPI",
-    to: "/kpi",
-    icon: BarChart3,
-    module: "KPI",
-  },
-
-  {
-    label: "Ruta Experiencia",
-    to: "/ruta-experiencia",
-    icon: ClipboardCheck,
-    module: "FORMULARIOS",
-  },
-
   {
     label: "Formularios",
     to: "/formularios",
     icon: ClipboardCheck,
     module: "FORMULARIOS",
+    activePaths: ["/ruta-experiencia"],
+  },
+  {
+    label: "Gestión",
+    to: "/gestion",
+    icon: Briefcase,
+    activePaths: ["/solicitudes", "/aprobaciones", "/kpi", "/usuarios", "/insumos"],
   },
 ]
 
@@ -145,8 +133,7 @@ export default function Shell({
   demoMode = false,
   onDemoLogout,
   onLogout,
-  showApprovals = false,
-  showUsersAdmin = false,
+  showGestion = false,
   viewAsOptions,
   viewAsEmail,
   onViewAs,
@@ -177,11 +164,19 @@ export default function Shell({
       : "Ditalcar Colaboradores"
 
 
-  const visibleNavigation = currentUser
-    ? mainNavigation.filter((item) =>
-        canAccessPilotModule(currentUser, item.module)
-      )
-    : mainNavigation
+  const { pathname } = useLocation()
+
+  const visibleNavigation = mainNavigation.filter((item) => {
+    if (!item.module) return showGestion
+    return currentUser ? canAccessPilotModule(currentUser, item.module) : true
+  })
+
+  function isItemActive(item: NavigationItem, routerActive: boolean) {
+    if (routerActive) return true
+    return (item.activePaths ?? []).some(
+      (path) => pathname === path || pathname.startsWith(`${path}/`)
+    )
+  }
 
 
   function closeMobileMenu() {
@@ -263,7 +258,7 @@ export default function Shell({
                       isActive,
                     }) =>
                       `app-sidebar-link ${
-                        isActive
+                        isItemActive(item, isActive)
                           ? "app-sidebar-link-active"
                           : ""
                       }`
@@ -295,75 +290,6 @@ export default function Shell({
 
           </div>
 
-
-          {/* ==================================================
-              GESTIÓN
-          ================================================== */}
-
-          {(showApprovals || showUsersAdmin) && (
-            <div className="app-sidebar-management">
-
-              <div className="app-sidebar-section-label">
-                GESTIÓN
-              </div>
-
-
-              <div className="app-sidebar-links">
-
-                {showApprovals && (
-                <NavLink
-                  to="/aprobaciones"
-                  onClick={
-                    closeMobileMenu
-                  }
-                  className={({
-                    isActive,
-                  }) =>
-                    `app-sidebar-link ${
-                      isActive
-                        ? "app-sidebar-link-active"
-                        : ""
-                    }`
-                  }
-                >
-
-                  <span className="app-sidebar-link-icon">
-
-                    <ShieldCheck
-                      size={18}
-                      strokeWidth={1.9}
-                    />
-
-                  </span>
-
-
-                  <span className="app-sidebar-link-text">
-                    Gestión
-                  </span>
-
-                </NavLink>
-                )}
-
-                {showUsersAdmin && (
-                  <NavLink
-                    to="/usuarios"
-                    onClick={closeMobileMenu}
-                    className={({ isActive }) =>
-                      `app-sidebar-link ${isActive ? "app-sidebar-link-active" : ""}`
-                    }
-                  >
-                    <span className="app-sidebar-link-icon">
-                      <UsersRound size={18} strokeWidth={1.9} />
-                    </span>
-                    <span className="app-sidebar-link-text">Usuarios</span>
-                  </NavLink>
-                )}
-
-
-              </div>
-
-            </div>
-          )}
 
         </nav>
 
@@ -619,6 +545,11 @@ function formatRole(
 
     EXPERIENCIA_CLIENTES:
       "Experiencia de Clientes",
+
+
+    PROJECT_MANAGER:
+
+      "Project Manager",
 
     ADMINISTRATIVO:
       "Administrativo",
