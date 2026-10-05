@@ -7,6 +7,7 @@ import { canViewRequest } from "../services/permissions"
 import type { RequestItem, UserScope } from "../types"
 import { responsibleLabel, visibleStatusLabel } from "../services/requestPresentation"
 import SignalLight, { signalFromRequest } from "../components/SignalLight"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 export default function Solicitudes({
   branch,
@@ -65,7 +66,7 @@ export default function Solicitudes({
           <h1>Seguimiento</h1>
           <p>
             {demoMode
-              ? currentUser.role === "EXPERIENCIA_CLIENTES"
+              ? hasExperienceAccess(currentUser)
                 ? "Piloto interactivo · flujo por rol y SLA"
                 : "Piloto interactivo · flujo por rol y seguimiento de plazos"
               : "Fuente real · Tablero General Solicitudes + seguimiento Lists"}
@@ -123,7 +124,7 @@ export default function Solicitudes({
               </div>
               {request.slaPausedReason && (
                 <div className="request-paused">
-                  {currentUser.role === "EXPERIENCIA_CLIENTES" ? "SLA" : "Plazo"} pausado · {request.slaPausedReason}
+                  {hasExperienceAccess(currentUser) ? "SLA" : "Plazo"} pausado · {request.slaPausedReason}
                 </div>
               )}
               <div className="request-foot">
