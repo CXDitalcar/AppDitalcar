@@ -1,4 +1,5 @@
 import type { UserRole, UserScope } from "../types"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 export const PILOT_LOCAL = "Stellantis Nueva Tobalaba"
 
@@ -29,7 +30,7 @@ export const PILOT_ACTIVE_ROLES: UserRole[] = [
   "VENDEDOR",
   "JEFATURA_LOCAL",
   "GERENCIA_MARCA",
-  "EXPERIENCIA_CLIENTES",
+  "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
   "JEFATURA_MARKETING",
   "GERENCIA_COMERCIAL",
 ]
@@ -50,7 +51,7 @@ export function isPilotDemoProfile(user: UserScope) {
 }
 
 export function isPilotFullAccess(user: UserScope) {
-  return user.role === "EXPERIENCIA_CLIENTES"
+  return hasExperienceAccess(user)
 }
 
 export function canAccessPilotModule(
@@ -80,7 +81,7 @@ export function canAccessPilotModule(
         "JEFATURA_MARCA",
         "JEFATURA_ZONAL",
         "GERENCIA_VENTAS",
-        "EXPERIENCIA_CLIENTES",
+        "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
       ].includes(user.role)
     }
 
@@ -93,13 +94,13 @@ export function canAccessPilotModule(
         "JEFATURA_ZONAL",
         "GERENCIA_VENTAS",
         "GERENCIA_COMERCIAL",
-        "EXPERIENCIA_CLIENTES",
+        "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
       ].includes(user.role)
     }
 
     if (module === "INSUMOS") {
       return (
-        user.role === "EXPERIENCIA_CLIENTES" ||
+        hasExperienceAccess(user) ||
         (user.role === "ADMINISTRATIVO" &&
           (user.areaFunctional ?? "").toLowerCase().includes("junior"))
       )
