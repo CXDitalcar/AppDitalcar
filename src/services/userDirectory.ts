@@ -51,7 +51,7 @@ const validRoles: UserRole[] = [
   "GERENCIA_ADMINISTRACION",
   "GERENCIA_COMERCIAL",
   "JEFATURA_MARKETING",
-  "EXPERIENCIA_CLIENTES",
+  "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
   "ADMINISTRATIVO",
   "EQUIPO_COMERCIAL",
   "GERENCIA_GENERAL",
@@ -83,6 +83,8 @@ function mapRole(value: unknown): UserRole {
     experiencia: "EXPERIENCIA_CLIENTES",
     experienciadeclientes: "EXPERIENCIA_CLIENTES",
     experienciaclientes: "EXPERIENCIA_CLIENTES",
+    projectmanager: "PROJECT_MANAGER",
+    pm: "PROJECT_MANAGER",
     administrativo: "ADMINISTRATIVO",
     junior: "ADMINISTRATIVO",
     equipocomercial: "EQUIPO_COMERCIAL",
@@ -108,7 +110,7 @@ function mapScope(value: unknown, role: UserRole, assignedLocals: string[]): Use
       "JEFATURA_OPERACIONES_COMERCIALES",
       "JEFATURA_ADMINISTRACION",
       "JEFATURA_MARKETING",
-      "EXPERIENCIA_CLIENTES",
+      "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
     ].includes(role)
   ) {
     return "RED"
