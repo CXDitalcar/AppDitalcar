@@ -76,6 +76,7 @@ import {
 import AcademyFeedbackPanel from "../components/AcademyFeedbackPanel"
 import SignalLight, { signalFromPercent } from "../components/SignalLight"
 import "./Academia.css"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 const CONSULTA_CODES = ["C", "O", "N", "S", "U", "L", "T", "A"]
 
@@ -84,7 +85,7 @@ function normalize(value?: string) {
 }
 
 function getAudience(user: UserScope): AcademyAudience {
-  if (user.role === "EXPERIENCIA_CLIENTES") return "EXPERIENCIA"
+  if (hasExperienceAccess(user)) return "EXPERIENCIA"
   if (user.role === "GERENCIA_VENTAS") return "GERENCIA_VENTAS"
   if (
     user.role === "GERENCIA_MARCA" ||
@@ -124,7 +125,7 @@ function audienceLabel(audience: AcademyAudience) {
 
 function canAdminAcademy(user: UserScope) {
   return (
-    user.role === "EXPERIENCIA_CLIENTES" ||
+    hasExperienceAccess(user) ||
     (user.role === "EQUIPO_COMERCIAL" &&
       normalize(user.areaFunctional).includes("project"))
   )
@@ -137,7 +138,7 @@ function canObserveAcademy(user: UserScope) {
     "JEFATURA_MARCA",
     "JEFATURA_ZONAL",
     "GERENCIA_VENTAS",
-    "EXPERIENCIA_CLIENTES",
+    "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
   ].includes(user.role)
 }
 
@@ -148,13 +149,13 @@ function canSeeAcademyTeam(user: UserScope) {
     user.role === "JEFATURA_MARCA" ||
     user.role === "JEFATURA_ZONAL" ||
     user.role.startsWith("GERENCIA_") ||
-    user.role === "EXPERIENCIA_CLIENTES"
+    hasExperienceAccess(user)
   )
 }
 
 function canSeeAcademyNetwork(user: UserScope) {
   return (
-    user.role === "EXPERIENCIA_CLIENTES" ||
+    hasExperienceAccess(user) ||
     user.role.startsWith("GERENCIA_") ||
     user.role === "GERENCIA_MARCA" ||
     user.role === "JEFATURA_MARCA" ||
