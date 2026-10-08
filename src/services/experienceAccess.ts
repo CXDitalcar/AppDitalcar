@@ -12,6 +12,16 @@ export const EXPERIENCE_ACCESS_ROLES: UserScope["role"][] = [
   "PROJECT_MANAGER",
 ]
 
+// Seguimiento de clientes: Experiencia, Project Manager y Asistente de Gerencia.
+export function canSeeSeguimiento(user?: Pick<UserScope, "role"> | null) {
+  return hasExperienceAccess(user) || user?.role === "ASISTENTE_GERENCIA"
+}
+
+// Datos (carga de planillas): sólo Experiencia y Project Manager.
+export function canSeeDatos(user?: Pick<UserScope, "role"> | null) {
+  return hasExperienceAccess(user)
+}
+
 export function hasExperienceAccess(user?: Pick<UserScope, "role"> | null) {
   return Boolean(user && EXPERIENCE_ACCESS_ROLES.includes(user.role))
 }

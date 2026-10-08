@@ -37,6 +37,7 @@ export function roleLabel(role: UserRole) {
     JEFATURA_MARKETING: "Equipo de Marketing",
     EXPERIENCIA_CLIENTES: "Experiencia de Clientes",
     PROJECT_MANAGER: "Project Manager",
+    ASISTENTE_GERENCIA: "Asistente de Gerencia",
     ADMINISTRATIVO: "Administración",
     EQUIPO_COMERCIAL: "Equipo Comercial",
     GERENCIA_GENERAL: "Gerencia General",

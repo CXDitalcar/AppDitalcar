@@ -477,7 +477,7 @@ export async function createRequest(
     authorEmail: user.email,
     authorName: user.name,
     createdAt: request.createdAt,
-    comment: "Solicitud ingresada en Ditalcar Colaboradores.",
+    comment: "Solicitud ingresada en DitalApp.",
   }
 
   try {

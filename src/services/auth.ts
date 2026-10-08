@@ -68,6 +68,17 @@ export async function manualActivateAccount(
   })
 }
 
+export async function activateWithTempKey(
+  email: string,
+  clave: string,
+  password: string
+): Promise<ApiResult<UserScope>> {
+  return apiRequest<UserScope>("/api/auth/activate-temp", {
+    method: "POST",
+    body: JSON.stringify({ email, clave, password }),
+  })
+}
+
 export async function requestActivation(
   email: string
 ): Promise<ApiResult<unknown>> {
