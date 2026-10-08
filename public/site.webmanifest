@@ -1,6 +1,6 @@
 {
-  "name": "Ditalcar Colaboradores",
-  "short_name": "Ditalcar",
+  "name": "DitalApp",
+  "short_name": "DitalApp",
   "description": "Portal interno Ditalcar para solicitudes, experiencia, academia y gestión de locales.",
   "start_url": "/",
   "display": "standalone",
