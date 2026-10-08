@@ -183,7 +183,7 @@ export async function loadKpiFromExcel(rawUrl, options = {}) {
     redirect: "follow",
     headers: {
       Accept: "application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream;q=0.9,*/*;q=0.1",
-      "User-Agent": "DitalcarColaboradores/1.0",
+      "User-Agent": "DitalApp/1.0",
     },
   })
 

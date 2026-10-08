@@ -4,7 +4,7 @@ const VALID_ROLES = new Set([
   "VENDEDOR","JEFATURA_LOCAL","JEFATURA_MARCA","JEFATURA_ZONAL","GERENCIA_MARCA",
   "GERENCIA_VENTAS","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES",
   "JEFATURA_ADMINISTRACION","GERENCIA_ADMINISTRACION","GERENCIA_COMERCIAL",
-  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
+  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ASISTENTE_GERENCIA","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
 ])
 
 function normalize(value) {
@@ -76,6 +76,10 @@ function mapRole(value) {
     experienciaclientes: "EXPERIENCIA_CLIENTES",
     projectmanager: "PROJECT_MANAGER",
     pm: "PROJECT_MANAGER",
+    asistentegerencia: "ASISTENTE_GERENCIA",
+    asistentedegerencia: "ASISTENTE_GERENCIA",
+    asistenciadegerencia: "ASISTENTE_GERENCIA",
+    asistenciagerencia: "ASISTENTE_GERENCIA",
     administrativo: "ADMINISTRATIVO",
     junior: "ADMINISTRATIVO",
     equipocomercial: "EQUIPO_COMERCIAL",
@@ -93,7 +97,7 @@ function mapScope(value, role, assignedLocals) {
   if ([
     "GERENCIA_VENTAS","GERENCIA_COMERCIAL","GERENCIA_ADMINISTRACION",
     "JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES",
-    "JEFATURA_ADMINISTRACION","JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","GERENCIA_GENERAL"
+    "JEFATURA_ADMINISTRACION","JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ASISTENTE_GERENCIA","GERENCIA_GENERAL"
   ].includes(role)) return "RED"
   return "LOCAL"
 }
@@ -161,7 +165,7 @@ export async function loadUsersFromExcel(rawUrl, options = {}) {
     redirect: "follow",
     headers: {
       Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream;q=0.9,*/*;q=0.1",
-      "User-Agent": "DitalcarColaboradores/1.0",
+      "User-Agent": "DitalApp/1.0",
     },
   })
 
