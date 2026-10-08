@@ -1,6 +1,6 @@
 # AppDitalcar
 
-# Ditalcar Colaboradores
+# DitalApp
 
 Piloto funcional de la plataforma interna Ditalcar.
 
