@@ -10,6 +10,7 @@ import {
 import Brand from "./Brand"
 import {
   activateAccount,
+  activateWithTempKey,
   loginWithPassword,
   manualActivateAccount,
   requestActivation,
@@ -19,7 +20,7 @@ import {
 import type { UserScope } from "../types"
 import "./AuthScreen.css"
 
-type AuthView = "LOGIN" | "ACTIVATE" | "ACTIVATE_REQUEST" | "RESET_REQUEST" | "RESET" | "MANUAL_SETUP"
+type AuthView = "LOGIN" | "ACTIVATE" | "ACTIVATE_REQUEST" | "RESET_REQUEST" | "RESET" | "MANUAL_SETUP" | "TEMP_KEY"
 
 export default function AuthScreen({
   onAuthenticated,
@@ -44,6 +45,7 @@ export default function AuthScreen({
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [setupKey, setSetupKey] = useState("")
+  const [tempKey, setTempKey] = useState("")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
   const [success, setSuccess] = useState(false)
@@ -99,6 +101,27 @@ export default function AuthScreen({
     setSuccess(true)
     setMessage("Acceso activado correctamente.")
     window.history.replaceState({}, "", window.location.pathname)
+    onAuthenticated(result.data)
+  }
+
+  async function handleTempKey(event: FormEvent) {
+    event.preventDefault()
+    if (password.length < 10) {
+      setMessage("La contraseña debe tener al menos 10 caracteres.")
+      return
+    }
+    if (password !== confirmPassword) {
+      setMessage("Las contraseñas no coinciden.")
+      return
+    }
+    setBusy(true)
+    setMessage("")
+    const result = await activateWithTempKey(email.trim().toLowerCase(), tempKey, password)
+    setBusy(false)
+    if (!result.ok || !result.data) {
+      setMessage(result.message ?? "No fue posible activar tu cuenta.")
+      return
+    }
     onAuthenticated(result.data)
   }
 
@@ -197,7 +220,7 @@ export default function AuthScreen({
       <div className="auth-card">
         <Brand large />
         <div className="auth-title">
-          <span>DITALCAR COLABORADORES</span>
+          <span>DITALAPP</span>
           <h1>{titleFor(view)}</h1>
           <p>{descriptionFor(view)}</p>
         </div>
@@ -239,6 +262,46 @@ export default function AuthScreen({
                 Olvidé mi contraseña
               </button>
             </div>
+            <button className="auth-back" type="button" onClick={() => setView("TEMP_KEY")}>
+              Tengo una clave temporal
+            </button>
+          </form>
+        )}
+
+        {view === "TEMP_KEY" && (
+          <form className="auth-form" onSubmit={handleTempKey}>
+            <EmailField email={email} onEmail={setEmail} />
+            <label>
+              <span>Clave temporal</span>
+              <div className="auth-input">
+                <ShieldCheck size={16} />
+                <input
+                  type="text"
+                  autoComplete="one-time-code"
+                  autoCapitalize="characters"
+                  value={tempKey}
+                  onChange={(event) => setTempKey(event.target.value.toUpperCase())}
+                  placeholder="XXXX-XXXX-XXXX"
+                  required
+                />
+              </div>
+            </label>
+            <PasswordFields
+              password={password}
+              confirmPassword={confirmPassword}
+              onPassword={setPassword}
+              onConfirm={setConfirmPassword}
+            />
+            <button className="auth-primary" disabled={busy}>
+              {busy ? "Activando…" : "Crear mi contraseña e ingresar"}
+              <ArrowRight size={16} />
+            </button>
+            <small className="auth-password-help">
+              La clave temporal te la entrega Experiencia de Clientes. Es personal, se usa una sola vez y vence.
+            </small>
+            <button className="auth-back" type="button" onClick={() => setView("LOGIN")}>
+              Volver al ingreso
+            </button>
           </form>
         )}
 
@@ -421,6 +484,7 @@ function PasswordFields({
 
 function titleFor(view: AuthView) {
   if (view === "MANUAL_SETUP") return "Activación manual"
+  if (view === "TEMP_KEY") return "Ingreso con clave temporal"
   if (view === "ACTIVATE_REQUEST") return "Activa tu cuenta"
   if (view === "ACTIVATE") return "Crea tu contraseña"
   if (view === "RESET_REQUEST") return "Recupera tu acceso"
@@ -430,6 +494,7 @@ function titleFor(view: AuthView) {
 
 function descriptionFor(view: AuthView) {
   if (view === "MANUAL_SETUP") return "Crea tu acceso de Experiencia sin depender del correo de invitación."
+  if (view === "TEMP_KEY") return "Ingresa tu correo, la clave temporal que te entregaron y crea tu contraseña personal."
   if (view === "ACTIVATE_REQUEST") return "Ingresa tu correo corporativo para recibir tu enlace personal."
   if (view === "ACTIVATE") return "Crea una contraseña personal para tu cuenta Ditalcar."
   if (view === "RESET_REQUEST") return "Te enviaremos un enlace personal para crear una nueva contraseña."

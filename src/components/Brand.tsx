@@ -12,7 +12,7 @@ export default function Brand({ large = false }: BrandProps) {
       />
 
       <div className="brand-copy">
-        <strong>COLABORADORES</strong>
+        <strong>DitalApp</strong>
         <span>Portal interno Ditalcar</span>
       </div>
     </div>

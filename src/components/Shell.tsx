@@ -9,7 +9,9 @@ import {
   Briefcase,
   Building2,
   ClipboardCheck,
+  Database,
   LayoutDashboard,
+  MessagesSquare,
   LogOut,
   Menu,
   X,
@@ -28,6 +30,7 @@ import "./Shell.css"
 import type {
   UserScope,
 } from "../types"
+import { canSeeDatos, canSeeSeguimiento } from "../services/experienceAccess"
 import {
   canAccessPilotModule,
   type PilotModule,
@@ -76,6 +79,8 @@ type NavigationItem = {
   icon: typeof LayoutDashboard
   // Sin module = acceso a Gestión (se resuelve con showGestion).
   module?: PilotModule
+  // Visibilidad propia (Seguimiento, Datos).
+  visible?: (user?: UserScope) => boolean
   // Rutas internas que también marcan este ítem como activo.
   activePaths?: string[]
   badge?: string
@@ -112,10 +117,22 @@ const mainNavigation: NavigationItem[] = [
     activePaths: ["/ruta-experiencia"],
   },
   {
+    label: "Seguimiento",
+    to: "/seguimiento",
+    icon: MessagesSquare,
+    visible: (user) => canSeeSeguimiento(user),
+  },
+  {
     label: "Gestión",
     to: "/gestion",
     icon: Briefcase,
     activePaths: ["/solicitudes", "/aprobaciones", "/kpi", "/usuarios", "/insumos"],
+  },
+  {
+    label: "Datos",
+    to: "/datos",
+    icon: Database,
+    visible: (user) => canSeeDatos(user),
   },
 ]
 
@@ -161,12 +178,13 @@ export default function Shell({
       ? formatRole(
           currentUser.role
         )
-      : "Ditalcar Colaboradores"
+      : "DitalApp"
 
 
   const { pathname } = useLocation()
 
   const visibleNavigation = mainNavigation.filter((item) => {
+    if (item.visible) return item.visible(currentUser)
     if (!item.module) return showGestion
     return currentUser ? canAccessPilotModule(currentUser, item.module) : true
   })
@@ -550,6 +568,11 @@ function formatRole(
     PROJECT_MANAGER:
 
       "Project Manager",
+
+
+    ASISTENTE_GERENCIA:
+
+      "Asistente de Gerencia",
 
     ADMINISTRATIVO:
       "Administrativo",

@@ -1,5 +1,5 @@
 /* ======================================================
-   DITALCAR COLABORADORES
+   DITALAPP
    SHELL GENERAL
 ====================================================== */
 
@@ -85,6 +85,11 @@
 .app-sidebar-brand img {
   max-width: 210px;
   height: auto;
+}
+
+/* "DitalApp · Portal interno Ditalcar" en una sola línea junto al logo. */
+.app-sidebar-brand .brand-copy span {
+  white-space: nowrap;
 }
 
 
