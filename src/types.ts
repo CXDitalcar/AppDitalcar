@@ -1,5 +1,5 @@
 // ======================================================
-// DITALCAR COLABORADORES · TIPOS GENERALES
+// DITALAPP · TIPOS GENERALES
 // ======================================================
 
 export type UserRole =
@@ -17,6 +17,7 @@ export type UserRole =
   | "JEFATURA_MARKETING"
   | "EXPERIENCIA_CLIENTES"
   | "PROJECT_MANAGER"
+  | "ASISTENTE_GERENCIA"
   | "ADMINISTRATIVO"
   | "EQUIPO_COMERCIAL"
   | "GERENCIA_GENERAL"

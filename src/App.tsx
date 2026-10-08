@@ -18,6 +18,9 @@ import KPI from "./pages/KPI"
 import Usuarios from "./pages/Usuarios"
 import RutaExperiencia from "./pages/RutaExperiencia"
 import Gestion from "./pages/Gestion"
+import Datos from "./pages/Datos"
+import Seguimiento from "./pages/Seguimiento"
+import ClienteFicha from "./pages/ClienteFicha"
 
 import { appConfig } from "./config"
 import { demoViewUsers } from "./data/mockData"
@@ -32,7 +35,7 @@ import {
   setRuntimeUsers,
 } from "./services/requestCatalog"
 import type { UserScope } from "./types"
-import { hasExperienceAccess } from "./services/experienceAccess"
+import { canSeeDatos, canSeeSeguimiento, hasExperienceAccess } from "./services/experienceAccess"
 
 export default function App() {
   const [apiUser, setApiUser] = useState<UserScope | null>(null)
@@ -113,7 +116,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="auth-loading-screen">
-        <strong>Ditalcar Colaboradores</strong>
+        <strong>DitalApp</strong>
         <span>Validando sesión…</span>
       </div>
     )
@@ -218,6 +221,18 @@ export default function App() {
                 <Navigate to="/" replace />
               )
             }
+          />
+
+          <Route
+            path="/seguimiento"
+            element={canSeeSeguimiento(currentUser) ? <Seguimiento currentUser={currentUser} /> : <Navigate to="/" replace />}
+          />
+
+          <Route path="/seguimiento/cliente" element={<ClienteFicha currentUser={currentUser} />} />
+
+          <Route
+            path="/datos"
+            element={canSeeDatos(currentUser) ? <Datos /> : <Navigate to="/" replace />}
           />
 
           <Route path="/playbooks-venta" element={<Navigate to="/academia?tab=playbooks" replace />} />
