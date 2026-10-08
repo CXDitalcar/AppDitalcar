@@ -49,6 +49,7 @@ import {
   saveRouteExecution,
 } from "./lib/routeStore.js"
 import { saveRouteEvidence } from "./lib/routeEvidence.js"
+import { registerSegRoutes } from "./segRoutes.js"
 import {
   appendRequestTimeline,
   getRequestStored,
@@ -854,7 +855,7 @@ app.http("stored-requests", {
     await appendRequestTimeline({
       id: `${item.id}-CREATED-${Date.now()}`, requestId: item.id, type: "CREATED",
       authorEmail: user.email, authorName: user.name, createdAt: item.createdAt || new Date().toISOString(),
-      comment: "Solicitud ingresada en Ditalcar Colaboradores.",
+      comment: "Solicitud ingresada en DitalApp.",
     })
     return json(200, { request: item, warnings: [] })
   },
@@ -1044,7 +1045,7 @@ app.http("auth-request-activation", {
 
     const token = await createOneTimeToken(email, "ACTIVATION", 60)
     const url = `${APP_URL || new URL(request.url).origin}/?activation=${encodeURIComponent(token)}`
-    const mail = await sendAuthMail({ to: email, subject: "Activa tu cuenta · Ditalcar Colaboradores", title: "Activa tu cuenta", text: "Crea tu contraseña personal para ingresar a Ditalcar Colaboradores. El enlace vence en 60 minutos.", buttonText: "Crear mi contraseña", url })
+    const mail = await sendAuthMail({ to: email, subject: "Activa tu cuenta · DitalApp", title: "Activa tu cuenta", text: "Crea tu contraseña personal para ingresar a DitalApp. El enlace vence en 60 minutos.", buttonText: "Crear mi contraseña", url })
     return json(200, { message: generic, ...(mail.devUrl ? { devUrl: mail.devUrl } : {}) })
   },
 })
@@ -1074,7 +1075,7 @@ app.http("auth-request-reset", {
     if (!user || !user.passwordHash || user.active === false) return json(200, { message: generic })
     const token = await createOneTimeToken(email, "RESET", 30)
     const url = `${APP_URL || new URL(request.url).origin}/?reset=${encodeURIComponent(token)}`
-    const mail = await sendAuthMail({ to: email, subject: "Recupera tu acceso · Ditalcar Colaboradores", title: "Recupera tu acceso", text: "Usa este enlace para crear una nueva contraseña. El enlace vence en 30 minutos.", buttonText: "Crear nueva contraseña", url })
+    const mail = await sendAuthMail({ to: email, subject: "Recupera tu acceso · DitalApp", title: "Recupera tu acceso", text: "Usa este enlace para crear una nueva contraseña. El enlace vence en 30 minutos.", buttonText: "Crear nueva contraseña", url })
     return json(200, { message: generic, ...(mail.devUrl ? { devUrl: mail.devUrl } : {}) })
   },
 })
@@ -1100,3 +1101,6 @@ app.http("auth-logout", {
     return json(200, { message: "Sesión cerrada." }, { "Set-Cookie": clearSessionCookie() })
   },
 })
+
+// Datos, Seguimiento de clientes y claves temporales (ver segRoutes.js).
+registerSegRoutes({ app, currentUser, isExperienceUser, publicUser, sessionDays: SESSION_DAYS })
