@@ -3,8 +3,6 @@ import {
   ArrowRight,
   BarChart3,
   ClipboardList,
-  FileSpreadsheet,
-  MessageSquareText,
   ShieldCheck,
   UsersRound,
   type LucideIcon,
@@ -84,22 +82,6 @@ export default function Gestion({
           tone: "green",
           status: "Disponible",
         },
-        {
-          key: "surveys",
-          title: "Encuestas",
-          description: "Archivo activo, última actualización y estado de procesamiento.",
-          icon: MessageSquareText,
-          tone: "neutral",
-          status: "En desarrollo",
-        },
-        {
-          key: "frogmi",
-          title: "Frogmi",
-          description: "Archivo activo, última actualización y estado de procesamiento.",
-          icon: FileSpreadsheet,
-          tone: "neutral",
-          status: "En desarrollo",
-        },
       ]
     : []
 
@@ -124,7 +106,7 @@ export default function Gestion({
 
       {administration.length > 0 && (
         <section className="gestion-section">
-          <h2>Administración y fuentes de datos</h2>
+          <h2>Administración</h2>
           <p className="gestion-section-note">Visible sólo para Experiencia de Clientes y Project Manager.</p>
           <div className="gestion-grid">
             {administration.map((item) => (

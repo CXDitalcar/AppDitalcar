@@ -25,6 +25,7 @@ import {
   visibleStatusLabel,
 } from "../services/requestPresentation"
 import type { RequestItem, UserScope } from "../types"
+import { hasExperienceAccess } from "../services/experienceAccess"
 
 type ManagementView =
   | "NUEVAS"
@@ -41,7 +42,7 @@ export default function Aprobaciones({
   currentUser: UserScope
 }) {
   const navigate = useNavigate()
-  const showSlaTerm = currentUser.role === "EXPERIENCIA_CLIENTES"
+  const showSlaTerm = hasExperienceAccess(currentUser)
   const [view, setView] = useState<ManagementView>("NUEVAS")
   const [search, setSearch] = useState("")
   const [localFilter, setLocalFilter] = useState("TODOS")
@@ -85,7 +86,7 @@ export default function Aprobaciones({
     const oversight = [
       "GERENCIA_MARCA",
       "GERENCIA_VENTAS",
-      "EXPERIENCIA_CLIENTES",
+      "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
     ].includes(currentUser.role)
 
     if (target === "NUEVAS") {

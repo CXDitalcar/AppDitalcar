@@ -8,6 +8,7 @@ import {
   type UsersDirectoryMeta,
 } from "../services/usersDirectoryApi"
 import { fetchOperationsStatus, type OperationsStatus } from "../services/operationalCatalogApi"
+import ClavesTemporales from "../components/ClavesTemporales"
 function roleLabel(role: UserScope["role"]) {
   return role
     .toLowerCase()
@@ -101,6 +102,8 @@ export default function Usuarios() {
           <RefreshCw size={17} /> Actualizar
         </button>
       </div>
+
+      <ClavesTemporales users={users} />
 
       <section className="users-source-card">
         <div className="users-source-title">

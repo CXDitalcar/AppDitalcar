@@ -1204,6 +1204,11 @@ function formatRole(
 
       "Project Manager",
 
+
+    ASISTENTE_GERENCIA:
+
+      "Asistente de Gerencia",
+
     ADMINISTRATIVO:
       "Administrativo",
 

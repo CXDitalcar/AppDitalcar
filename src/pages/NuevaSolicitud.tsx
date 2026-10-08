@@ -165,7 +165,7 @@ export default function NuevaSolicitud({
     return {
       code: sourceExecution.formCode,
       name: sourceExecution.formCode === "FOR-AUD-RUTA-01" ? "Auditoría Ruta Experiencia" : "Ruta de Experiencia",
-      description: "Hallazgo generado dentro de Ditalcar Colaboradores.",
+      description: "Hallazgo generado dentro de DitalApp.",
       url: "",
       frequency: "SEMANAL" as const,
       roles: [currentUser.role],
@@ -715,7 +715,7 @@ export default function NuevaSolicitud({
                   <div>
                     <div className="request-family-title-row">
                       <h3>{config.label}</h3>
-                      {development && <span className="request-development-badge">EN DESARROLLO</span>}
+                      {development && <span className="request-development-badge">EN CONSTRUCCIÓN</span>}
                     </div>
                     <p>
                       {development
@@ -724,7 +724,7 @@ export default function NuevaSolicitud({
                     </p>
                   </div>
                   {development ? (
-                    <span className="request-development-label">Próximamente</span>
+                    <span className="request-development-label">En construcción</span>
                   ) : (
                     <ArrowRight className="family-arrow" size={20} />
                   )}

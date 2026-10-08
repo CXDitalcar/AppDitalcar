@@ -22,6 +22,7 @@ import { getAllRequestAssignments } from "../services/requestCatalog"
 import type { RequestItem, UserScope } from "../types"
 import "./Home.css"
 import { hasExperienceAccess } from "../services/experienceAccess"
+import SeguimientoPendientes from "../components/SeguimientoPendientes"
 
 type KpiData = {
   summary: {
@@ -283,12 +284,14 @@ export default function Home({
     <div className="home-pilot-page">
       <section className="home-pilot-head">
         <div>
-          <span className="eyebrow">DITALCAR COLABORADORES</span>
+          <span className="eyebrow">DITALAPP</span>
           <h1>Hola, {firstName}</h1>
           <p>{branch} · aquí se concentra lo que necesita tu atención.</p>
         </div>
         {demoMode && <span className="home-pilot-badge">MODO PILOTO</span>}
       </section>
+
+      <SeguimientoPendientes currentUser={currentUser} />
 
       <section className="activity-hub-grid home-primary-grid">
         <ActivityPanel
