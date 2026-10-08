@@ -11,8 +11,9 @@
   "dependencies": {
     "@azure/data-tables": "^13.3.0",
     "@azure/functions": "^4.7.2",
+    "@azure/storage-blob": "^12.28.0",
     "bcryptjs": "^2.4.3",
     "exceljs": "^4.4.0",
-    "@azure/storage-blob": "^12.28.0"
+    "jszip": "^3.10.1"
   }
 }
