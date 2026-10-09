@@ -50,12 +50,15 @@ import {
 } from "./lib/routeStore.js"
 import { saveRouteEvidence } from "./lib/routeEvidence.js"
 import { registerSegRoutes } from "./segRoutes.js"
+import { listAppDirectoryUsers, saveAppUser } from "./lib/appUsers.js"
 import {
   appendRequestTimeline,
   getRequestStored,
   getRequestTimelineStored,
   listRequestsStored,
   saveRequestStored,
+  readRequestAttachment,
+  saveRequestAttachment,
 } from "./lib/requestStore.js"
 
 const SESSION_DAYS = Number(process.env.AUTH_SESSION_DAYS || 1)
@@ -84,14 +87,41 @@ function isExperienceUser(user) {
   return EXPERIENCE_ACCESS_ROLES.includes(user?.role)
 }
 
+// Visibilidad de solicitudes (08-10):
+// - Experiencia y Project Manager ven todas (seguimiento y futuro dashboard).
+// - Gerencia de Ventas y Gerencia de Administración mantienen vista de red.
+// - El resto ve lo propio: lo que pidió, lo que tiene a cargo, en lo que participó,
+//   lo que el catálogo le asigna (audiencia) y, si es jefatura o gerencia de marca, su local.
+function sameText(a, b) { return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase() }
 function canSeeStoredRequest(user, item) {
   if (!user || !item) return false
-  if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)) return true
+  if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "GERENCIA_VENTAS", "GERENCIA_ADMINISTRACION"].includes(user.role)) return true
   const email = String(user.email || "").toLowerCase()
-  if (String(item.requesterEmail || "").toLowerCase() === email) return true
-  if (String(item.currentResponsibleEmail || "").toLowerCase() === email) return true
-  const locals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
-  return locals.includes(item.local)
+  if (sameText(item.requesterEmail, email)) return true
+  if (sameText(item.currentResponsibleEmail, email)) return true
+  if (sameText(item.managementOwnerEmail, email)) return true
+  if ((item.participants || []).some((value) => sameText(value, email))) return true
+  const audience = item.audience || {}
+  if ((audience.emails || []).some((value) => sameText(value, email))) return true
+  if ((audience.roles || []).includes(user.role)) return true
+  if (["JEFATURA_LOCAL", "GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user.role)) {
+    const locals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
+    if (locals.some((local) => sameText(local, item.local))) return true
+    if (user.role === "GERENCIA_MARCA" && canAccessRouteLocal(user, item.local)) return true
+  }
+  return false
+}
+
+// Nunca se expone la ruta interna del blob: el archivo se descarga por la API.
+function publicRequest(item) {
+  if (!item) return item
+  return { ...item, attachments: (item.attachments || []).map(({ blobName: _blob, ...rest }) => rest) }
+}
+
+function withParticipant(item, email) {
+  const list = new Set((item.participants || []).map((value) => String(value).toLowerCase()))
+  if (email) list.add(String(email).toLowerCase())
+  return [...list]
 }
 
 const ROUTE_LOCAL_BRANDS = [
@@ -317,12 +347,24 @@ app.http("users-directory", {
     if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
 
     // Fuente maestra: LIST 02_Usuarios. El Excel queda sólo como fallback temporal.
+    // Se suman los usuarios creados en la app (Agregar usuario); los del directorio tienen prioridad.
+    const appUsers = await listAppDirectoryUsers().catch(() => [])
+    const merge = (users) => {
+      const known = new Set((users || []).map((u) => String(u.email).toLowerCase()))
+      return [...(users || []), ...appUsers.filter((u) => !known.has(String(u.email).toLowerCase()))]
+    }
     try {
       const result = await loadUsersFromList({ force: request.query.get("force") === "1" })
-      return json(200, result)
+      return json(200, { ...result, users: merge(result.users) })
     } catch (listError) {
       const url = await getUsersExcelUrl()
       if (!url) {
+        if (appUsers.length) {
+          return json(200, {
+            users: appUsers,
+            meta: { source: "APP_USERS", listName: "02_Usuarios", warning: "02_Usuarios no disponible y sin Excel temporal; se muestran solo los usuarios creados en la app." },
+          })
+        }
         return json(503, {
           message: listError?.message || "No fue posible leer 02_Usuarios y no hay Excel temporal conectado.",
           source: "FALLBACK",
@@ -332,6 +374,7 @@ app.http("users-directory", {
         const result = await loadUsersFromExcel(url)
         return json(200, {
           ...result,
+          users: merge(result.users),
           meta: {
             ...result.meta,
             source: "EXCEL_FALLBACK",
@@ -374,7 +417,10 @@ app.http("operations-catalog", {
       }
     }
 
-    return json(200, { ...result, users: directory.users, usersMeta: directory.meta })
+    const appUsers = await listAppDirectoryUsers().catch(() => [])
+    const known = new Set((directory.users || []).map((u) => String(u.email).toLowerCase()))
+    const users = [...(directory.users || []), ...appUsers.filter((u) => !known.has(String(u.email).toLowerCase()))]
+    return json(200, { ...result, users, usersMeta: directory.meta })
   },
 })
 
@@ -828,7 +874,7 @@ app.http("stored-requests", {
     if (!user) return json(401, { message: "Sesión no válida." })
     if (request.method === "GET") {
       const rows = await listRequestsStored()
-      return json(200, { requests: rows.filter((item) => canSeeStoredRequest(user, item)) })
+      return json(200, { requests: rows.filter((item) => canSeeStoredRequest(user, item)).map(publicRequest) })
     }
     const data = await body(request)
     const incoming = data.request || {}
@@ -844,9 +890,11 @@ app.http("stored-requests", {
       id: undefined,
       requesterEmail: user.email,
       requesterName: user.name,
+      requesterRole: user.role,
+      participants: [String(user.email).toLowerCase()],
       approvalSLAHours: incoming.approvalSLAStartedAt ? (sla?.review?.hours ?? incoming.approvalSLAHours) : incoming.approvalSLAHours,
       acceptanceSLAHours: sla?.acceptance?.hours ?? incoming.acceptanceSLAHours,
-      resolutionSLAHours: sla?.resolution?.hours ?? incoming.resolutionSLAHours,
+      resolutionSLAHours: incoming.slaFixedDays ? incoming.resolutionSLAHours : (sla?.resolution?.hours ?? incoming.resolutionSLAHours),
       confirmationSLAHours: sla?.confirmation?.hours ?? incoming.confirmationSLAHours ?? 48,
       slaSource: sla?.source || incoming.slaSource || "FALLBACK",
       slaListName: sla?.listName || incoming.slaListName,
@@ -857,7 +905,7 @@ app.http("stored-requests", {
       authorEmail: user.email, authorName: user.name, createdAt: item.createdAt || new Date().toISOString(),
       comment: "Solicitud ingresada en DitalApp.",
     })
-    return json(200, { request: item, warnings: [] })
+    return json(200, { request: publicRequest(item), warnings: [] })
   },
 })
 
@@ -869,17 +917,30 @@ app.http("stored-request-detail", {
     const existing = await getRequestStored(request.params.id)
     if (!existing) return json(404, { message: "Solicitud no encontrada." })
     if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
-    if (request.method === "GET") return json(200, { request: existing })
+    if (request.method === "GET") return json(200, { request: publicRequest(existing) })
 
     const data = await body(request)
-    const next = { ...(data.request || existing), id: existing.id }
+    const incoming = data.request || existing
+    // Datos que el cliente no puede reescribir: identidad del solicitante, adjuntos y participantes.
+    const next = {
+      ...incoming,
+      id: existing.id,
+      requesterEmail: existing.requesterEmail,
+      requesterName: existing.requesterName,
+      requesterRole: existing.requesterRole ?? incoming.requesterRole,
+      createdAt: existing.createdAt,
+      isTest: existing.isTest,
+      attachments: existing.attachments || [],
+      participants: withParticipant(existing, user.email),
+    }
     const saved = await saveRequestStored(next)
     await appendRequestTimeline({
       id: `${saved.id}-${data.type || "COMMENT"}-${Date.now()}`, requestId: saved.id, type: data.type || "COMMENT",
       authorEmail: user.email, authorName: user.name, createdAt: new Date().toISOString(),
       comment: data.detail ? `${data.title || "Actualización"} · ${data.detail}` : (data.title || "Actualización"),
+      attachmentIds: Array.isArray(data.attachmentIds) ? data.attachmentIds.map(String) : undefined,
     })
-    return json(200, { request: saved, warnings: [] })
+    return json(200, { request: publicRequest(saved), warnings: [] })
   },
 })
 
@@ -892,6 +953,81 @@ app.http("stored-request-history", {
     if (!existing) return json(404, { message: "Solicitud no encontrada." })
     if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
     return json(200, { history: await getRequestTimelineStored(existing.id) })
+  },
+})
+
+app.http("stored-request-attachments", {
+  methods: ["POST"], authLevel: "anonymous", route: "requests/{id}/attachments",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!user) return json(401, { message: "Sesión no válida." })
+    const existing = await getRequestStored(request.params.id)
+    if (!existing) return json(404, { message: "Solicitud no encontrada." })
+    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
+    try {
+      const data = await body(request)
+      const buffer = Buffer.from(String(data.dataBase64 || ""), "base64")
+      const saved = await saveRequestAttachment(existing.id, { fileName: data.fileName, contentType: data.contentType, buffer })
+      const attachment = {
+        id: saved.id,
+        requestId: existing.id,
+        fileName: saved.fileName,
+        contentType: saved.contentType,
+        size: saved.size,
+        blobName: saved.blobName,
+        stage: String(data.stage || "SOLICITUD"),
+        uploadedByEmail: user.email,
+        uploadedByName: user.name,
+        uploadedAt: new Date().toISOString(),
+      }
+      const updated = await saveRequestStored({
+        ...existing,
+        attachments: [...(existing.attachments || []), attachment],
+        participants: withParticipant(existing, user.email),
+      })
+      const { blobName: _blob, ...publicAttachment } = attachment
+      return json(200, { attachment: publicAttachment, request: publicRequest(updated) })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible guardar el adjunto." })
+    }
+  },
+})
+
+app.http("stored-request-attachment-file", {
+  methods: ["GET"], authLevel: "anonymous", route: "requests/{id}/attachments/{attachmentId}",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!user) return json(401, { message: "Sesión no válida." })
+    const existing = await getRequestStored(request.params.id)
+    if (!existing) return json(404, { message: "Solicitud no encontrada." })
+    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
+    const attachment = (existing.attachments || []).find((item) => item.id === request.params.attachmentId)
+    if (!attachment?.blobName) return json(404, { message: "Adjunto no encontrado." })
+    const file = await readRequestAttachment(attachment.blobName)
+    return {
+      status: 200,
+      body: file.buffer,
+      headers: {
+        "Content-Type": file.contentType,
+        "Content-Disposition": `inline; filename="${String(attachment.fileName).replace(/"/g, "")}"`,
+        "Cache-Control": "private, max-age=300",
+      },
+    }
+  },
+})
+
+app.http("users-app", {
+  methods: ["GET", "POST"], authLevel: "anonymous", route: "users/app",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes y Project Manager." })
+    if (request.method === "GET") return json(200, { users: await listAppDirectoryUsers() })
+    try {
+      const saved = await saveAppUser(await body(request), user.email)
+      return json(200, { message: `${saved.name} quedó ${saved.active ? "activo" : "inactivo"} en DitalApp.`, user: saved })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible guardar el usuario." })
+    }
   },
 })
 

@@ -4,6 +4,7 @@
 import { json, body } from "./lib/http.js"
 import { appFilesContainer, getDataFileState } from "./lib/dataFiles.js"
 import { DATA_KINDS } from "./lib/datosParsers.js"
+import { parsePriceList, readModelCatalog, readResources, removeBrand, saveBrandModels, saveResources, validUrl } from "./lib/catalogoDatos.js"
 import { appendImportLog, getImportLog, mergeMaster, readAllMasters } from "./lib/datosStore.js"
 import {
   CONTACT_RESULTS, addContact, confirmDelivery, getClaim, importContacts, readSegData, saveClaim, saveReview,
@@ -54,7 +55,19 @@ async function findDirectoryUser(email) {
       if (found) return found
     }
   } catch { /* sin Excel temporal */ }
+  // Usuario creado dentro de la app (Usuarios › Agregar usuario).
+  const local = await getUser(target).catch(() => null)
+  if (local?.source === "APP" && local.active !== false) return publicUserFromEntity(local)
   return null
+}
+
+function publicUserFromEntity(entity) {
+  const parse = (value) => { try { return JSON.parse(value || "[]") } catch { return [] } }
+  return {
+    email: entity.email, name: entity.name, role: entity.role, local: entity.local, localPrincipal: entity.localPrincipal,
+    assignedLocals: parse(entity.assignedLocals), scope: entity.scope, zone: entity.zone, brands: parse(entity.brands),
+    areaFunctional: entity.areaFunctional, active: entity.active !== false,
+  }
 }
 
 function profileEntity(dirUser, existing) {
@@ -83,6 +96,67 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
     }
   }
 
+  // ================= LISTAS DE PRECIOS · MODELOS =================
+  async function procesarPrecios(user, data) {
+    const marca = String(data.marca || "").replace(/\s+/g, " ").trim()
+    if (!marca) return json(400, { message: "Elige la marca de la lista de precios." })
+    const state = await getDataFileState("precios")
+    if (!state.blobName) return json(400, { message: "Primero sube el archivo." })
+    const container = await appFilesContainer()
+    const buffer = await container.getBlobClient(state.blobName).downloadToBuffer()
+    const entry = { kind: "precios", label: `Lista de precios · ${marca}`, fileName: state.fileName, by: user.email, byName: user.name, at: new Date().toISOString() }
+    try {
+      const parsed = await parsePriceList(buffer, state.fileName)
+      if (!parsed.modelos.length) throw new Error("No encontré modelos en la primera columna de la primera hoja.")
+      const before = (await readModelCatalog())[marca]?.modelos || []
+      await saveBrandModels(marca, parsed.modelos, { fileName: state.fileName, at: entry.at, by: user.email })
+      const prev = new Set(before.map((m) => m.toUpperCase()))
+      const nuevos = parsed.modelos.filter((m) => !prev.has(m.toUpperCase())).length
+      const summary = { leidos: parsed.leidos, nuevos, actualizados: 0, sinCambios: parsed.modelos.length - nuevos, duplicados: Math.max(0, parsed.leidos - parsed.skipped - parsed.modelos.length), errores: 0, omitidos: parsed.skipped }
+      const ok = { ...entry, ok: true, summary, modelos: parsed.modelos.length }
+      await appendImportLog(ok)
+      return json(200, { message: `Lista de ${marca} cargada: ${parsed.modelos.length} modelos.`, ...ok })
+    } catch (error) {
+      await appendImportLog({ ...entry, ok: false, error: error?.message || "Error al procesar." })
+      return json(400, { message: error?.message || "No fue posible procesar la lista." })
+    }
+  }
+
+  app.http("catalogo-modelos", {
+    methods: ["GET", "DELETE"], authLevel: "anonymous", route: "catalogo/modelos",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      if (request.method === "DELETE") {
+        if (!isExperienceUser(user)) return forbidden()
+        await removeBrand(String(request.query.get("marca") || ""))
+      }
+      const catalog = await readModelCatalog()
+      const marcas = Object.entries(catalog)
+        .map(([marca, info]) => ({ marca, modelos: info.modelos || [], fileName: info.fileName, at: info.at }))
+        .sort((a, b) => a.marca.localeCompare(b.marca, "es"))
+      return json(200, { marcas })
+    }),
+  })
+
+  // ================= RECURSOS DE ACADEMIA (link a carpeta) =================
+  app.http("academia-recursos", {
+    methods: ["GET", "POST"], authLevel: "anonymous", route: "academia/recursos",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      if (request.method === "GET") return json(200, await readResources())
+      if (!isExperienceUser(user)) return forbidden()
+      const data = await body(request)
+      try {
+        const saved = await saveResources({ carpetaUrl: validUrl(data.carpetaUrl) }, user.email)
+        return json(200, { message: saved.carpetaUrl ? "Enlace guardado." : "Enlace eliminado.", ...saved })
+      } catch (error) {
+        return json(400, { message: error?.message || "Enlace no válido." })
+      }
+    }),
+  })
+
   // ================= DATOS =================
   app.http("datos-estado", {
     methods: ["GET"], authLevel: "anonymous", route: "datos/estado",
@@ -107,6 +181,7 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
       if (!isExperienceUser(user)) return forbidden()
       const data = await body(request)
       const kind = String(data.kind || "")
+      if (kind === "precios") return procesarPrecios(user, data)
       const def = DATA_KINDS[kind]
       if (!def) return json(400, { message: "Tipo de archivo no reconocido." })
       const state = await getDataFileState(kind)
