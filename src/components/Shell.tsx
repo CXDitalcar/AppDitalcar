@@ -9,7 +9,6 @@ import {
   Briefcase,
   Building2,
   ClipboardCheck,
-  Database,
   LayoutDashboard,
   MessagesSquare,
   LogOut,
@@ -30,7 +29,7 @@ import "./Shell.css"
 import type {
   UserScope,
 } from "../types"
-import { canSeeDatos, canSeeSeguimiento } from "../services/experienceAccess"
+import { canSeeSeguimiento } from "../services/experienceAccess"
 import {
   canAccessPilotModule,
   type PilotModule,
@@ -110,11 +109,12 @@ const mainNavigation: NavigationItem[] = [
     module: "MI_LOCAL",
   },
   {
-    label: "Formularios",
-    to: "/formularios",
+    // El Junior no ve Gestión: tiene acceso directo a sus solicitudes.
+    label: "Solicitudes",
+    to: "/solicitudes",
     icon: ClipboardCheck,
-    module: "FORMULARIOS",
-    activePaths: ["/ruta-experiencia"],
+    visible: (user) => user?.role === "ASISTENTE_JUNIOR",
+    activePaths: ["/solicitudes"],
   },
   {
     label: "Seguimiento",
@@ -123,16 +123,11 @@ const mainNavigation: NavigationItem[] = [
     visible: (user) => canSeeSeguimiento(user),
   },
   {
+    // Gestión reúne Solicitudes, Bandeja, KPI, Formularios y (Experiencia/PM) Datos y Usuarios.
     label: "Gestión",
     to: "/gestion",
     icon: Briefcase,
-    activePaths: ["/solicitudes", "/aprobaciones", "/kpi", "/usuarios", "/insumos"],
-  },
-  {
-    label: "Datos",
-    to: "/datos",
-    icon: Database,
-    visible: (user) => canSeeDatos(user),
+    activePaths: ["/solicitudes", "/aprobaciones", "/kpi", "/usuarios", "/insumos", "/formularios", "/ruta-experiencia", "/datos"],
   },
 ]
 
@@ -185,7 +180,7 @@ export default function Shell({
 
   const visibleNavigation = mainNavigation.filter((item) => {
     if (item.visible) return item.visible(currentUser)
-    if (!item.module) return showGestion
+    if (!item.module) return showGestion && currentUser?.role !== "ASISTENTE_JUNIOR"
     return currentUser ? canAccessPilotModule(currentUser, item.module) : true
   })
 
@@ -573,6 +568,9 @@ function formatRole(
     ASISTENTE_GERENCIA:
 
       "Asistente de Gerencia",
+    ASISTENTE_JUNIOR:
+
+      "Junior",
 
     ADMINISTRATIVO:
       "Administrativo",
