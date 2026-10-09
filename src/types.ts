@@ -18,6 +18,7 @@ export type UserRole =
   | "EXPERIENCIA_CLIENTES"
   | "PROJECT_MANAGER"
   | "ASISTENTE_GERENCIA"
+  | "ASISTENTE_JUNIOR"
   | "ADMINISTRATIVO"
   | "EQUIPO_COMERCIAL"
   | "GERENCIA_GENERAL"
@@ -45,11 +46,25 @@ export type UserScope = {
 }
 
 export type RequestFamily =
+  | "COLABORADORES"
+  | "EXPERIENCIA"
+  | "COMERCIAL"
+  | "DOCUMENTACION"
   | "UNIDADES"
   | "INSUMOS_SHOWROOM"
-  | "COLABORADORES"
-  | "COMERCIAL"
   | "OTROS"
+
+// Disponibilidad del proceso (08-10):
+// ACTIVO = operativo · BETA = solicitudes de prueba sin validez (el flujo sigue por correo)
+// CONSTRUCCION = visible como "En construcción", no se puede pedir · OCULTO = solo Experiencia/PM lo ven.
+export type ProcessAvailability = "ACTIVO" | "BETA" | "CONSTRUCCION" | "OCULTO"
+
+// ESTANDAR = solicitud → (jefe) → responsable → resuelto → confirmación.
+// PROPUESTA = iteraciones con imágenes entre Experiencia y Gerencia de Marca → Gerencia Comercial (pausa) → ejecución → cierre con foto.
+export type ProcessFlow = "ESTANDAR" | "PROPUESTA"
+
+// Cómo cierra el solicitante: CONFIRMAR (por defecto), INSTALADA (marca "Instalada") o FOTO (foto obligatoria).
+export type ProcessCloseMode = "CONFIRMAR" | "INSTALADA" | "FOTO"
 
 export type RequestStatus =
   | "RECIBIDA"
@@ -67,6 +82,7 @@ export type ApprovalContext =
   | "PROCESO"
   | "PRESUPUESTO_COMERCIAL"
   | "INFRAESTRUCTURA_GENERAL"
+  | "PROPUESTA_MARCA"
 
 export type SLAStatus =
   | "NO_INICIADO"
@@ -111,6 +127,21 @@ export type ProcessConfig = {
   order: number
   active: boolean
   notes?: string
+  availability?: ProcessAvailability
+  flow?: ProcessFlow
+  closeMode?: ProcessCloseMode
+  // SLA de gestión en días hábiles (o corridos si slaCalendarDays). slaDefault = "(por defecto)", aún no asignado oficialmente.
+  slaDays?: number
+  slaDefault?: boolean
+  slaCalendarDays?: boolean
+  // Botón "En espera de aprobación" (pausa sin indicar quién aprueba).
+  allowsWaitingApproval?: boolean
+  // Si se informa un monto, la solicitud pasa al flujo PROPUESTA.
+  amountTriggersProposal?: boolean
+  // Correos/roles extra que siempre ven la solicitud.
+  extraViewerRoles?: UserRole[]
+  // Nota visible en el formulario antes de enviar.
+  formNotice?: string
 }
 
 export type ProcessFieldType =
@@ -130,6 +161,8 @@ export type ProcessFieldType =
   | "INTERNAL_NUMBER"
   | "INTERNAL_TEXT"
   | "CATALOG_ITEM"
+  | "MODEL_SELECT"
+  | "BRAND_SELECT"
 
 export type ProcessFieldDefinition = {
   id: string
@@ -232,6 +265,8 @@ export type RequestAttachment = {
   requestId: string
   fileName: string
   fileUrl?: string
+  contentType?: string
+  size?: number
   stage: string
   uploadedByEmail: string
   uploadedByName: string
@@ -264,6 +299,16 @@ export type RequestTimelineItem = {
   authorName: string
   createdAt: string
   comment?: string
+  attachmentIds?: string[]
+}
+
+export type RequestProposalState = {
+  round: number
+  stage: "EXPERIENCIA" | "MARCA" | "ACUERDO" | "GERENCIA_COMERCIAL" | "EJECUCION"
+  brandManagerEmail?: string
+  brandManagerName?: string
+  agreedAt?: string
+  sentToCommercialAt?: string
 }
 
 export type RequestItem = {
@@ -327,6 +372,14 @@ export type RequestItem = {
 
   internalCheckpoints: InternalCheckpointValue[]
   isTest?: boolean
+  attachments?: RequestAttachment[]
+  participants?: string[]
+  audience?: { roles: UserRole[]; emails: string[] }
+  flow?: ProcessFlow
+  proposal?: RequestProposalState
+  waitingApproval?: boolean
+  slaFixedDays?: number
+  slaDefault?: boolean
 }
 
 export type RequestPermissions = {

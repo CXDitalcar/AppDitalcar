@@ -147,7 +147,7 @@ export default function App() {
   const canSeeSolicitudes = canAccessPilotModule(currentUser, "SOLICITUDES")
   // Gestión aparece si el perfil tiene al menos una herramienta dentro.
   // Usuarios/fuentes dependen del perfil REAL (experienceCanViewAs), no de "Ver como".
-  const showGestion = showApprovals || canSeeSolicitudes || canSeeKPI || experienceCanViewAs
+  const showGestion = showApprovals || canSeeSolicitudes || canSeeKPI || canSeeFormularios || experienceCanViewAs
 
   // “Ver como” es una herramienta administrativa de Experiencia, no una vía de ingreso.
   const operationalUsers = getAllOperationalUsers().filter((user) => user.active)
@@ -215,6 +215,7 @@ export default function App() {
                   showApprovals={showApprovals}
                   showRequests={canSeeSolicitudes}
                   showKpi={canSeeKPI}
+                  showForms={canSeeFormularios}
                   showAdmin={experienceCanViewAs}
                 />
               ) : (
