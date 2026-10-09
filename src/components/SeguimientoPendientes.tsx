@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react"
 import { Link } from "react-router-dom"
-import { Check, PackageCheck, PhoneCall, ShieldAlert } from "lucide-react"
+import { Check, MessageCircle, PackageCheck, PhoneCall, ShieldAlert } from "lucide-react"
 import type { UserScope } from "../types"
 import { DeliveryForm } from "../pages/ClienteFicha"
 import { derivacionAtendida, fmtDate, getPendientes, type Pendientes } from "../services/seguimientoApi"
@@ -22,11 +22,26 @@ export default function SeguimientoPendientes({ currentUser }: { currentUser: Us
   useEffect(() => { void load() }, [currentUser.email])
 
   if (!data) return null
-  const total = data.entregas.length + data.derivaciones.length + data.reclamos.length + data.ayuda.length
+  const c = data.contactos
+  const contactosTotal = c ? c.enviar + c.reintentar + c.revisar : 0
+  const total = data.entregas.length + data.derivaciones.length + data.reclamos.length + data.ayuda.length + contactosTotal
   if (!total) return null
 
   return (
     <section className="seg-pending" aria-label="Pendientes de seguimiento de clientes">
+      {c && contactosTotal > 0 && (
+        <article className="seg-card">
+          <h3 style={{ margin: "0 0 10px", fontSize: 17 }}><MessageCircle size={17} style={{ verticalAlign: "-3px" }} /> Contactos de seguimiento pendientes</h3>
+          <div className="seg-row">
+            <div className="datos-summary" style={{ margin: 0 }}>
+              {c.enviar > 0 && <span>{c.enviar} por enviar</span>}
+              {c.reintentar > 0 && <span>{c.reintentar} por reintentar</span>}
+              {c.revisar > 0 && <span>{c.revisar} por revisar</span>}
+            </div>
+            <div className="seg-actions"><Link className="seg-btn small primary" to="/seguimiento">Ir a Seguimiento</Link></div>
+          </div>
+        </article>
+      )}
       {data.reclamos.length > 0 && (
         <article className="seg-card">
           <h3 style={{ margin: "0 0 10px", fontSize: 17 }}><ShieldAlert size={17} style={{ verticalAlign: "-3px" }} /> Reclamos a tu cargo ({data.reclamos.length})</h3>

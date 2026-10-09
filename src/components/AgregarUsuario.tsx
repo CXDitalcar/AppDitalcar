@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
-import { Pencil, UserPlus } from "lucide-react"
+import { FileUp, Pencil, UserPlus } from "lucide-react"
+import { prepareUploadFile } from "../services/fileUtils"
 import type { UserRole, UserScope } from "../types"
-import { ditalcarLocals } from "../data/requestConfig"
+import { getLocals } from "../services/localesStore"
 import { DEFAULT_BRANDS } from "../services/catalogoApi"
 import { roleLabel } from "../services/workflow"
 import "../pages/Seguimiento.css"
@@ -42,6 +43,30 @@ export default function AgregarUsuario({ onSaved }: { onSaved: () => void }) {
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
 
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<{ message: string; errores: string[]; omitidos: number; sinCorreo: number } | null>(null)
+
+  async function importFile(file?: File | null) {
+    if (!file) return
+    setImporting(true)
+    setError("")
+    setImportResult(null)
+    try {
+      const prepared = await prepareUploadFile(file)
+      const result = await apiJson<{ message: string; summary: { errores: string[]; omitidos: number; sinCorreo: number } }>("/api/users/app/import", {
+        method: "POST",
+        body: JSON.stringify({ fileName: prepared.name, dataBase64: prepared.base64 }),
+      })
+      setImportResult({ message: result.message, ...result.summary })
+      await load()
+      onSaved()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No fue posible importar el archivo.")
+    } finally {
+      setImporting(false)
+    }
+  }
+
   async function load() {
     try { setAppUsers((await apiJson<{ users: AppUser[] }>("/api/users/app")).users) } catch { setAppUsers([]) }
   }
@@ -49,7 +74,7 @@ export default function AgregarUsuario({ onSaved }: { onSaved: () => void }) {
 
   const isNetwork = NETWORK_ROLES.includes(form.role)
   const isBrand = form.role === "GERENCIA_MARCA"
-  const localNames = useMemo(() => ditalcarLocals.map((local) => local.name).sort((a, b) => a.localeCompare(b, "es")), [])
+  const localNames = useMemo(() => getLocals().map((local) => local.name).sort((a, b) => a.localeCompare(b, "es")), [])
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((current) => ({ ...current, [key]: value }))
@@ -123,9 +148,15 @@ export default function AgregarUsuario({ onSaved }: { onSaved: () => void }) {
           </p>
         </div>
         {!open && (
-          <button className="seg-btn primary" onClick={() => { setForm(EMPTY); setEditing(false); setOpen(true); setMessage(""); setError("") }}>
-            <UserPlus size={16} /> Nuevo usuario
-          </button>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <button className="seg-btn primary" onClick={() => { setForm(EMPTY); setEditing(false); setOpen(true); setMessage(""); setError("") }}>
+              <UserPlus size={16} /> Nuevo usuario
+            </button>
+            <label className="seg-btn" style={{ position: "relative" }}>
+              <FileUp size={16} /> {importing ? "Importando…" : "Importar Excel"}
+              <input type="file" accept=".xlsx,.xlsm" className="datos-file-input" disabled={importing} onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = "" }} />
+            </label>
+          </div>
         )}
       </div>
 
@@ -197,6 +228,20 @@ export default function AgregarUsuario({ onSaved }: { onSaved: () => void }) {
       )}
 
       {message && <div className="seg-meta" style={{ color: "#8fe3a6", marginTop: 10 }}>{message}</div>}
+      {!open && error && <div className="seg-error" style={{ marginTop: 10 }}>{error}</div>}
+      {importResult && (
+        <div className="seg-meta" style={{ marginTop: 10 }}>
+          <span style={{ color: "#8fe3a6" }}>{importResult.message}</span>
+          {importResult.omitidos > 0 && <> · {importResult.omitidos} ya activos desde 02_Usuarios (sin cambios)</>}
+          {importResult.sinCorreo > 0 && <> · {importResult.sinCorreo} filas sin correo</>}
+          {importResult.errores.length > 0 && (
+            <ul style={{ margin: "6px 0 0", paddingLeft: 18, color: "#ff9097" }}>
+              {importResult.errores.slice(0, 15).map((line) => <li key={line}>{line}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
+      <div className="seg-meta" style={{ marginTop: 6 }}>Importar Excel: mismo formato que 02_Usuarios (Email, Nombre, RolApp, Activo, Alcance, LocalPrincipal, LocalesAsignados, Marcas), con títulos en la primera fila.</div>
 
       {appUsers.length > 0 && (
         <div className="seg-table-wrap" style={{ marginTop: 14 }}>

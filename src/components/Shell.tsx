@@ -7,6 +7,8 @@ import {
   BadgeCheck,
   BookOpen,
   Briefcase,
+  Car,
+  ClipboardList,
   Building2,
   ClipboardCheck,
   LayoutDashboard,
@@ -117,17 +119,32 @@ const mainNavigation: NavigationItem[] = [
     activePaths: ["/solicitudes"],
   },
   {
+    // Detalle para Experiencia/PM/Asistente; vista macro (totales) para el resto. El junior no lo ve.
     label: "Seguimiento",
     to: "/seguimiento",
     icon: MessagesSquare,
-    visible: (user) => canSeeSeguimiento(user),
+    visible: (user) => Boolean(user) && user?.role !== "ASISTENTE_JUNIOR",
+  },
+  {
+    // Estado de cada NV sin datos del cliente (alcance según perfil).
+    label: "Ventas",
+    to: "/ventas",
+    icon: Car,
+    visible: (user) => Boolean(user),
+  },
+  {
+    // Medición Frogmi de su local (junior y jefatura). Experiencia/PM entran desde Gestión.
+    label: "Frogmi",
+    to: "/frogmi",
+    icon: ClipboardList,
+    visible: (user) => user?.role === "ASISTENTE_JUNIOR" || user?.role === "JEFATURA_LOCAL",
   },
   {
     // Gestión reúne Solicitudes, Bandeja, KPI, Formularios y (Experiencia/PM) Datos y Usuarios.
     label: "Gestión",
     to: "/gestion",
     icon: Briefcase,
-    activePaths: ["/solicitudes", "/aprobaciones", "/kpi", "/usuarios", "/insumos", "/formularios", "/ruta-experiencia", "/datos"],
+    activePaths: ["/solicitudes", "/aprobaciones", "/kpi", "/usuarios", "/insumos", "/formularios", "/ruta-experiencia", "/datos", "/frogmi"],
   },
 ]
 
@@ -348,7 +365,6 @@ export default function Shell({
                     </option>
                   ))}
               </select>
-              <small>Solo visible para Experiencia durante el piloto.</small>
             </label>
           )}
 
