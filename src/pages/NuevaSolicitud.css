@@ -989,3 +989,18 @@
    FAMILIAS EN DESARROLLO · PILOTO
 ====================================================== */
 .request-family-card.in-development{cursor:not-allowed;opacity:.72;border-style:dashed;border-color:rgba(243,168,59,.26);background:linear-gradient(135deg,rgba(20,20,23,.82),rgba(12,12,15,.78))}.request-family-card.in-development:hover{transform:none;box-shadow:none;border-color:rgba(243,168,59,.32)}.request-family-card.in-development .request-family-icon{color:#d6a55d;border-color:rgba(243,168,59,.2);background:rgba(243,168,59,.07)}.request-family-title-row{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.request-family-title-row h3{margin:0 0 7px}.request-development-badge{display:inline-flex;margin-bottom:7px;padding:4px 6px;border:1px solid rgba(243,168,59,.28);border-radius:999px;background:rgba(243,168,59,.08);color:#efbd72;font-size:7px;font-weight:900;letter-spacing:.06em}.request-development-label{color:#9e855f;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+
+/* Catálogo v2 (08-10): Beta, en construcción, avisos y plazo */
+.request-development-badge{font-size:10px;margin-left:8px;vertical-align:middle}
+.request-development-badge.beta{border-color:rgba(120,170,255,.35);background:rgba(120,170,255,.1);color:#a9c6ff}
+.request-development-label{font-size:11px}
+.process-choice-card.in-development{cursor:not-allowed;opacity:.7;border-style:dashed}
+.process-choice-card.in-development:hover{transform:none;box-shadow:none}
+.process-choice-card .process-sla{display:block;margin-top:6px;color:#b9b9c2;font-size:12px}
+.request-notice{display:flex;gap:10px;align-items:flex-start;margin:0 0 14px;padding:12px 14px;border:1px solid rgba(255,255,255,.1);border-radius:12px;background:rgba(255,255,255,.04);color:#d8d8de;font-size:14px;line-height:1.45}
+.request-notice strong{display:block;margin-bottom:2px;color:#fff}
+.request-notice span{display:block}
+.request-notice svg{flex:none;margin-top:2px;color:#e5484d}
+.request-notice.beta{border-color:rgba(120,170,255,.35);background:rgba(120,170,255,.08)}
+.request-notice.beta svg{color:#a9c6ff}
+.dynamic-field select + input{margin-top:8px}

@@ -119,11 +119,12 @@ export default function Home({
     const actions: ActivityItem[] = []
     const pending: ActivityItem[] = []
 
-    if (currentUser.role === "JEFATURA_LOCAL" && isPilotLocal(currentUser)) {
+    // Formularios viven en Gestión; en Inicio aparecen cuando hay que realizarlos.
+    if (currentUser.role === "JEFATURA_LOCAL") {
       actions.push({
         id: "ruta-experiencia",
         title: "Realizar Ruta de Experiencia",
-        detail: "Actividad asignada a la Jefatura de Sucursal · Stellantis Nueva Tobalaba.",
+        detail: `Formulario semanal de la Jefatura de Sucursal${currentUser.local ? ` · ${currentUser.local}` : ""}.`,
         to: "/formularios",
         tone: "green",
       })

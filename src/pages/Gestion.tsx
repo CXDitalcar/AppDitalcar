@@ -2,7 +2,9 @@ import { Link } from "react-router-dom"
 import {
   ArrowRight,
   BarChart3,
+  ClipboardCheck,
   ClipboardList,
+  Database,
   ShieldCheck,
   UsersRound,
   type LucideIcon,
@@ -20,6 +22,7 @@ type GestionProps = {
   showApprovals: boolean
   showRequests: boolean
   showKpi: boolean
+  showForms: boolean
   // Usuarios y fuentes de datos: sólo con el perfil REAL de Experiencia
   // (no se habilita con "Ver como"). El backend también lo valida.
   showAdmin: boolean
@@ -39,6 +42,7 @@ export default function Gestion({
   showApprovals,
   showRequests,
   showKpi,
+  showForms,
   showAdmin,
 }: GestionProps) {
   const operation: GestionItem[] = [
@@ -57,6 +61,15 @@ export default function Gestion({
       description: "Seguimiento de las solicitudes que ingresaste o que involucran a tu local.",
       to: "/solicitudes",
       icon: ClipboardList,
+      tone: "green" as SignalTone,
+      status: "Disponible",
+    },
+    showForms && {
+      key: "forms",
+      title: "Formularios",
+      description: "Ruta de Experiencia y auditorías. Cuando tengas uno pendiente, también aparece en Inicio.",
+      to: "/formularios",
+      icon: ClipboardCheck,
       tone: "green" as SignalTone,
       status: "Disponible",
     },
@@ -82,6 +95,15 @@ export default function Gestion({
           tone: "green",
           status: "Disponible",
         },
+        {
+          key: "datos",
+          title: "Datos",
+          description: "Carga de planillas (SIGA, Control, T, listas de precios…) y enlace de Recursos de Academia.",
+          to: "/datos",
+          icon: Database,
+          tone: "green",
+          status: "Disponible",
+        },
       ]
     : []
 
@@ -90,7 +112,7 @@ export default function Gestion({
       <header className="gestion-head">
         <span className="eyebrow">GESTIÓN</span>
         <h1>Herramientas de gestión</h1>
-        <p>Solicitudes, indicadores y administración en un solo lugar.</p>
+        <p>Solicitudes, formularios, indicadores y administración en un solo lugar.</p>
       </header>
 
       {operation.length > 0 && (

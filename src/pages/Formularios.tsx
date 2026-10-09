@@ -1208,6 +1208,9 @@ function formatRole(
     ASISTENTE_GERENCIA:
 
       "Asistente de Gerencia",
+    ASISTENTE_JUNIOR:
+
+      "Junior",
 
     ADMINISTRATIVO:
       "Administrativo",

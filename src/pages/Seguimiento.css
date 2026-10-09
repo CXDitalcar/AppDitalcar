@@ -405,3 +405,18 @@
   .seg-filters { grid-template-columns: 1fr; }
   .seg-timeline li { grid-template-columns: 1fr; gap: 2px; }
 }
+
+/* Datos · listas de precios y recursos (08-10) */
+.datos-subtitle{font-size:18px;margin:22px 0 10px}
+.datos-inline-form{display:grid;gap:8px;margin-top:10px}
+.datos-brand-list{display:grid;gap:6px;margin-top:14px;border-top:1px solid rgba(255,255,255,.08);padding-top:10px}
+.datos-brand{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.datos-brand-name{background:none;border:0;color:#e7e7ea;text-align:left;cursor:pointer;font-size:14px;padding:4px 0}
+.datos-brand-models{grid-column:1/-1;color:#b9b9c2;font-size:13px;line-height:1.5}
+
+/* Usuarios · Agregar usuario (08-10) */
+.user-form{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);display:grid;gap:10px}
+.user-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
+.user-chip{border:1px solid rgba(255,255,255,.14);border-radius:999px;background:transparent;color:#cfcfd6;padding:6px 10px;font-size:13px;cursor:pointer}
+.user-chip.on{border-color:#e5484d;background:rgba(229,72,77,.16);color:#fff}
+.user-check{display:flex;align-items:center;gap:8px;color:#d8d8de;font-size:14px}

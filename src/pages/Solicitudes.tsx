@@ -69,7 +69,7 @@ export default function Solicitudes({
               ? hasExperienceAccess(currentUser)
                 ? "Piloto interactivo · flujo por rol y SLA"
                 : "Piloto interactivo · flujo por rol y seguimiento de plazos"
-              : "Fuente real · Tablero General Solicitudes + seguimiento Lists"}
+              : "Solicitudes guardadas en DitalApp · historial, adjuntos y plazos"}
           </p>
         </div>
         <div className="request-head-actions">

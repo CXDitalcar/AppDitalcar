@@ -1,6 +1,7 @@
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from "react"
 
@@ -11,6 +12,10 @@ import {
   CircleDollarSign,
   Clock3,
   FileText,
+  ImagePlus,
+  PauseCircle,
+  PlayCircle,
+  Send,
   Info,
   MessageSquareText,
   Paperclip,
@@ -35,10 +40,13 @@ import {
 } from "../services/requestCatalog"
 
 import {
+  attachmentUrl,
   getRequestById,
   getRequestHistory,
   saveRequestTransition,
+  uploadRequestAttachment,
 } from "../services/requestRepository"
+import { isImageFile } from "../services/fileUtils"
 
 import {
   canApproveRequest,
@@ -55,12 +63,18 @@ import {
 } from "../services/requestPresentation"
 
 import {
+  brandAgreesRouting,
+  brandRequestsChangesRouting,
   budgetApprovalRouting,
+  processSlaLabel,
   routeAfterApproval,
+  sendProposalToBrandRouting,
+  sendToCommercialRouting,
 } from "../services/workflow"
 
 import type {
   ProcessFieldDefinition,
+  RequestAttachment,
   RequestFieldValue,
   RequestItem,
   RequestTimelineItem,
@@ -324,7 +338,8 @@ function RequestDetailContent({
     patch: Partial<RequestItem>,
     type: RequestTimelineType,
     title: string,
-    detail?: string
+    detail?: string,
+    attachmentIds?: string[]
   ) {
     if (saving) return
 
@@ -344,7 +359,8 @@ function RequestDetailContent({
         next,
         type,
         title,
-        detail
+        detail,
+        attachmentIds
       )
 
       setRequest(result.request)
@@ -370,13 +386,23 @@ function RequestDetailContent({
       request.approvalContext ===
       "JEFATURA_LOCAL"
 
+    const commercialProposal =
+      request.approvalContext === "PRESUPUESTO_COMERCIAL" && request.flow === "PROPUESTA"
+
     persist(
-      routeAfterApproval(request),
+      {
+        ...routeAfterApproval(request),
+        ...(commercialProposal
+          ? { proposal: { ...(request.proposal ?? { round: 1 }), stage: "EJECUCION" as const } }
+          : {}),
+      },
       "APPROVED",
       localReview
         ? "Revisión aprobada"
-        : "Solicitud aprobada",
-      "La solicitud avanzó al siguiente paso."
+        : commercialProposal
+          ? "Aprobada por Gerencia Comercial"
+          : "Solicitud aprobada",
+      commercialProposal ? "Comienza la ejecución." : "La solicitud avanzó al siguiente paso."
     )
 
     setAction(null)
@@ -693,6 +719,119 @@ function RequestDetailContent({
 
 
   // ====================================================
+  // ADJUNTOS (fotos, propuestas, evidencia de cierre)
+  // ====================================================
+
+  async function uploadFiles(files: File[], stage: string) {
+    const ids: string[] = []
+    let latest: RequestItem | null = null
+    for (const file of files) {
+      const result = await uploadRequestAttachment(currentUser, request.id, file, stage)
+      ids.push(result.attachment.id)
+      latest = result.request
+    }
+    if (latest) setRequest(latest)
+    return ids
+  }
+
+  async function withFiles(
+    files: File[],
+    stage: string,
+    run: (ids: string[]) => Promise<void> | void
+  ) {
+    setPersistError("")
+    try {
+      setSaving(true)
+      const ids = files.length ? await uploadFiles(files, stage) : []
+      setSaving(false)
+      await run(ids)
+    } catch (errorValue: any) {
+      setSaving(false)
+      setPersistError(errorValue?.message ?? "No fue posible subir el archivo.")
+    }
+  }
+
+  async function addEvidence(note: string, files: File[]) {
+    await withFiles(files, "SEGUIMIENTO", (ids) =>
+      persist({}, "COMMENT", files.length ? "Adjunto agregado" : "Comentario", note.trim() || undefined, ids)
+    )
+  }
+
+
+  // ====================================================
+  // FLUJO CON PROPUESTA
+  // ====================================================
+
+  async function sendProposal(note: string, files: File[]) {
+    await withFiles(files, "PROPUESTA", (ids) =>
+      persist(
+        sendProposalToBrandRouting(request),
+        "MANAGEMENT",
+        `Propuesta enviada a Gerencia de Marca (vuelta ${(request.proposal?.round ?? 0) + 1})`,
+        note.trim() || undefined,
+        ids
+      )
+    )
+  }
+
+  async function brandAgrees(note: string, files: File[]) {
+    await withFiles(files, "PROPUESTA", (ids) =>
+      persist(brandAgreesRouting(request), "APPROVED", "Gerencia de Marca de acuerdo con la propuesta", note.trim() || undefined, ids)
+    )
+  }
+
+  async function brandRequestsChanges(note: string, files: File[]) {
+    await withFiles(files, "PROPUESTA", (ids) =>
+      persist(brandRequestsChangesRouting(request), "COMMENT", "Gerencia de Marca pide cambios", note.trim(), ids)
+    )
+  }
+
+  function sendToCommercial() {
+    persist(
+      sendToCommercialRouting(request),
+      "BUDGET_REQUESTED",
+      "Enviada a Gerencia Comercial",
+      "Hay acuerdo entre Experiencia y Gerencia de Marca. El plazo queda en pausa mientras Gerencia Comercial revisa."
+    )
+  }
+
+
+  // ====================================================
+  // EN ESPERA DE APROBACIÓN (PAI): pausa sin indicar quién aprueba
+  // ====================================================
+
+  function toggleWaitingApproval() {
+    if (request.waitingApproval) {
+      const paused = request.resolutionSLAPausedAt
+        ? Math.max(0, Math.round((Date.now() - new Date(request.resolutionSLAPausedAt).getTime()) / 60000))
+        : 0
+      persist(
+        {
+          waitingApproval: false,
+          resolutionSLAPausedAt: undefined,
+          resolutionSLAPausedMinutes: (request.resolutionSLAPausedMinutes ?? 0) + paused,
+          slaPausedReason: undefined,
+        },
+        "MANAGEMENT",
+        "Gestión reanudada",
+        "La aprobación llegó; el plazo vuelve a correr."
+      )
+      return
+    }
+    persist(
+      {
+        waitingApproval: true,
+        resolutionSLAPausedAt: new Date().toISOString(),
+        slaPausedReason: "En espera de aprobación",
+      },
+      "MANAGEMENT",
+      "En espera de aprobación",
+      "El plazo queda en pausa hasta que llegue la aprobación."
+    )
+  }
+
+
+  // ====================================================
   // MARCAR RESUELTA
   // ====================================================
 
@@ -728,14 +867,20 @@ function RequestDetailContent({
   // CONFIRMAR
   // ====================================================
 
-  function confirmResolution() {
-    persist(
-      {
-        status: "RESUELTA",
-      },
-      "RESOLUTION_CONFIRMED",
-      "Resolución confirmada",
-      "La solicitud quedó cerrada."
+  async function confirmResolution(note = "", files: File[] = []) {
+    const mode = process?.closeMode ?? "CONFIRMAR"
+    if (mode === "FOTO" && !files.length) {
+      setPersistError("Para cerrar, sube una foto de cómo quedó la implementación.")
+      return
+    }
+    await withFiles(files, "CIERRE", (ids) =>
+      persist(
+        { status: "RESUELTA" },
+        "RESOLUTION_CONFIRMED",
+        mode === "INSTALADA" ? "Instalada" : mode === "FOTO" ? "Implementación confirmada con foto" : "Resolución confirmada",
+        note.trim() || "La solicitud quedó cerrada.",
+        ids
+      )
     )
   }
 
@@ -913,7 +1058,9 @@ function RequestDetailContent({
           value={
             request.slaPausedReason
               ? "En pausa"
-              : "A tiempo"
+              : request.slaFixedDays
+                ? `${request.slaFixedDays} días${request.flow === "PROPUESTA" ? "" : " hábiles"}${request.slaDefault ? " (por defecto)" : ""}`
+                : processSlaLabel(request.processCode) ?? "A tiempo"
           }
           icon={Clock3}
         />
@@ -932,8 +1079,8 @@ function RequestDetailContent({
         <div className="pilot-flow-alert pilot-test-alert">
           <Info size={17} />
           <div>
-            <strong>Solicitud de prueba</strong>
-            <span>Este caso existe para que Gerencias y Jefaturas puedan revisar el flujo sin afectar datos reales.</span>
+            <strong>Solicitud de prueba (Beta)</strong>
+            <span>Estas solicitudes son de prueba y no tienen validez. El flujo oficial sigue siendo por correo.</span>
           </div>
         </div>
       )}
@@ -1079,18 +1226,18 @@ function RequestDetailContent({
               <Paperclip size={18} />
             </div>
 
-            <div className="request-no-files">
-              <FileText size={20} />
-              <div>
-                <strong>
-                  Adjuntos de la solicitud
-                </strong>
-                <span>
-                  Zona preparada para documentos
-                  y evidencias.
-                </span>
-              </div>
-            </div>
+            <AttachmentList requestId={request.id} attachments={request.attachments ?? []} />
+
+            {!request.isTest || hasExperienceAccess(currentUser) ? (
+              <FileComposer
+                label="Agregar adjunto o comentario"
+                placeholder="Comentario (opcional)"
+                button="Agregar"
+                disabled={saving}
+                requireSomething
+                onSubmit={addEvidence}
+              />
+            ) : null}
           </section>
 
 
@@ -1238,6 +1385,14 @@ function RequestDetailContent({
                         </p>
                       )}
 
+                      {entry.attachmentIds?.length ? (
+                        <AttachmentList
+                          requestId={request.id}
+                          attachments={(request.attachments ?? []).filter((item) => entry.attachmentIds!.includes(item.id))}
+                          compact
+                        />
+                      ) : null}
+
                       <small>
                         {actorLabel(
                           currentUser,
@@ -1298,7 +1453,31 @@ function RequestDetailContent({
               APROBACIÓN
           ============================================== */}
 
-          {canApprove && (
+          {canApprove && request.approvalContext === "PROPUESTA_MARCA" && (
+            <section className="request-side-card approval-actions-card">
+              <span className="eyebrow">PROPUESTA · VUELTA {request.proposal?.round ?? 1}</span>
+              <h3>Revisa la propuesta de Experiencia</h3>
+              <p className="side-note">Mira las imágenes en el historial. Puedes dar tu acuerdo o pedir cambios, también con imágenes.</p>
+              <FileComposer
+                label="Comentario (opcional)"
+                placeholder="Ej.: de acuerdo, avancemos."
+                button="Dar acuerdo"
+                disabled={saving}
+                onSubmit={brandAgrees}
+              />
+              <FileComposer
+                label="¿Qué cambios pides? *"
+                placeholder="Describe los cambios"
+                button="Pedir cambios"
+                requireNote
+                danger
+                disabled={saving}
+                onSubmit={brandRequestsChanges}
+              />
+            </section>
+          )}
+
+          {canApprove && request.approvalContext !== "PROPUESTA_MARCA" && (
             <section className="request-side-card approval-actions-card">
               <span className="eyebrow">
                 ACCIÓN
@@ -1521,6 +1700,39 @@ function RequestDetailContent({
 
               <h3>Acciones</h3>
 
+              {request.flow === "PROPUESTA" && request.proposal?.stage !== "EJECUCION" && (
+                <div className="proposal-box">
+                  <p className="side-note">
+                    {request.proposal?.stage === "ACUERDO"
+                      ? "Hay acuerdo con la Gerencia de Marca. Envía la solicitud a Gerencia Comercial o ajusta la propuesta."
+                      : request.proposal?.round
+                        ? "La Gerencia de Marca pidió cambios. Sube una nueva propuesta."
+                        : "Sube la propuesta (imágenes, referencias, presupuesto) para la Gerencia de Marca del local."}
+                  </p>
+                  {request.proposal?.stage === "ACUERDO" && (
+                    <button className="request-action approve" onClick={sendToCommercial} disabled={saving}>
+                      <Send size={17} />
+                      Enviar a Gerencia Comercial
+                    </button>
+                  )}
+                  <FileComposer
+                    label={request.proposal?.stage === "ACUERDO" ? "Ajustar propuesta" : "Propuesta para Gerencia de Marca"}
+                    placeholder="Describe la propuesta"
+                    button="Enviar propuesta"
+                    requireSomething
+                    disabled={saving}
+                    onSubmit={sendProposal}
+                  />
+                </div>
+              )}
+
+              {process?.allowsWaitingApproval && (
+                <button className="request-action adjust" onClick={toggleWaitingApproval} disabled={saving}>
+                  {request.waitingApproval ? <PlayCircle size={17} /> : <PauseCircle size={17} />}
+                  {request.waitingApproval ? "Reanudar (aprobación recibida)" : "En espera de aprobación"}
+                </button>
+              )}
+
               <button
                 className="request-action information"
                 onClick={() => {
@@ -1536,21 +1748,26 @@ function RequestDetailContent({
                 Pedir información
               </button>
 
-              <button
-                className="request-action adjust"
-                onClick={requestBudget}
-              >
-                <CircleDollarSign size={17} />
-                Solicitar aprobación
-              </button>
+              {request.flow !== "PROPUESTA" && !process?.allowsWaitingApproval && (
+                <button
+                  className="request-action adjust"
+                  onClick={requestBudget}
+                >
+                  <CircleDollarSign size={17} />
+                  Solicitar aprobación
+                </button>
+              )}
 
-              <button
-                className="request-action approve"
-                onClick={resolve}
-              >
-                <CheckCircle2 size={17} />
-                Marcar resuelta
-              </button>
+              {(request.flow !== "PROPUESTA" || request.proposal?.stage === "EJECUCION") && (
+                <button
+                  className="request-action approve"
+                  onClick={resolve}
+                  disabled={Boolean(request.waitingApproval)}
+                >
+                  <CheckCircle2 size={17} />
+                  {request.flow === "PROPUESTA" ? "Marcar implementada" : "Marcar resuelta"}
+                </button>
+              )}
 
               {action === "INFO" && (
                 <CommentBox
@@ -1605,21 +1822,35 @@ function RequestDetailContent({
               <div>
                 <strong>Por confirmar</strong>
                 <p>
-                  Puede confirmar el solicitante
-                  o la Jefatura de Sucursal.
-                  El plazo es 48 h.
+                  {process?.closeMode === "FOTO"
+                    ? "El local confirma subiendo una foto de cómo quedó la implementación."
+                    : process?.closeMode === "INSTALADA"
+                      ? "Quien lo pidió marca que quedó instalado."
+                      : "Puede confirmar el solicitante o la Jefatura de Sucursal. El plazo es 48 h."}
                 </p>
               </div>
 
               {canConfirm && (
                 <>
-                  <button
-                    className="request-action approve"
-                    onClick={confirmResolution}
-                  >
-                    <CheckCircle2 size={17} />
-                    Confirmar resuelto
-                  </button>
+                  {process?.closeMode === "FOTO" ? (
+                    <FileComposer
+                      label="Foto de la implementación *"
+                      placeholder="Comentario (opcional)"
+                      button="Confirmar con foto"
+                      requireFiles
+                      imagesOnly
+                      disabled={saving}
+                      onSubmit={(note, files) => confirmResolution(note, files)}
+                    />
+                  ) : (
+                    <button
+                      className="request-action approve"
+                      onClick={() => void confirmResolution()}
+                    >
+                      <CheckCircle2 size={17} />
+                      {process?.closeMode === "INSTALADA" ? "Marcar instalada" : "Confirmar resuelto"}
+                    </button>
+                  )}
 
                   <button
                     className="request-action reject"
@@ -1810,6 +2041,7 @@ function userActionLabel(
   canConfirm: boolean
 ) {
   if (request.status === "RECIBIDA" && canManage) return "Tomar solicitud"
+  if (request.status === "PENDIENTE_APROBACION" && canApprove && request.approvalContext === "PROPUESTA_MARCA") return "Revisar propuesta"
   if (request.status === "PENDIENTE_APROBACION" && canApprove) return "Revisar y aprobar"
   if (request.status === "EN_GESTION" && canManage) return "Continuar gestión"
   if (request.status === "RESUELTA_POR_CONFIRMAR" && canConfirm) return "Confirmar si quedó resuelto"
@@ -1836,4 +2068,130 @@ function userActionDetail(
   if (action === "Sin acción pendiente") return "La solicitud no requiere una acción adicional de tu parte."
   if (action === "Esperar información") return "El plazo está detenido mientras la persona responsable completa los antecedentes."
   return "Esta actividad está disponible para tu perfil y requiere continuar el flujo."
+}
+
+
+// ======================================================
+// ADJUNTOS
+// ======================================================
+
+function AttachmentList({
+  requestId,
+  attachments,
+  compact = false,
+}: {
+  requestId: string
+  attachments: RequestAttachment[]
+  compact?: boolean
+}) {
+  if (!attachments.length) {
+    if (compact) return null
+    return (
+      <div className="request-no-files">
+        <FileText size={20} />
+        <div>
+          <strong>Sin adjuntos</strong>
+          <span>Fotos, propuestas y documentos de la solicitud aparecerán aquí.</span>
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div className={`request-attachments ${compact ? "compact" : ""}`}>
+      {attachments.map((item) => {
+        const url = attachmentUrl(requestId, item.id)
+        return isImageFile(item) ? (
+          <a key={item.id} href={url} target="_blank" rel="noreferrer" className="request-attachment image" title={item.fileName}>
+            <img src={url} alt={item.fileName} loading="lazy" />
+          </a>
+        ) : (
+          <a key={item.id} href={url} target="_blank" rel="noreferrer" className="request-attachment file">
+            <FileText size={16} />
+            <span>{item.fileName}</span>
+          </a>
+        )
+      })}
+    </div>
+  )
+}
+
+function FileComposer({
+  label,
+  placeholder,
+  button,
+  onSubmit,
+  disabled = false,
+  requireFiles = false,
+  requireNote = false,
+  requireSomething = false,
+  imagesOnly = false,
+  danger = false,
+}: {
+  label: string
+  placeholder?: string
+  button: string
+  onSubmit: (note: string, files: File[]) => Promise<void> | void
+  disabled?: boolean
+  requireFiles?: boolean
+  requireNote?: boolean
+  requireSomething?: boolean
+  imagesOnly?: boolean
+  danger?: boolean
+}) {
+  const [note, setNote] = useState("")
+  const [files, setFiles] = useState<File[]>([])
+  const picker = useRef<HTMLInputElement>(null)
+  const valid =
+    (!requireFiles || files.length > 0) &&
+    (!requireNote || note.trim().length > 0) &&
+    (!requireSomething || files.length > 0 || note.trim().length > 0)
+
+  return (
+    <div className="action-form file-composer">
+      <label>
+        <span>{label}</span>
+        <textarea value={note} placeholder={placeholder} onChange={(event) => setNote(event.target.value)} />
+      </label>
+      <button type="button" className="request-action information file-composer-pick" onClick={() => picker.current?.click()}>
+        <ImagePlus size={16} />
+        {imagesOnly ? "Agregar foto" : "Agregar imagen o archivo"}
+      </button>
+      <input
+        ref={picker}
+        type="file"
+        multiple
+        hidden
+        accept={imagesOnly ? "image/*" : "image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"}
+        onChange={(event) => {
+          const picked = Array.from(event.target.files ?? [])
+          setFiles((current) => [...current, ...picked])
+          event.target.value = ""
+        }}
+      />
+      {files.length > 0 && (
+        <div className="upload-file-list">
+          {files.map((file, index) => (
+            <div key={`${file.name}-${index}`} className="upload-file">
+              <FileText size={14} />
+              <span>{file.name}</span>
+              <button type="button" onClick={() => setFiles((current) => current.filter((_, i) => i !== index))}>
+                Quitar
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+      <button
+        className={danger ? "danger-btn" : "primary-btn"}
+        disabled={disabled || !valid}
+        onClick={async () => {
+          await onSubmit(note, files)
+          setNote("")
+          setFiles([])
+        }}
+      >
+        {button}
+      </button>
+    </div>
+  )
 }

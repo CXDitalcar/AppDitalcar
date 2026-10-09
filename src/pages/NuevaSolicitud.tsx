@@ -10,9 +10,13 @@ import {
   ArrowRight,
   CheckCircle2,
   FileText,
+  FlaskConical,
+  Info,
   Layers3,
+  Megaphone,
   Package,
   Paperclip,
+  Store,
   Users,
 } from "lucide-react"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -25,15 +29,20 @@ import {
 import {
   createRequest,
   findActiveRequestByBreach,
+  uploadRequestAttachment,
 } from "../services/requestRepository"
 import {
   getLocalOptions,
+  getProcessAssignments,
   getProcessesForUser,
   getRequestFields,
   getSupplyCatalog,
   isDemoUser,
+  isProcessRequestable,
 } from "../services/requestCatalog"
-import { initialRequestRouting } from "../services/workflow"
+import { initialRequestRouting, processSlaHours, processSlaLabel, requiresLocalReview } from "../services/workflow"
+import { brandOptions, getModelCatalog, OTHER_MODEL_PREFIX, type ModelBrand } from "../services/catalogoApi"
+import { FAMILY_ORDER } from "../data/requestCatalogV2"
 import { resolveProcessSla, type SlaResolved } from "../services/slaApi"
 import type {
   ProcessConfig,
@@ -57,38 +66,44 @@ const familyInfo: Record<
     icon: typeof Package
   }
 > = {
+  COLABORADORES: {
+    label: "Colaboradores",
+    description: "Credenciales y pie de firma. Uniformes y TI, en construcción.",
+    icon: Users,
+  },
+  EXPERIENCIA: {
+    label: "Experiencia del local",
+    description: "Horarios, señalizaciones, organigrama, zonas de experiencia, mobiliario e instalaciones.",
+    icon: Store,
+  },
+  COMERCIAL: {
+    label: "Marketing",
+    description: "Patentes de modelo o exhibición, banderas y materiales.",
+    icon: Megaphone,
+  },
+  DOCUMENTACION: {
+    label: "Documentación de unidades",
+    description: "PAI / precio, eficiencia energética, seguridad opcional y fichas de producto.",
+    icon: FileText,
+  },
   UNIDADES: {
     label: "Unidades",
-    description:
-      "Bonificaciones, traslados, patentes, facturación y otras gestiones asociadas a unidades.",
+    description: "Versión de prueba: estas solicitudes no tienen validez y el flujo sigue por correo.",
     icon: Package,
   },
   INSUMOS_SHOWROOM: {
-    label: "Insumos y Showroom",
-    description:
-      "Insumos, zonas de experiencia, mobiliario, equipamiento e instalaciones del local.",
-    icon: Layers3,
-  },
-  COLABORADORES: {
-    label: "Colaboradores",
-    description:
-      "Credenciales, pie de firma, habilitación tecnológica y otras necesidades del equipo.",
-    icon: Users,
-  },
-  COMERCIAL: {
-    label: "Comercial / Marketing",
-    description:
-      "Materiales, patentes de exhibición y solicitudes del área Comercial.",
+    label: "Insumos",
+    description: "Versión de prueba: estas solicitudes no tienen validez y el flujo sigue por correo.",
     icon: Layers3,
   },
   OTROS: {
     label: "Otros",
-    description:
-      "Procesos transversales que no pertenecen a las familias anteriores.",
+    description: "Procesos en construcción.",
     icon: FileText,
   },
 }
 
+const BETA_NOTICE = "Estas solicitudes son de prueba y no tienen validez. El flujo oficial sigue siendo por correo."
 
 export default function NuevaSolicitud({
   currentUser,
@@ -123,6 +138,13 @@ export default function NuevaSolicitud({
   const [submitting, setSubmitting] = useState(false)
   const [warnings, setWarnings] = useState<string[]>([])
   const [resolvedSla, setResolvedSla] = useState<SlaResolved | null>(null)
+  const [modelCatalog, setModelCatalog] = useState<ModelBrand[]>([])
+
+  useEffect(() => {
+    let active = true
+    getModelCatalog().then((value) => { if (active) setModelCatalog(value) })
+    return () => { active = false }
+  }, [])
 
   const sourceBreach = useMemo(() => {
     if (!breachFromUrl) return undefined
@@ -190,13 +212,11 @@ export default function NuevaSolicitud({
     [currentUser]
   )
 
-  const unitsInDevelopment = !hasExperienceAccess(currentUser)
-
   useEffect(() => {
     if (!processFromUrl) return
 
     const process = availableProcesses.find(
-      (item) => item.code === processFromUrl && item.active
+      (item) => item.code === processFromUrl && item.active && isProcessRequestable(item)
     )
 
     if (!process) return
@@ -245,12 +265,17 @@ export default function NuevaSolicitud({
   }, [sourceBreach, currentUser])
 
   const visibleFamilies = useMemo(() => {
-    return (Object.keys(familyInfo) as RequestFamily[]).filter(
-      (family) =>
-        availableProcesses.some((process) => process.family === family) ||
-        (family === "UNIDADES" && unitsInDevelopment)
+    return FAMILY_ORDER.filter((family) =>
+      availableProcesses.some((process) => process.family === family)
     )
-  }, [availableProcesses, unitsInDevelopment])
+  }, [availableProcesses])
+
+  function familyState(family: RequestFamily) {
+    const processes = availableProcesses.filter((process) => process.family === family)
+    if (processes.every((process) => !isProcessRequestable(process))) return "CONSTRUCCION"
+    if (processes.every((process) => process.availability === "BETA")) return "BETA"
+    return "ACTIVO"
+  }
 
   const familyProcesses = useMemo(() => {
     if (!selectedFamily) return []
@@ -258,6 +283,12 @@ export default function NuevaSolicitud({
       (process) => process.family === selectedFamily
     )
   }, [availableProcesses, selectedFamily])
+
+  const needsBossReview = Boolean(
+    selectedProcess &&
+      selectedProcess.availability !== "BETA" &&
+      requiresLocalReview(currentUser, selectedProcess.code)
+  )
 
   const allProcessFields = useMemo(() => {
     if (!selectedProcess) return []
@@ -370,6 +401,10 @@ export default function NuevaSolicitud({
 
     if (!trimmed) return ""
 
+    if (field.type === "MODEL_SELECT" && value.startsWith(OTHER_MODEL_PREFIX) && !value.slice(OTHER_MODEL_PREFIX.length).trim()) {
+      return `Escribe el modelo en "${field.label}".`
+    }
+
     if (field.type === "PHONE") {
       const digits = trimmed.replace(/\D/g, "")
       if (digits.length < 8) {
@@ -479,6 +514,38 @@ export default function NuevaSolicitud({
       const routingApprovalHours = "approvalSLAHours" in routing ? routing.approvalSLAHours : undefined
       const routingAcceptanceHours = "acceptanceSLAHours" in routing ? routing.acceptanceSLAHours : undefined
 
+      const isBeta = selectedProcess.availability === "BETA"
+      const builtFields = buildRequestFields()
+      const amountValue = builtFields.find((field) => /MONTO/i.test(field.fieldId))?.requestedValue ?? ""
+      const flow =
+        selectedProcess.flow === "PROPUESTA" ||
+        (selectedProcess.amountTriggersProposal && Number(amountValue) > 0)
+          ? "PROPUESTA"
+          : "ESTANDAR"
+      const slaHours = flow === "PROPUESTA" ? 14 * 24 : processSlaHours(selectedProcess.code)
+      const assignments = getProcessAssignments(selectedProcess.code).filter((item) => item.type !== "APPROVER")
+      const audience = {
+        roles: Array.from(new Set(assignments.filter((item) => !item.email && item.role).map((item) => item.role!))),
+        emails: Array.from(new Set(assignments.filter((item) => item.email).map((item) => item.email!.toLowerCase()))),
+      }
+      const nowIso = new Date().toISOString()
+      // Experiencia crea proyectos "con propuesta" por iniciativa propia: entra directo a la iteración.
+      const experienceStartsProposal =
+        flow === "PROPUESTA" && hasExperienceAccess(currentUser) && routing.status === "RECIBIDA"
+      const proposalStart = experienceStartsProposal
+        ? {
+            status: "EN_GESTION" as const,
+            managementAcceptedAt: nowIso,
+            managementOwnerEmail: currentUser.email,
+            managementOwnerName: currentUser.name,
+            managementOwnerLabel: "Experiencia de Clientes",
+            currentResponsibleEmail: currentUser.email,
+            currentResponsibleName: currentUser.name,
+            currentResponsibleLabel: "Experiencia de Clientes",
+            resolutionSLAStartedAt: nowIso,
+          }
+        : {}
+
       const request: Omit<RequestItem, "id"> = {
         processCode: selectedProcess.code,
         processName: selectedProcess.name,
@@ -487,8 +554,8 @@ export default function NuevaSolicitud({
         requesterName: currentUser.name,
         requesterRole: currentUser.role,
         local: selectedLocal,
-        fields: buildRequestFields(),
-        createdAt: new Date().toISOString(),
+        fields: builtFields,
+        createdAt: nowIso,
         approvalSLAPausedMinutes: 0,
         resolutionSLAPausedMinutes: 0,
         reopened: false,
@@ -508,7 +575,14 @@ export default function NuevaSolicitud({
           ? (sla?.review?.hours ?? routingApprovalHours)
           : routingApprovalHours,
         acceptanceSLAHours: sla?.acceptance?.hours ?? routingAcceptanceHours,
-        resolutionSLAHours: sla?.resolution?.hours,
+        resolutionSLAHours: slaHours ?? sla?.resolution?.hours,
+        slaFixedDays: flow === "PROPUESTA" ? 14 : selectedProcess.slaDays,
+        slaDefault: flow === "PROPUESTA" ? false : selectedProcess.slaDefault,
+        flow,
+        proposal: flow === "PROPUESTA" ? { round: 0, stage: "EXPERIENCIA" } : undefined,
+        audience,
+        isTest: isBeta || undefined,
+        ...proposalStart,
         confirmationSLAHours: sla?.confirmation?.hours ?? selectedProcess.confirmationHours,
         slaReviewCode: selectedProcess.slaReviewCode,
         slaAcceptanceCode: selectedProcess.slaAcceptanceCode,
@@ -520,12 +594,22 @@ export default function NuevaSolicitud({
       }
 
       const result = await createRequest(currentUser, request)
+      const uploadWarnings: string[] = []
+      if (attachments.length && !isDemoUser(currentUser)) {
+        for (const file of attachments) {
+          try {
+            await uploadRequestAttachment(currentUser, result.request.id, file, "SOLICITUD")
+          } catch (uploadError: any) {
+            uploadWarnings.push(`No se pudo subir "${file.name}": ${uploadError?.message ?? "error"}. Puedes adjuntarlo desde el detalle.`)
+          }
+        }
+      }
       if (breachFromUrl && originExecutionFromUrl) {
         localStorage.setItem(`ditalcar.route.request.${breachFromUrl}`, result.request.id)
       }
       setCreatedId(result.request.id)
       setCreatedStatus(result.request.status)
-      setWarnings(result.warnings)
+      setWarnings([...result.warnings, ...uploadWarnings])
       setStep(4)
     } catch (errorValue: any) {
       setError(
@@ -700,7 +784,9 @@ export default function NuevaSolicitud({
             {visibleFamilies.map((family) => {
               const config = familyInfo[family]
               const Icon = config.icon
-              const development = family === "UNIDADES" && unitsInDevelopment
+              const state = familyState(family)
+              const development = state === "CONSTRUCCION"
+              const beta = state === "BETA"
               return (
                 <button
                   key={family}
@@ -716,10 +802,11 @@ export default function NuevaSolicitud({
                     <div className="request-family-title-row">
                       <h3>{config.label}</h3>
                       {development && <span className="request-development-badge">EN CONSTRUCCIÓN</span>}
+                      {beta && <span className="request-development-badge beta">BETA · PRUEBA</span>}
                     </div>
                     <p>
                       {development
-                        ? "Las solicitudes asociadas a unidades se están preparando y todavía no están habilitadas para este perfil."
+                        ? "Estas solicitudes se están preparando y todavía no están habilitadas."
                         : config.description}
                     </p>
                   </div>
@@ -747,20 +834,32 @@ export default function NuevaSolicitud({
             <p>{familyInfo[selectedFamily].label}</p>
           </div>
           <div className="process-choice-list">
-            {familyProcesses.map((process) => (
-              <button
-                key={process.code}
-                className="process-choice-card"
-                onClick={() => selectProcess(process)}
-              >
-                <div>
-                  <span className="process-code">{process.code}</span>
-                  <h3>{process.name}</h3>
-                  <p>{process.description}</p>
-                </div>
-                <ArrowRight size={20} />
-              </button>
-            ))}
+            {familyProcesses.map((process) => {
+              const requestable = isProcessRequestable(process)
+              return (
+                <button
+                  key={process.code}
+                  className={`process-choice-card ${requestable ? "" : "in-development"}`}
+                  onClick={() => requestable && selectProcess(process)}
+                  disabled={!requestable}
+                  aria-disabled={!requestable}
+                >
+                  <div>
+                    <span className="process-code">
+                      {process.code}
+                      {process.availability === "BETA" && <span className="request-development-badge beta">BETA · PRUEBA</span>}
+                      {!requestable && <span className="request-development-badge">EN CONSTRUCCIÓN</span>}
+                    </span>
+                    <h3>{process.name}</h3>
+                    <p>{requestable ? process.description : "En construcción: todavía no se puede solicitar por la app."}</p>
+                    {requestable && processSlaLabel(process.code) && (
+                      <small className="process-sla">Plazo: {processSlaLabel(process.code)}</small>
+                    )}
+                  </div>
+                  {requestable ? <ArrowRight size={20} /> : <span className="request-development-label">En construcción</span>}
+                </button>
+              )
+            })}
           </div>
         </section>
       )}
@@ -782,6 +881,25 @@ export default function NuevaSolicitud({
                 <p>{selectedProcess.description}</p>
               </div>
 
+              {selectedProcess.availability === "BETA" && (
+                <div className="request-notice beta">
+                  <FlaskConical size={18} />
+                  <div><strong>Versión de prueba</strong><span>{BETA_NOTICE}</span></div>
+                </div>
+              )}
+              {selectedProcess.formNotice && (
+                <div className="request-notice">
+                  <Info size={18} />
+                  <div><span>{selectedProcess.formNotice}</span></div>
+                </div>
+              )}
+              {needsBossReview && (
+                <div className="request-notice">
+                  <Info size={18} />
+                  <div><span>Tu jefatura revisa esta solicitud antes de que llegue al área responsable.</span></div>
+                </div>
+              )}
+
               <div className="dynamic-form">
                 <LocalField
                   localConfig={localConfig}
@@ -796,6 +914,7 @@ export default function NuevaSolicitud({
                     value={values[field.id] ?? ""}
                     onChange={(value) => updateValue(field.id, value)}
                     localOptions={localConfig.options}
+                    modelCatalog={modelCatalog}
                   />
                 ))}
               </div>
@@ -840,6 +959,7 @@ export default function NuevaSolicitud({
                             updateRepeatValue(rowIndex, field.id, value)
                           }
                           localOptions={localConfig.options}
+                          modelCatalog={modelCatalog}
                           forceReadOnly={
                             selectedProcess.formMode === "INSUMOS_2_0" &&
                             field.type === "CATALOG_ITEM"
@@ -925,9 +1045,12 @@ export default function NuevaSolicitud({
                 label="Confirmación"
                 value={`${resolvedSla?.confirmation?.hours ?? selectedProcess.confirmationHours} h`}
               />
-              {resolvedSla?.resolution?.hours !== undefined && (
+              {processSlaLabel(selectedProcess.code) ? (
+                <SummaryRow label="Plazo de gestión" value={processSlaLabel(selectedProcess.code)!} />
+              ) : resolvedSla?.resolution?.hours !== undefined && (
                 <SummaryRow label="Plazo de resolución" value={`${resolvedSla.resolution.hours} h`} />
               )}
+              {selectedProcess.availability === "BETA" && <SummaryRow label="Tipo" value="Prueba · sin validez" />}
               {hasExperienceAccess(currentUser) && (
                 <SummaryRow
                   label="Fuente de SLA"
@@ -1114,15 +1237,64 @@ function DynamicField({
   value,
   onChange,
   localOptions,
+  modelCatalog = [],
   forceReadOnly = false,
 }: {
   field: ProcessFieldDefinition
   value: string
   onChange: (value: string) => void
   localOptions: string[]
+  modelCatalog?: ModelBrand[]
   forceReadOnly?: boolean
 }) {
   const catalog = getSupplyCatalog()
+
+  if (field.type === "BRAND_SELECT") {
+    return (
+      <label className="dynamic-field">
+        <FieldLabel field={field} />
+        <select value={value} onChange={(event) => onChange(event.target.value)}>
+          <option value="">Seleccionar marca</option>
+          {brandOptions(modelCatalog).map((brand) => (
+            <option key={brand} value={brand}>{brand}</option>
+          ))}
+        </select>
+        {field.help && <small>{field.help}</small>}
+      </label>
+    )
+  }
+
+  if (field.type === "MODEL_SELECT") {
+    const isOther = value.startsWith(OTHER_MODEL_PREFIX)
+    return (
+      <label className="dynamic-field">
+        <FieldLabel field={field} />
+        <select
+          value={isOther ? "__OTRO__" : value}
+          onChange={(event) => onChange(event.target.value === "__OTRO__" ? OTHER_MODEL_PREFIX : event.target.value)}
+        >
+          <option value="">{modelCatalog.length ? "Seleccionar modelo" : "Aún no hay listas de precios cargadas · elige Otro"}</option>
+          {modelCatalog.map((brand) => (
+            <optgroup key={brand.marca} label={brand.marca}>
+              {brand.modelos.map((model) => (
+                <option key={`${brand.marca}-${model}`} value={`${brand.marca} · ${model}`}>{model}</option>
+              ))}
+            </optgroup>
+          ))}
+          <option value="__OTRO__">Otro (escribir)</option>
+        </select>
+        {isOther && (
+          <input
+            value={value.slice(OTHER_MODEL_PREFIX.length)}
+            placeholder="Marca y modelo"
+            onChange={(event) => onChange(OTHER_MODEL_PREFIX + event.target.value)}
+            autoFocus
+          />
+        )}
+        {field.help && <small>{field.help}</small>}
+      </label>
+    )
+  }
 
   if (forceReadOnly && field.type === "CATALOG_ITEM") {
     const item = catalog.find((catalogItem) => catalogItem.code === value)

@@ -9,6 +9,7 @@ import {
 } from "../services/usersDirectoryApi"
 import { fetchOperationsStatus, type OperationsStatus } from "../services/operationalCatalogApi"
 import ClavesTemporales from "../components/ClavesTemporales"
+import AgregarUsuario from "../components/AgregarUsuario"
 function roleLabel(role: UserScope["role"]) {
   return role
     .toLowerCase()
@@ -102,6 +103,8 @@ export default function Usuarios() {
           <RefreshCw size={17} /> Actualizar
         </button>
       </div>
+
+      <AgregarUsuario onSaved={() => { void load(); window.dispatchEvent(new Event("ditalcar-users-source-updated")) }} />
 
       <ClavesTemporales users={users} />
 
