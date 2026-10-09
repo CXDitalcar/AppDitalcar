@@ -5,7 +5,7 @@ const validRoles = new Set([
   "VENDEDOR","JEFATURA_LOCAL","JEFATURA_MARCA","JEFATURA_ZONAL","GERENCIA_MARCA",
   "GERENCIA_VENTAS","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES",
   "JEFATURA_ADMINISTRACION","GERENCIA_ADMINISTRACION","GERENCIA_COMERCIAL",
-  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ASISTENTE_GERENCIA","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
+  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ASISTENTE_GERENCIA","ASISTENTE_JUNIOR","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
 ])
 
 const NETWORK_ROLES = new Set([
@@ -19,7 +19,7 @@ export function publicUser(entity) {
   return {
     email: entity.email,
     name: entity.name || entity.email,
-    role: validRoles.has(entity.role) ? entity.role : "VENDEDOR",
+    role: entity.role === "JEFATURA_COMERCIAL_CLIENTES" ? "GERENCIA_MARCA" : validRoles.has(entity.role) ? entity.role : "VENDEDOR",
     local: entity.local || undefined,
     localPrincipal: entity.localPrincipal || entity.local || undefined,
     assignedLocals: parseArray(entity.assignedLocals),
@@ -94,7 +94,11 @@ export async function refreshProfileFromSharePoint(email) {
   const items = await itemsResp.json()
   const normalized = normalizeEmail(email)
   const item = items.value?.find((row) => normalizeEmail(pick(row.fields, ["Email"])) === normalized)
-  if (!item) return null
+  if (!item) {
+    // Usuarios creados en la app (Usuarios › Agregar usuario) siguen válidos aunque no estén en 02_Usuarios.
+    const local = await getUser(normalized)
+    return local?.source === "APP" && local.active !== false ? local : null
+  }
 
   const fields = item.fields || {}
   const activeRaw = pick(fields, ["Activo"])

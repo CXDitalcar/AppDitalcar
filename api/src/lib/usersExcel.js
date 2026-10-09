@@ -4,7 +4,7 @@ const VALID_ROLES = new Set([
   "VENDEDOR","JEFATURA_LOCAL","JEFATURA_MARCA","JEFATURA_ZONAL","GERENCIA_MARCA",
   "GERENCIA_VENTAS","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES",
   "JEFATURA_ADMINISTRACION","GERENCIA_ADMINISTRACION","GERENCIA_COMERCIAL",
-  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ASISTENTE_GERENCIA","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
+  "JEFATURA_MARKETING","EXPERIENCIA_CLIENTES","PROJECT_MANAGER","ASISTENTE_GERENCIA","ASISTENTE_JUNIOR","ADMINISTRATIVO","EQUIPO_COMERCIAL","GERENCIA_GENERAL"
 ])
 
 function normalize(value) {
@@ -51,6 +51,7 @@ function bool(value, fallback = true) {
 function mapRole(value) {
   const raw = cellText(value)
   const upper = raw.toUpperCase().replace(/\s+/g, "_")
+  if (upper === "JEFATURA_COMERCIAL_CLIENTES") return "GERENCIA_MARCA" // rol eliminado el 08-10: ahora es Gerencia de Marca
   if (VALID_ROLES.has(upper)) return upper
 
   const aliases = {
@@ -63,8 +64,8 @@ function mapRole(value) {
     gerenciademarca: "GERENCIA_MARCA",
     gerenciamarca: "GERENCIA_MARCA",
     gerenciaventas: "GERENCIA_VENTAS",
-    jefaturacomercialyclientes: "JEFATURA_COMERCIAL_CLIENTES",
-    jefaturacomercialclientes: "JEFATURA_COMERCIAL_CLIENTES",
+    jefaturacomercialyclientes: "GERENCIA_MARCA",
+    jefaturacomercialclientes: "GERENCIA_MARCA",
     jefaturaoperacionescomerciales: "JEFATURA_OPERACIONES_COMERCIALES",
     jefaturaadministracion: "JEFATURA_ADMINISTRACION",
     gerenciaadministracion: "GERENCIA_ADMINISTRACION",
@@ -81,7 +82,9 @@ function mapRole(value) {
     asistenciadegerencia: "ASISTENTE_GERENCIA",
     asistenciagerencia: "ASISTENTE_GERENCIA",
     administrativo: "ADMINISTRATIVO",
-    junior: "ADMINISTRATIVO",
+    junior: "ASISTENTE_JUNIOR",
+    asistentejunior: "ASISTENTE_JUNIOR",
+    juniorpreparador: "ASISTENTE_JUNIOR",
     equipocomercial: "EQUIPO_COMERCIAL",
     gerenciageneral: "GERENCIA_GENERAL",
   }

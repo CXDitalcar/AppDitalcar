@@ -26,6 +26,16 @@ function emailKey(email) {
   return Buffer.from(normalizeEmail(email)).toString("base64url")
 }
 
+// Usuarios creados dentro de DitalApp por Experiencia/PM (source = "APP").
+export async function listAppUsers() {
+  await ensureTables()
+  const rows = []
+  for await (const entity of clients.users.listEntities({ queryOptions: { filter: "PartitionKey eq 'USER' and source eq 'APP'" } })) {
+    rows.push(entity)
+  }
+  return rows
+}
+
 export async function getUser(email) {
   await ensureTables()
   try {
