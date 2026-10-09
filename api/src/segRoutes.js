@@ -4,14 +4,14 @@
 import { json, body } from "./lib/http.js"
 import { appFilesContainer, getDataFileState } from "./lib/dataFiles.js"
 import { DATA_KINDS } from "./lib/datosParsers.js"
-import { parsePriceList, readModelCatalog, readResources, removeBrand, saveBrandModels, saveResources, validUrl } from "./lib/catalogoDatos.js"
-import { appendImportLog, getImportLog, mergeMaster, readAllMasters } from "./lib/datosStore.js"
+import { cleanResourceItems, parsePriceList, readLocals, saveLocals, readModelCatalog, readResources, removeBrand, saveBrandModels, saveResources, validUrl } from "./lib/catalogoDatos.js"
+import { appendImportLog, getImportLog, mergeMaster, readAllMasters, readMaster } from "./lib/datosStore.js"
 import {
   CONTACT_RESULTS, addContact, confirmDelivery, getClaim, importContacts, readSegData, saveClaim, saveReview,
 } from "./lib/segStore.js"
 import {
   BUCKETS, CLAIM_LEVELS, CLAIM_LEVEL_LABELS, DEFAULT_RULES, canActOnClaim, canCommentClaim, canRegisterContacts,
-  canSeeClaim, canSeeRow, computeSeguimiento, isBranchHeadOf, isFullViewer, isSellerOf, trasladosForRow,
+  canSeeClaim, canSeeRow, computeSeguimiento, inMacroScope, isBranchHeadOf, isFullViewer, isSellerOf, trasladosForRow,
 } from "./lib/seguimiento.js"
 import { QUICK_RESPONSES, RECLAMO_MESSAGE } from "./lib/segMessages.js"
 import { normRut } from "./lib/segNormalize.js"
@@ -139,6 +139,23 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
     }),
   })
 
+  // ================= LOCALES =================
+  app.http("catalogo-locales", {
+    methods: ["GET", "POST"], authLevel: "anonymous", route: "catalogo/locales",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      if (request.method === "GET") return json(200, { locales: await readLocals() })
+      if (!isExperienceUser(user)) return forbidden()
+      try {
+        const locales = await saveLocals((await body(request)).locales, user.email)
+        return json(200, { message: "Locales guardados.", locales })
+      } catch (error) {
+        return json(400, { message: error?.message || "No fue posible guardar los locales." })
+      }
+    }),
+  })
+
   // ================= RECURSOS DE ACADEMIA (link a carpeta) =================
   app.http("academia-recursos", {
     methods: ["GET", "POST"], authLevel: "anonymous", route: "academia/recursos",
@@ -149,8 +166,12 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
       if (!isExperienceUser(user)) return forbidden()
       const data = await body(request)
       try {
-        const saved = await saveResources({ carpetaUrl: validUrl(data.carpetaUrl) }, user.email)
-        return json(200, { message: saved.carpetaUrl ? "Enlace guardado." : "Enlace eliminado.", ...saved })
+        const patch = {}
+        if (data.carpetaUrl !== undefined) patch.carpetaUrl = validUrl(data.carpetaUrl)
+        if (data.items !== undefined) patch.items = cleanResourceItems(data.items)
+        const saved = await saveResources(patch, user.email)
+        const message = data.items !== undefined ? "Recursos guardados." : saved.carpetaUrl ? "Enlace guardado." : "Enlace eliminado."
+        return json(200, { message, ...saved })
       } catch (error) {
         return json(400, { message: error?.message || "Enlace no válido." })
       }
@@ -163,8 +184,9 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
     handler: handle(async (request) => {
       const user = await currentUser(request)
       if (!isExperienceUser(user)) return forbidden()
-      const [log, masters, seg] = await Promise.all([getImportLog(), readAllMasters(), readSegData()])
-      const meta = sourcesMeta(masters)
+      const masterKinds = Object.entries(DATA_KINDS).filter(([, def]) => def.store === "master").map(([kind]) => kind)
+      const [log, masterList, seg] = await Promise.all([getImportLog(), Promise.all(masterKinds.map((k) => readMaster(k))), readSegData()])
+      const meta = sourcesMeta(Object.fromEntries(masterKinds.map((k, i) => [k, masterList[i]])))
       const fuentes = Object.entries(DATA_KINDS).map(([kind, def]) => ({
         kind, label: def.label,
         registros: def.store === "master" ? meta[kind]?.registros || 0 : seg.contactos.filter((c) => c.source === (kind === "consolidado" ? "IMPORT_CONSOLIDADO" : "IMPORT_OPERATIVO")).length,
@@ -232,11 +254,13 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
       if (!user) return json(401, { message: "Sesión no válida." })
       const nv = String(request.query.get("nv") || "")
       const rutParam = normRut(request.query.get("rut") || "")
-      const { masters, seg, result } = await loadAll(user)
+      const { masters, seg, rules, result } = await loadAll(user)
       const anchor = result.rows.find((r) => r.nv === nv) || result.rows.find((r) => rutParam && r.rut === rutParam)
       if (!anchor) return json(404, { message: "No encontré esa NV o ese cliente en los datos cargados." })
       const rut = anchor.rut
-      const rows = result.rows.filter((r) => (rut ? r.rut === rut : r.nv === anchor.nv)).filter((r) => canSeeRow(user, r))
+      // Quien tiene a cargo un reclamo de este cliente puede abrir la ficha para gestionarlo.
+      const claimNvs = new Set(seg.reclamos.filter((c) => c.estado !== "CERRADO" && canActOnClaim(user, c)).map((c) => c.nv))
+      const rows = result.rows.filter((r) => (rut ? r.rut === rut : r.nv === anchor.nv)).filter((r) => canSeeRow(user, r, rules) || claimNvs.has(r.nv))
       if (!rows.length) return forbidden()
       const nvs = new Set(rows.map((r) => r.nv))
       const unidades = rows.map((r) => ({
@@ -327,9 +351,52 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
         ...rules,
         stellantisSoloPromotores: data.stellantisSoloPromotores !== undefined ? Boolean(data.stellantisSoloPromotores) : rules.stellantisSoloPromotores,
         diasCompraReciente: Math.min(Math.max(Number(data.diasCompraReciente ?? rules.diasCompraReciente) || 15, 1), 90),
+        detallePropio: data.detallePropio !== undefined ? Boolean(data.detallePropio) : Boolean(rules.detallePropio),
       }
       await setAppConfig(RULES_KEY, JSON.stringify(next), { updatedBy: user.email })
       return json(200, next)
+    }),
+  })
+
+  // ---------- vista macro (todos los perfiles, sin datos de clientes) ----------
+  app.http("seg-macro", {
+    methods: ["GET"], authLevel: "anonymous", route: "seguimiento/macro",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      const { seg, rules, result } = await loadAll(user)
+      const rows = result.rows.filter((r) => r.bucket !== "fuera" && inMacroScope(user, r))
+      const nvs = new Set(rows.map((r) => r.nv))
+      const contacted = rows.filter((r) => r.totalContactos > 0)
+      const respondidos = rows.filter((r) => seg.contactos.some((c) => c.nv === r.nv && ["RESPONDIDO", "DERIVADO_EJECUTIVO", "DERIVADO_EXPERIENCIA"].includes(c.result)))
+      const entregas = rows.filter((r) => r.entrega)
+      const percep = (p) => entregas.filter((r) => r.entrega?.percepcion === p).length
+      const reclamos = seg.reclamos.filter((c) => c.estado !== "CERRADO" && nvs.has(c.nv))
+      const byLocal = {}
+      for (const r of rows) {
+        const k = r.local || "Sin local"
+        byLocal[k] = byLocal[k] || { local: k, total: 0, contactados: 0, entregados: 0, etapas: [0, 0, 0, 0] }
+        byLocal[k].total += 1
+        if (r.totalContactos > 0) byLocal[k].contactados += 1
+        if (r.entrega) byLocal[k].entregados += 1
+        byLocal[k].etapas[(r.etapa || 1) - 1] += 1
+      }
+      const detalle = rules.detallePropio && !isFullViewer(user)
+        ? rows.filter((r) => isSellerOf(user, r) || isBranchHeadOf(user, r)).slice(0, 200)
+          .map((r) => ({ nv: r.nv, cliente: r.cliente, marca: r.marca, modelo: r.modelo, local: r.local, etapaLabel: r.etapaLabel, ultimoContacto: r.ultimoContacto ? { result: r.ultimoContacto.result, at: r.ultimoContacto.at } : null }))
+        : null
+      return json(200, {
+        total: rows.length,
+        etapas: [1, 2, 3, 4].map((e) => ({ etapa: e, total: rows.filter((r) => r.etapa === e).length })),
+        contactados: contacted.length,
+        respondidos: respondidos.length,
+        entregasConfirmadas: entregas.length,
+        promotores: percep("PROMOTOR"), neutros: percep("NEUTRO"), detractores: percep("DETRACTOR"),
+        reclamosAbiertos: { total: reclamos.length, SUCURSAL: reclamos.filter((c) => c.nivel === "SUCURSAL").length, MARCA: reclamos.filter((c) => c.nivel === "MARCA").length, COMERCIAL: reclamos.filter((c) => c.nivel === "COMERCIAL").length },
+        porLocal: Object.values(byLocal).sort((a, b) => b.total - a.total),
+        detalle,
+        actualizado: result.generatedAt,
+      })
     }),
   })
 
@@ -422,7 +489,11 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
         }
       }
       const { masters, seg, result } = await loadAll(realUser)
-      if (!Object.keys(masters.siga.records || {}).length) return json(200, { entregas: [], derivaciones: [], reclamos: [], ayuda: [] })
+      if (!Object.keys(masters.siga.records || {}).length) return json(200, { entregas: [], derivaciones: [], reclamos: [], ayuda: [], contactos: null })
+      // Contactos de seguimiento pendientes (Asistente de Gerencia, Experiencia y PM).
+      const contactos = isFullViewer(user)
+        ? { enviar: result.counts.enviar || 0, reintentar: result.counts.reintentar || 0, revisar: isExperienceUser(user) ? result.counts.revisar || 0 : 0 }
+        : null
       const entregas = result.rows.filter((r) => r.confirmarEntrega && r.bucket !== "fuera" && (isSellerOf(user, r) || isBranchHeadOf(user, r)))
         .map((r) => ({ nv: r.nv, cliente: r.cliente, marca: r.marca, modelo: r.modelo, local: r.local, vendedor: r.vendedor, fechaFactura: r.fechaFactura, fechaRecepcion: r.fechaRecepcion, prioritaria: r.entregaPrioritaria }))
       const derivaciones = result.rows.filter((r) => r.ultimoContacto?.result === "DERIVADO_EJECUTIVO" && isSellerOf(user, r))
@@ -431,7 +502,7 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
         .map((c) => ({ id: c.id, nv: c.nv, cliente: c.cliente, motivo: c.motivo, urgencia: c.urgencia, nivel: c.nivel, nivelLabel: CLAIM_LEVEL_LABELS[c.nivel], creadoAt: c.creadoAt }))
       const ayuda = isExperienceUser(user) ? seg.reclamos.filter((c) => c.estado !== "CERRADO" && c.ayudaSolicitada)
         .map((c) => ({ id: c.id, nv: c.nv, cliente: c.cliente, motivo: c.motivo, nivelLabel: CLAIM_LEVEL_LABELS[c.nivel] })) : []
-      return json(200, { entregas, derivaciones, reclamos, ayuda })
+      return json(200, { entregas, derivaciones, reclamos, ayuda, contactos })
     }),
   })
 

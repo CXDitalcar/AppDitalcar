@@ -50,7 +50,9 @@ import {
 } from "./lib/routeStore.js"
 import { saveRouteEvidence } from "./lib/routeEvidence.js"
 import { registerSegRoutes } from "./segRoutes.js"
-import { listAppDirectoryUsers, saveAppUser } from "./lib/appUsers.js"
+import { registerOpsRoutes } from "./opsRoutes.js"
+import { importAppUsers, listAppDirectoryUsers, saveAppUser } from "./lib/appUsers.js"
+import { parseUsersWorkbook } from "./lib/usersExcel.js"
 import {
   appendRequestTimeline,
   getRequestStored,
@@ -670,6 +672,95 @@ app.http("kpi-upload", {
   },
 })
 
+// KPI manual (pegar datos o foto + cifras principales) mientras no haya archivo/enlace que funcione.
+const KPI_NUMBER_FIELDS = [
+  "notesSales", "newVehicleSales", "newVehicleValid", "newVehicleCancelled", "newVehicleOrdersBilled",
+  "usedVehicleSales", "usedVehicleValid", "usedVehicleCancelled", "usedVehicleOrdersBilled",
+  "billingCurrentNew", "billingCurrentUsed", "billingPreviousNew", "billingPreviousUsed",
+  "pendingInvoiceNew", "pendingInvoiceUsed", "goal",
+]
+const MONTHS = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"]
+function num(value) {
+  const n = Number(String(value ?? "").replace(/[^0-9,.-]/g, "").replace(/\.(?=\d{3}(\D|$))/g, "").replace(",", "."))
+  return Number.isFinite(n) ? n : 0
+}
+function manualSnapshot(input, photo, previous) {
+  const s = {}
+  for (const key of KPI_NUMBER_FIELDS) s[key] = num(input[key])
+  const monthNumber = Math.min(12, Math.max(1, Number(input.month) || new Date().getMonth() + 1))
+  const year = Number(input.year) || new Date().getFullYear()
+  s.period = { monthNumber, month: MONTHS[monthNumber - 1], year }
+  s.validSalesTotal = s.newVehicleValid + s.usedVehicleValid
+  s.cancelledTotal = s.newVehicleCancelled + s.usedVehicleCancelled
+  s.ordersBilledTotal = s.newVehicleOrdersBilled + s.usedVehicleOrdersBilled
+  s.billingCurrentTotal = s.billingCurrentNew + s.billingCurrentUsed
+  s.billingPreviousTotal = s.billingPreviousNew + s.billingPreviousUsed
+  const variation = (a, b) => (b ? a / b - 1 : 0)
+  s.variationTotal = variation(s.billingCurrentTotal, s.billingPreviousTotal)
+  s.variationNew = variation(s.billingCurrentNew, s.billingPreviousNew)
+  s.variationUsed = variation(s.billingCurrentUsed, s.billingPreviousUsed)
+  s.compliance = s.goal ? s.billingCurrentTotal / s.goal : 0
+  s.remaining = Math.max(0, 1 - s.compliance)
+  return {
+    summary: s,
+    detail: [],
+    evolution: { total: [], newVehicles: [], usedVehicles: [] },
+    meta: {
+      sourceUrl: "manual",
+      sourceType: "manual",
+      checkedAt: new Date().toISOString(),
+      dashboardSheet: "",
+      graphsSheet: "",
+      fileName: photo ? photo.fileName : "Cifras ingresadas en DitalApp",
+      photo: photo || previous?.meta?.photo || null,
+      note: String(input.note || "").slice(0, 300),
+    },
+  }
+}
+
+app.http("kpi-manual", {
+  methods: ["POST"], authLevel: "anonymous", route: "kpi/manual",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes." })
+    try {
+      const data = await body(request)
+      let photo = null
+      if (data.photo?.dataBase64) {
+        const buffer = Buffer.from(String(data.photo.dataBase64), "base64")
+        if (buffer.length > 10 * 1024 * 1024) return json(400, { message: "La foto supera 10 MB." })
+        if (!/^image\//.test(String(data.photo.contentType || ""))) return json(400, { message: "La foto debe ser una imagen." })
+        const container = await (await import("./lib/dataFiles.js")).appFilesContainer()
+        const blobName = `kpi/fotos/${Date.now()}.jpg`
+        await container.getBlockBlobClient(blobName).uploadData(buffer, { blobHTTPHeaders: { blobContentType: data.photo.contentType } })
+        photo = { blobName, fileName: String(data.photo.fileName || "foto-kpi.jpg"), uploadedAt: new Date().toISOString() }
+      }
+      const previous = await getKpiSnapshot()
+      const snapshot = manualSnapshot(data.summary || {}, photo, data.keepPhoto ? previous : null)
+      await saveKpiSnapshot(snapshot, user.email)
+      await saveKpiSourceMode("manual", user.email)
+      return json(200, { message: "Cifras KPI guardadas.", data: snapshot, activeMode: "manual" })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible guardar las cifras KPI." })
+    }
+  },
+})
+
+app.http("kpi-photo", {
+  methods: ["GET"], authLevel: "anonymous", route: "kpi/foto",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!user) return json(401, { message: "Sesión no válida." })
+    const snapshot = await getKpiSnapshot()
+    const blobName = snapshot?.meta?.photo?.blobName
+    if (!blobName) return json(404, { message: "Sin foto KPI." })
+    const container = await (await import("./lib/dataFiles.js")).appFilesContainer()
+    const client = container.getBlockBlobClient(blobName)
+    const props = await client.getProperties()
+    return { status: 200, body: await client.downloadToBuffer(), headers: { "Content-Type": props.contentType || "image/jpeg", "Cache-Control": "private, max-age=300" } }
+  },
+})
+
 app.http("kpi-data", {
   methods: ["GET"], authLevel: "anonymous", route: "kpi/data",
   handler: async (request) => {
@@ -677,7 +768,7 @@ app.http("kpi-data", {
     if (!user) return json(401, { message: "Sesión no válida." })
     const snapshot = await getKpiSnapshot()
     if (snapshot) return json(200, { ...snapshot, stale: false })
-    return json(503, { message: "Todavía no existe un snapshot KPI válido. Conecta o sube un archivo desde Gestión → KPI." })
+    return json(503, { message: "Todavía no existe un snapshot KPI válido. La fuente se carga en Gestión › Datos." })
   },
 })
 
@@ -689,6 +780,11 @@ app.http("kpi-refresh", {
     const mode = await getKpiSourceMode()
     try {
       let result
+      if (mode === "manual") {
+        const snapshot = await getKpiSnapshot()
+        if (!snapshot) throw new Error("No hay cifras KPI cargadas.")
+        return json(200, { message: "Las cifras se cargaron manualmente; no hay archivo que releer.", data: snapshot })
+      }
       if (mode === "upload") {
         const upload = await getKpiUploadMeta()
         if (!upload?.blobName) throw new Error("No hay un archivo KPI subido todavía.")
@@ -916,7 +1012,7 @@ app.http("stored-request-detail", {
     if (!user) return json(401, { message: "Sesión no válida." })
     const existing = await getRequestStored(request.params.id)
     if (!existing) return json(404, { message: "Solicitud no encontrada." })
-    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
+    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "Esta solicitud no está a tu cargo." })
     if (request.method === "GET") return json(200, { request: publicRequest(existing) })
 
     const data = await body(request)
@@ -951,7 +1047,7 @@ app.http("stored-request-history", {
     if (!user) return json(401, { message: "Sesión no válida." })
     const existing = await getRequestStored(request.params.id)
     if (!existing) return json(404, { message: "Solicitud no encontrada." })
-    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
+    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "Esta solicitud no está a tu cargo." })
     return json(200, { history: await getRequestTimelineStored(existing.id) })
   },
 })
@@ -963,7 +1059,7 @@ app.http("stored-request-attachments", {
     if (!user) return json(401, { message: "Sesión no válida." })
     const existing = await getRequestStored(request.params.id)
     if (!existing) return json(404, { message: "Solicitud no encontrada." })
-    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
+    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "Esta solicitud no está a tu cargo." })
     try {
       const data = await body(request)
       const buffer = Buffer.from(String(data.dataBase64 || ""), "base64")
@@ -1000,7 +1096,7 @@ app.http("stored-request-attachment-file", {
     if (!user) return json(401, { message: "Sesión no válida." })
     const existing = await getRequestStored(request.params.id)
     if (!existing) return json(404, { message: "Solicitud no encontrada." })
-    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "No tienes acceso a esta solicitud." })
+    if (!canSeeStoredRequest(user, existing)) return json(403, { message: "Esta solicitud no está a tu cargo." })
     const attachment = (existing.attachments || []).find((item) => item.id === request.params.attachmentId)
     if (!attachment?.blobName) return json(404, { message: "Adjunto no encontrado." })
     const file = await readRequestAttachment(attachment.blobName)
@@ -1027,6 +1123,26 @@ app.http("users-app", {
       return json(200, { message: `${saved.name} quedó ${saved.active ? "activo" : "inactivo"} en DitalApp.`, user: saved })
     } catch (error) {
       return json(400, { message: error?.message || "No fue posible guardar el usuario." })
+    }
+  },
+})
+
+app.http("users-app-import", {
+  methods: ["POST"], authLevel: "anonymous", route: "users/app/import",
+  handler: async (request) => {
+    const user = await currentUser(request)
+    if (!isExperienceUser(user)) return json(403, { message: "Acceso reservado para Experiencia de Clientes y Project Manager." })
+    try {
+      const data = await body(request)
+      const buffer = Buffer.from(String(data.dataBase64 || ""), "base64")
+      if (!buffer.length) return json(400, { message: "El archivo está vacío." })
+      if (buffer.length > 8 * 1024 * 1024) return json(400, { message: "El archivo supera 8 MB." })
+      const parsed = await parseUsersWorkbook(buffer)
+      if (!parsed.users.length) return json(400, { message: "No encontré usuarios con correo en el archivo." })
+      const summary = await importAppUsers(parsed.users, user.email)
+      return json(200, { message: `Importación lista: ${summary.nuevos} nuevos, ${summary.actualizados} actualizados.`, summary: { ...summary, sinCorreo: parsed.skipped } })
+    } catch (error) {
+      return json(400, { message: error?.message || "No fue posible leer el archivo." })
     }
   },
 })
@@ -1240,3 +1356,5 @@ app.http("auth-logout", {
 
 // Datos, Seguimiento de clientes y claves temporales (ver segRoutes.js).
 registerSegRoutes({ app, currentUser, isExperienceUser, publicUser, sessionDays: SESSION_DAYS })
+// Ventas, Frogmi y Gespark (ver opsRoutes.js).
+registerOpsRoutes({ app, currentUser, isExperienceUser })
