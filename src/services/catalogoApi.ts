@@ -46,7 +46,9 @@ export function brandOptions(catalog: ModelBrand[]) {
   return [...seen.values()].sort((a, b) => a.localeCompare(b, "es"))
 }
 
-export type AcademyResources = { carpetaUrl: string; updatedAt?: string; updatedBy?: string }
+export type ResourceCategory = "GENERAL" | "FICHAS" | "INSTRUCTIVOS"
+export type AcademyResourceItem = { id: string; title: string; url: string; category: ResourceCategory; brand?: string; pinned?: boolean }
+export type AcademyResources = { carpetaUrl: string; items?: AcademyResourceItem[]; updatedAt?: string; updatedBy?: string }
 
 export function getAcademyResources() {
   return apiJson<AcademyResources>("/api/academia/recursos")
@@ -56,5 +58,12 @@ export function saveAcademyResources(carpetaUrl: string) {
   return apiJson<AcademyResources & { message: string }>("/api/academia/recursos", {
     method: "POST",
     body: JSON.stringify({ carpetaUrl }),
+  })
+}
+
+export function saveAcademyResourceItems(items: AcademyResourceItem[]) {
+  return apiJson<AcademyResources & { message: string }>("/api/academia/recursos", {
+    method: "POST",
+    body: JSON.stringify({ items }),
   })
 }

@@ -1,7 +1,7 @@
 // Carga de planillas en "Datos": se suben por bloques (sirve para archivos de
 // varios MB, como el Control de unidades) y luego el backend las procesa.
 
-export type DataKind = "siga" | "control" | "traslados" | "consolidado" | "operativo"
+export type DataKind = "siga" | "control" | "traslados" | "consolidado" | "operativo" | "extranet" | "frogmi" | "notificados"
 
 export type ImportSummary = {
   leidos: number

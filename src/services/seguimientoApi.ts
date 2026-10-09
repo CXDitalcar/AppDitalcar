@@ -80,6 +80,22 @@ export type Reglas = {
   diasCompraReciente: number
   diasVigenciaRecibido: number
   diasVentanaEntrega: number
+  detallePropio?: boolean
+}
+
+export type SegMacro = {
+  total: number
+  etapas: { etapa: number; total: number }[]
+  contactados: number
+  respondidos: number
+  entregasConfirmadas: number
+  promotores: number
+  neutros: number
+  detractores: number
+  reclamosAbiertos: { total: number; SUCURSAL: number; MARCA: number; COMERCIAL: number }
+  porLocal: { local: string; total: number; contactados: number; entregados: number; etapas: number[] }[]
+  detalle: { nv: string; cliente: string; marca: string; modelo: string; local: string; etapaLabel: string; ultimoContacto: { result: string; at: string } | null }[] | null
+  actualizado: string
 }
 
 export type Reclamo = {
@@ -137,6 +153,7 @@ export type Pendientes = {
   derivaciones: { nv: string; cliente: string; telefono: string; marca: string; modelo: string; observacion: string; at: string }[]
   reclamos: { id: string; nv: string; cliente: string; motivo: string; urgencia: string; nivel: string; nivelLabel: string; creadoAt: string }[]
   ayuda: { id: string; nv: string; cliente: string; motivo: string; nivelLabel: string }[]
+  contactos?: { enviar: number; reintentar: number; revisar: number } | null
 }
 
 async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
@@ -153,6 +170,7 @@ async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
 const post = <T>(path: string, data: unknown) => apiJson<T>(path, { method: "POST", body: JSON.stringify(data) })
 
 export const getSeguimiento = () => apiJson<SegLista>("/api/seguimiento/lista")
+export const getSeguimientoMacro = () => apiJson<SegMacro>("/api/seguimiento/macro")
 export const getFicha = (params: { nv?: string; rut?: string }) =>
   apiJson<Ficha>(`/api/seguimiento/ficha?${new URLSearchParams(Object.entries(params).filter(([, v]) => v) as [string, string][]).toString()}`)
 export const registrarContacto = (data: { nv: string; stage?: number; quickId?: string; result?: string; observacion?: string }) =>

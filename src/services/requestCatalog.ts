@@ -1,7 +1,6 @@
 import { mockUsers } from "../data/mockData"
 import {
   demoSupplyCatalog,
-  ditalcarLocals,
   knownPeopleByEmail,
   requestAssignments as fallbackAssignments,
   requestFields as fallbackFields,
@@ -9,6 +8,7 @@ import {
 } from "../data/requestConfig"
 import { PILOT_LOCAL } from "../data/pilotStellantis"
 import { applyCatalogV2 } from "../data/requestCatalogV2"
+import { getLocals } from "./localesStore"
 import { hasExperienceAccess } from "./experienceAccess"
 import { fetchOperationalCatalog, type OperationalCatalogMeta, type UsersCatalogMeta } from "./operationalCatalogApi"
 import type {
@@ -191,16 +191,16 @@ export function getLocalOptions(user: UserScope, forcedLocal?: string) {
   const brandScope = user.scope === "MARCA" || user.role === "GERENCIA_MARCA" || user.role === "JEFATURA_MARCA"
   if (brandScope && user.brands?.length) {
     const brands = user.brands.map(normalized)
-    const options = ditalcarLocals.filter((local) => local.brands.some((brand) => brands.includes(normalized(brand)))).map((local) => local.name)
+    const options = getLocals().filter((local) => local.brands.some((brand) => brands.includes(normalized(brand)))).map((local) => local.name)
     return { mode: options.length > 1 ? ("SELECT" as const) : ("LOCKED" as const), options, selected: options[0] ?? "" }
   }
   if (user.role === "JEFATURA_ZONAL" || user.scope === "ZONA") {
-    const options = ditalcarLocals.filter((local) => local.operation !== "GEELY" && local.operation !== "STELLANTIS").map((local) => local.name)
+    const options = getLocals().filter((local) => local.operation !== "GEELY" && local.operation !== "STELLANTIS").map((local) => local.name)
     return { mode: "SELECT" as const, options, selected: options[0] ?? "" }
   }
   const redRoles: UserScope["role"][] = ["GERENCIA_VENTAS","GERENCIA_COMERCIAL","GERENCIA_ADMINISTRACION","JEFATURA_COMERCIAL_CLIENTES","JEFATURA_OPERACIONES_COMERCIALES","JEFATURA_ADMINISTRACION","JEFATURA_MARKETING","EXPERIENCIA_CLIENTES", "PROJECT_MANAGER"]
   if (user.scope === "RED" || redRoles.includes(user.role)) {
-    const options = ditalcarLocals.map((local) => local.name)
+    const options = getLocals().map((local) => local.name)
     return { mode: "SELECT" as const, options, selected: options[0] ?? "" }
   }
   return { mode: "LOCKED" as const, options: [user.local ?? PILOT_LOCAL], selected: user.local ?? PILOT_LOCAL }
