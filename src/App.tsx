@@ -20,6 +20,9 @@ import RutaExperiencia from "./pages/RutaExperiencia"
 import Gestion from "./pages/Gestion"
 import Datos from "./pages/Datos"
 import Seguimiento from "./pages/Seguimiento"
+import SeguimientoMacro from "./pages/SeguimientoMacro"
+import Ventas from "./pages/Ventas"
+import Frogmi from "./pages/Frogmi"
 import ClienteFicha from "./pages/ClienteFicha"
 
 import { appConfig } from "./config"
@@ -36,6 +39,7 @@ import {
 } from "./services/requestCatalog"
 import type { UserScope } from "./types"
 import { canSeeDatos, canSeeSeguimiento, hasExperienceAccess } from "./services/experienceAccess"
+import { loadLocals } from "./services/localesStore"
 
 export default function App() {
   const [apiUser, setApiUser] = useState<UserScope | null>(null)
@@ -64,6 +68,7 @@ export default function App() {
     if (!apiUser) return
     let active = true
     const refreshCatalog = () => {
+      void loadLocals()
       loadOperationalCatalog()
         .finally(() => {
           if (active) setCatalogVersion((value) => value + 1)
@@ -226,7 +231,26 @@ export default function App() {
 
           <Route
             path="/seguimiento"
-            element={canSeeSeguimiento(currentUser) ? <Seguimiento currentUser={currentUser} /> : <Navigate to="/" replace />}
+            element={
+              canSeeSeguimiento(currentUser) ? (
+                <Seguimiento currentUser={currentUser} />
+              ) : currentUser.role === "ASISTENTE_JUNIOR" ? (
+                <Navigate to="/" replace />
+              ) : (
+                <SeguimientoMacro />
+              )
+            }
+          />
+
+          <Route path="/ventas" element={<Ventas currentUser={currentUser} />} />
+
+          <Route
+            path="/frogmi"
+            element={
+              hasExperienceAccess(currentUser) || currentUser.role === "ASISTENTE_JUNIOR" || currentUser.role === "JEFATURA_LOCAL"
+                ? <Frogmi />
+                : <Navigate to="/" replace />
+            }
           />
 
           <Route path="/seguimiento/cliente" element={<ClienteFicha currentUser={currentUser} />} />
