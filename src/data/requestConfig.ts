@@ -5475,6 +5475,8 @@ export const ditalcarLocals = [
   { name: "JMC-KGM Nueva Tobalaba", brands: ["KGM", "JMC"], operation: "GENERAL" },
   { name: "Chery Tobalaba", brands: ["Chery"], operation: "GENERAL" },
   { name: "Geely Florida", brands: ["Geely"], operation: "GEELY" },
+  { name: "Chery Florida", brands: ["Chery"], operation: "GENERAL" },
+  { name: "Cantagallo", brands: ["Chery", "Mitsubishi", "JMC", "KGM"], operation: "GENERAL" },
 ] as const
 
 export const demoSupplyCatalog = [

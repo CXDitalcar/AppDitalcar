@@ -113,8 +113,8 @@ const PROCESS_PATCHES: Record<string, ProcessPatch> = {
 
   // ---------- Marketing ----------
   "COM-PME-01": {
-    family: "COMERCIAL", requesterRoles: MARKETING_ROLES, localReviewRule: "SOLO_VENDEDOR",
-    slaDays: 5, availability: "ACTIVO", areaLabel: "Marketing", order: 10,
+    family: "DOCUMENTACION", requesterRoles: MARKETING_ROLES, localReviewRule: "SOLO_VENDEDOR",
+    slaDays: 5, availability: "ACTIVO", areaLabel: "Marketing", order: 15,
     description: "Patente de modelo o de exhibición para el showroom.",
   },
   "COM-MAT-01": {
@@ -213,6 +213,11 @@ const FIELD_REPLACEMENTS: Record<string, ProcessFieldDefinition[]> = {
     field("COM-PME-01", "CANTIDAD", "Cantidad", "NUMBER", 30, { required: true }),
     field("COM-PME-01", "MOTIVO", "Motivo / detalle", "TEXTAREA", 40),
   ],
+  "COM-OTR-01": [
+    field("COM-OTR-01", "DETALLE", "¿Qué necesitas?", "TEXTAREA", 10, { required: true }),
+    field("COM-OTR-01", "MARCA", "Marca (si aplica)", "BRAND_SELECT", 20),
+    field("COM-OTR-01", "PRIORIDAD", "Prioridad", "SELECT", 30, { required: true, options: ["Normal", "Alta"] }),
+  ],
   "COM-MAT-01": [
     field("COM-MAT-01", "TIPO_MATERIAL", "Tipo de material", "SELECT", 10, { required: true, options: ["Bandera", "Gráfica", "POP", "Pendón", "Otro"] }),
     field("COM-MAT-01", "MARCA", "Marca", "BRAND_SELECT", 20),
@@ -249,6 +254,32 @@ function experienceManager(processCode: string): ProcessAssignment {
 
 const REMOVED_ROLE: UserRole = "JEFATURA_COMERCIAL_CLIENTES"
 
+// Procesos nuevos que aún no existen en la LIST 22_Procesos.
+const EXTRA_PROCESSES: ProcessConfig[] = [
+  {
+    code: "COM-OTR-01",
+    name: "Otra solicitud de Marketing",
+    family: "COMERCIAL",
+    description: "Necesidades de Marketing que no son banderas ni materiales.",
+    formMode: "DINAMICO",
+    requesterRoles: MARKETING_ROLES,
+    localReviewRule: "SOLO_VENDEDOR",
+    allowsAmountAdjustment: false,
+    allowsAttachments: true,
+    requiresAttachment: false,
+    manualRequest: true,
+    fromBreach: false,
+    areaLabel: "Marketing",
+    confirmationHours: 48,
+    version: 1,
+    order: 30,
+    active: true,
+    availability: "ACTIVO",
+    slaDays: 5,
+    slaDefault: true,
+  },
+]
+
 export function applyCatalogV2(source: {
   processes: ProcessConfig[]
   fields: ProcessFieldDefinition[]
@@ -256,7 +287,7 @@ export function applyCatalogV2(source: {
 }) {
   const removed = new Set(Object.entries(PROCESS_PATCHES).filter(([, p]) => p.remove).map(([code]) => code))
 
-  const processes = source.processes
+  const processes = [...source.processes, ...EXTRA_PROCESSES.filter((extra) => !source.processes.some((p) => p.code === extra.code))]
     .filter((p) => !removed.has(p.code))
     .map((p) => {
       const { remove: _remove, ...patch } = PROCESS_PATCHES[p.code] ?? {}
@@ -289,6 +320,7 @@ export function applyCatalogV2(source: {
       .filter((a) => !(a.type === "VIEWER" && a.role === "GERENCIA_COMERCIAL"))
       .filter((a) => !(a.type === "APPROVER" && ["INS-MOB-01", "INS-MAN-01", "COM-PME-01", "COM-MAT-01"].includes(a.processCode))),
     ...marketingManagers("UNI-DOC-PAI", base),
+    ...marketingManagers("COM-OTR-01", base),
     experienceManager("UNI-DOC-FIC"),
   ]
   // Procesos de Experiencia sin responsable configurado (por ejemplo INS-ZEX en la LIST): Experiencia.
