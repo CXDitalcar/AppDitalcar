@@ -1,0 +1,33 @@
+DitalApp · Entrega A (08-10-2026) · Solicitudes + estructura
+==========================================================
+
+QUÉ TRAE
+- Solicitudes guardadas en la app (historial, adjuntos con fotos, plazos). Ya no dependen de que TI habilite Graph.
+- Catálogo revisado con Florencia:
+  · Colaboradores: Credencial y Pie de firma (Uniformes y TI "En construcción").
+  · Experiencia del local: Horarios, Señalizaciones, Organigrama, Zonas de experiencia, Mobiliario,
+    Instalaciones e infraestructura, Otra solicitud.
+  · Marketing: Patente de modelo/exhibición y Banderas/materiales.
+  · Documentación de unidades: PAI/Precio (con "En espera de aprobación"), Eficiencia energética,
+    Seguridad opcional y Ficha de producto.
+  · Unidades e Insumos: BETA de prueba (sin validez; el flujo sigue por correo).
+  · Eliminados: Bonificación y Traslado. Comisiones: oculta (solo Experiencia/PM la ven en construcción).
+- Vendedor y Junior: sus solicitudes pasan primero por su jefe.
+- Flujo con propuesta (Zonas, Mobiliario, Instalaciones y "Otra" con monto): iteraciones con imágenes
+  entre Experiencia y Gerencia de Marca → Gerencia Comercial (plazo en pausa) → ejecución → cierre con foto. 14 días.
+- Experiencia y PM ven todas las solicitudes.
+- Rol nuevo ASISTENTE_JUNIOR (menú: Inicio, Academia, Solicitudes). Jefatura Comercial y Clientes pasa a Gerencia de Marca.
+- Menú: Inicio · Academia · Mi local · Seguimiento · Gestión. Formularios y Datos quedan dentro de Gestión.
+- Usuarios › "Agregar usuario" (solo Experiencia y PM).
+- Datos › Listas de precios (modelos de la 1ª columna) y enlace de la carpeta de Recursos de Academia.
+
+CÓMO SUBIRLO A GITHUB (1 commit)
+1. Descomprime el ZIP y entra a la carpeta DitalApp_EntregaA.
+2. En la raíz del repositorio (rama main): "Add file" > "Upload files".
+3. Arrastra JUNTAS las carpetas "api" y "src" (no la carpeta DitalApp_EntregaA).
+4. Antes de confirmar, revisa que GitHub muestre 37 archivos. Commit a main.
+5. Espera el flujo en verde y recarga la app con Ctrl+Shift+R.
+
+DESPUÉS DE SUBIR
+- 02_Usuarios: a los juniors, RolApp = ASISTENTE_JUNIOR. A quien era Jefatura Comercial y Clientes, GERENCIA_MARCA.
+- Gestión › Datos: sube las listas de precios (una por marca) y pega el enlace de la carpeta de Recursos.
