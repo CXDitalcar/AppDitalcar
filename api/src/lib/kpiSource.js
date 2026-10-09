@@ -19,7 +19,7 @@ export async function saveKpiExcelUrl(url, updatedBy) {
 export async function getKpiSourceMode() {
   const stored = await getAppConfig(MODE_KEY)
   const mode = String(stored?.value || "").trim().toLowerCase()
-  if (mode === "url" || mode === "upload") return mode
+  if (mode === "url" || mode === "upload" || mode === "manual") return mode
   const upload = await getKpiUploadMeta()
   if (upload?.blobName) return "upload"
   const url = await getKpiExcelUrl()
@@ -28,7 +28,7 @@ export async function getKpiSourceMode() {
 
 export async function saveKpiSourceMode(mode, updatedBy) {
   const value = String(mode || "").trim().toLowerCase()
-  if (!["url", "upload"].includes(value)) throw new Error("Fuente KPI no válida.")
+  if (!["url", "upload", "manual"].includes(value)) throw new Error("Fuente KPI no válida.")
   return setAppConfig(MODE_KEY, value, { updatedBy: String(updatedBy || "") })
 }
 

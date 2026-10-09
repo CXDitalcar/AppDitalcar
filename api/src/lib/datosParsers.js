@@ -59,6 +59,31 @@ function cellValue(value) {
   return value
 }
 
+function columnName(index) {
+  let name = ""
+  for (let n = index + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + ((n - 1) % 26)) + name
+  return name
+}
+
+function addCellRefs(xml) {
+  let rowNumber = 0
+  return xml.replace(/<row\b([^>]*?)(\/?)>(?:([\s\S]*?)<\/row>)?/g, (match, attrs, selfClose, inner) => {
+    const existing = attrs.match(/\sr="(\d+)"/)
+    rowNumber = existing ? Number(existing[1]) : rowNumber + 1
+    const rowAttrs = existing ? attrs : `${attrs} r="${rowNumber}"`
+    if (selfClose) return `<row${rowAttrs}/>`
+    let col = 0
+    const cells = String(inner || "").replace(/<c\b([^>]*?)(\/?)>/g, (cell, cellAttrs, cellClose) => {
+      const ref = cellAttrs.match(/\sr="([A-Z]+)\d+"/)
+      if (ref) { col = ref[1].split("").reduce((n, ch) => n * 26 + ch.charCodeAt(0) - 64, 0); return cell }
+      const tag = `<c r="${columnName(col)}${rowNumber}"${cellAttrs}${cellClose}>`
+      col += 1
+      return tag
+    })
+    return `<row${rowAttrs}>${cells}</row>`
+  })
+}
+
 // Algunos Excel generados por Power Automate/.NET usan rutas absolutas ("/xl/...")
 // en sus relaciones internas; ExcelJS no las entiende. Se reescriben a relativas.
 async function normalizeXlsxPackage(buffer) {
@@ -76,6 +101,9 @@ async function normalizeXlsxPackage(buffer) {
         .replace(new RegExp(`<(/?)${p}:`, "g"), "<$1")
         .replace(`xmlns:${p}="http://schemas.openxmlformats.org/spreadsheetml/2006/main"`, 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"')
     }
+    // Hojas exportadas sin referencias de fila/celda (r="…"), como la exportación de Frogmi:
+    // ExcelJS las rechaza, así que se numeran en orden.
+    if (/worksheets\/[^/]+\.xml$/i.test(path) && /<row(?![^>]*\sr=)[\s>\/]/.test(xml)) xml = addCellRefs(xml)
     if (xml !== raw) { changed = true; zip.file(path, xml) }
     if (!path.endsWith(".rels")) continue
     const baseDir = path.replace(/_rels\/[^/]+$/, "") // "xl/" o "" o "xl/worksheets/"
@@ -112,7 +140,7 @@ export async function readSheets(buffer, fileName = "") {
 }
 
 // Encuentra la fila de encabezados que contiene todas las columnas pedidas.
-function findHeader(rows, required, maxScan = 15) {
+export function findHeader(rows, required, maxScan = 15) {
   for (let i = 0; i < Math.min(rows.length, maxScan); i++) {
     const keys = (rows[i] || []).map((c) => normKey(c))
     if (required.every((r) => keys.includes(normKey(r)))) return i
@@ -121,7 +149,7 @@ function findHeader(rows, required, maxScan = 15) {
 }
 
 // Índice por nombre normalizado; con nombres repetidos guarda la primera aparición.
-function headerIndex(row) {
+export function headerIndex(row) {
   const index = {}
   ;(row || []).forEach((cell, i) => {
     const key = normKey(cell)
@@ -241,11 +269,18 @@ export async function parseTraslados(buffer, fileName) {
       const nvRaw = text(row, col("NV"))
       const nv = normNv(get(row, col("NV")))
       const vin = normVin(get(row, col("VIN")))
-      const fecha = parseDate(get(row, col("FECHA TRASLADO")))
-      if ((!nv && !vin) || !fecha) { skipped++; continue }
+      const fechaRaw = get(row, col("FECHA TRASLADO"))
+      const fecha = parseDate(fechaRaw)
+      if (!nv && !vin) { skipped++; continue }
+      const fechaTexto = fecha ? "" : cleanText(fechaRaw)
+      // Fila sin fecha legible (por ejemplo "10-09-206"): se guarda marcada para revisión
+      // en vez de descartarse o sumarse a un mes en silencio.
+      if (!fecha && !fechaTexto) { skipped++; continue }
       const destino = text(row, col("DESTINO"))
       records.push({
-        key: `${vin || `NV${nv}`}|${fecha}|${normKey(destino)}`,
+        key: `${vin || `NV${nv}`}|${fecha || `SINFECHA:${normKey(fechaTexto)}`}|${normKey(destino)}`,
+        fechaIlegible: !fecha,
+        fechaTexto,
         nv,
         tipo: nv ? "NV" : normText(nvRaw) || "SIN NV",
         vin,
@@ -384,10 +419,134 @@ export async function parseOperativo(buffer, fileName) {
   return { records: contacts, errors: 0 }
 }
 
+// ---------- 6. Extranet del transportista (Gespark) ----------
+// Columnas: VIN, Estado Color (32768 = Gespark realizado) y, si vienen, FECHA, MARCA, MODELO,
+// DESTINO y Estado Chasis. Si un VIN aparece varias veces, vale la fila con 32768.
+export const GESPARK_OK = 32768
+
+export async function parseExtranet(buffer, fileName) {
+  const sheets = await readSheets(buffer, fileName)
+  for (const sheet of sheets) {
+    const h = findHeader(sheet.rows, ["VIN", "ESTADO COLOR"], 25)
+    if (h < 0) continue
+    const col = headerIndex(sheet.rows[h])
+    const byVin = new Map()
+    let skipped = 0
+    for (const row of sheet.rows.slice(h + 1)) {
+      const vin = normKey(get(row, col("VIN")))
+      if (vin.length < 6) { skipped++; continue }
+      const color = Number(String(get(row, col("ESTADO COLOR")) ?? "").replace(/\D/g, "")) || 0
+      const record = {
+        key: vin, vin, color,
+        fecha: parseDate(get(row, col("FECHA"))),
+        marca: text(row, col("MARCA")), modelo: text(row, col("MODELO")),
+        destino: text(row, col("DESTINO")), chasis: text(row, col("ESTADO CHASIS")),
+      }
+      const prev = byVin.get(vin)
+      if (!prev || color === GESPARK_OK) byVin.set(vin, record)
+    }
+    return { records: [...byVin.values()], errors: 0, skipped, sheet: sheet.name }
+  }
+  throw new Error("No reconozco el listado de la extranet: necesita las columnas VIN y Estado Color.")
+}
+
+// ---------- 7. Frogmi (exportación "data 2", hoja Export) ----------
+export function frogmiActivity(value) {
+  const t = normText(value)
+  if (t.includes("RECEPCION")) return "RECEPCION"
+  if (t.includes("STOCK")) return "STOCK"
+  if (t.includes("CONTROL PREVIO")) return "CONTROL"
+  if (t.includes("PREPARACION")) return "PREPARACION"
+  if (t.includes("ENTREGA A CLIENTE") || t.includes("ENTREGA CLIENTE")) return "ENTREGA"
+  return ""
+}
+
+// Local "corto" usado en Frogmi y en la medición junior.
+export function frogmiLocal(value) {
+  const k = normKey(value)
+  if (!k || k.includes("FLOTA") || k.includes("USADO") || k.includes("ADMINISTRACION")) return ""
+  if (k.includes("TOBALABA")) return "TOBALABA"
+  if (k.includes("NORTE")) return "NORTE"
+  if (k.includes("CANTAGALLO")) return "CANTAGALLO"
+  if (k.includes("ALAMEDA")) return "ALAMEDA"
+  if (k.includes("VESPUCIO")) return "VESPUCIO"
+  if (k.includes("COSTANERA")) return "COSTANERA"
+  if (k.includes("FLORIDA")) return "FLORIDA"
+  return ""
+}
+
+export async function parseFrogmi(buffer, fileName) {
+  const sheets = await readSheets(buffer, fileName)
+  for (const sheet of sheets) {
+    const h = findHeader(sheet.rows, ["Tienda", "Actividad", "ID Evento"], 10)
+    if (h < 0) continue
+    const col = headerIndex(sheet.rows[h])
+    const vinCol = sheet.rows[h].findIndex((c) => normKey(c).includes("VINDELVEHICULO"))
+    const pick = (row, prefix) => {
+      const i = sheet.rows[h].findIndex((c) => normKey(c).includes(prefix))
+      return i >= 0 ? cleanText(row[i]) : ""
+    }
+    const records = []
+    let skipped = 0
+    for (const row of sheet.rows.slice(h + 1)) {
+      const id = text(row, col("ID Evento"))
+      const form = frogmiActivity(get(row, col("Actividad")))
+      if (!id || !form) { skipped++; continue }
+      records.push({
+        key: id, id, form,
+        fecha: parseDate(get(row, col("Fecha"))),
+        tienda: text(row, col("Tienda")),
+        local: frogmiLocal(get(row, col("Tienda"))),
+        vinDigitado: vinCol >= 0 ? normKey(row[vinCol]) : "",
+        marca: pick(row, "MARCADELVEHICULO"),
+        modelo: pick(row, "MODELODELVEHICULO"),
+      })
+    }
+    return { records, errors: 0, skipped, sheet: sheet.name }
+  }
+  throw new Error("No reconozco la exportación de Frogmi: necesita las columnas Tienda, Actividad e ID Evento (formato \"data 2\").")
+}
+
+// ---------- 8. Informe de Notificación de Venta (Chile) ----------
+// Encabezados en la fila que contiene "Vehículo: VIN". Se ignoran Subtotal, Total y pie del reporte.
+// No se guardan datos de contacto del cliente: solo el RUT normalizado, como respaldo del cruce.
+export async function parseNotificados(buffer, fileName) {
+  const sheets = await readSheets(buffer, fileName)
+  for (const sheet of sheets) {
+    const h = findHeader(sheet.rows, ["Vehículo: VIN", "Vehículo: Fecha Venta"], 60)
+    if (h < 0) continue
+    const col = headerIndex(sheet.rows[h])
+    const records = []
+    let skipped = 0
+    for (const row of sheet.rows.slice(h + 1)) {
+      const vin = normVin(get(row, col("Vehículo: VIN")))
+      const fechaVenta = parseDate(get(row, col("Vehículo: Fecha Venta")))
+      if (!vin || !fechaVenta) { skipped++; continue }
+      const notificado = normText(get(row, col("Vehículo: Notificado")))
+      records.push({
+        key: vin, vin, fechaVenta,
+        marcaSharing: text(row, col("Vehículo: MarcaSharing")),
+        fechaEntrega: parseDate(get(row, col("Vehículo: Fecha Entrega"))),
+        notificado: !notificado || ["TRUE", "VERDADERO", "SI", "1"].includes(notificado),
+        estado: text(row, col("Vehículo: Estado")),
+        tipoVenta: text(row, col("Vehículo: Tipo Venta: Nombre de Tipo Venta")),
+        exposicion: text(row, col("Vehículo: Exposición: Direccion Envio Name")),
+        vendedorPortal: text(row, col("Vehículo: Pedido venta: Oportunidad: Propietario de oportunidad: Nombre completo")),
+        rutCliente: normRut(get(row, col("Cliente: Cuenta personal: Numero Documento")) || get(row, col("Cliente: RUT"))),
+      })
+    }
+    return { records, errors: 0, skipped, sheet: sheet.name }
+  }
+  throw new Error("No reconozco el Informe de Notificación de Venta: falta la fila de encabezados con \"Vehículo: VIN\" y \"Vehículo: Fecha Venta\".")
+}
+
 export const DATA_KINDS = {
   siga: { label: "SIGA · notas de venta", parse: parseSiga, store: "master" },
   control: { label: "Control de unidades nuevo", parse: parseControl, store: "master" },
   traslados: { label: "Planilla T · traslados", parse: parseTraslados, store: "master" },
   consolidado: { label: "Consolidado de contactados (historial)", parse: parseConsolidado, store: "contacts" },
   operativo: { label: "Seguimiento operativo (historial)", parse: parseOperativo, store: "contacts" },
+  extranet: { label: "Extranet transportista · Gespark", parse: parseExtranet, store: "master" },
+  frogmi: { label: "Frogmi · formularios (data 2)", parse: parseFrogmi, store: "master" },
+  notificados: { label: "Informe de Notificación de Venta", parse: parseNotificados, store: "master" },
 }

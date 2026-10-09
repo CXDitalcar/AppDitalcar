@@ -186,33 +186,9 @@ export async function loadUsersFromExcel(rawUrl, options = {}) {
     throw new Error("El enlace abre una página web en vez del archivo Excel. Usa un enlace de descarga directa o un enlace compartido que no pida inicio de sesión.")
   }
 
-  const workbook = new ExcelJS.Workbook()
-  await workbook.xlsx.load(buffer)
-
-  const preferred = String(options.sheetName || process.env.USERS_EXCEL_SHEET || "Usuarios").trim()
-  const worksheet = workbook.getWorksheet(preferred)
-    || workbook.getWorksheet("02_Usuarios")
-    || workbook.worksheets[0]
-
-  if (!worksheet) throw new Error("El archivo no contiene hojas legibles.")
-
-  const headers = normalizeHeaderRow(worksheet)
-  if (!headers.some((header) => normalize(header) === "email" || normalize(header) === "correo" || normalize(header) === "correoelectronico")) {
-    throw new Error("La hoja no tiene una columna Email/Correo en la primera fila.")
-  }
-
-  const users = []
-  worksheet.eachRow((row, rowNumber) => {
-    if (rowNumber === 1) return
-    const fields = {}
-    headers.forEach((header, colNumber) => {
-      if (!header) return
-      fields[header] = cellText(row.getCell(colNumber).value)
-    })
-    const user = toUser(fields)
-    if (user) users.push(user)
-  })
-
+  const parsed = await parseUsersWorkbook(buffer, options)
+  const users = parsed.users
+  const worksheet = { name: parsed.sheet }
   const result = {
     users,
     meta: {
@@ -229,6 +205,39 @@ export async function loadUsersFromExcel(rawUrl, options = {}) {
 
   cache = { key: cacheKey, loadedAt: Date.now(), value: result }
   return result
+}
+
+// Lee un libro de usuarios (mismo formato que 02_Usuarios: encabezados en la primera fila).
+export async function parseUsersWorkbook(buffer, options = {}) {
+  const workbook = new ExcelJS.Workbook()
+  await workbook.xlsx.load(buffer)
+
+  const preferred = String(options.sheetName || process.env.USERS_EXCEL_SHEET || "Usuarios").trim()
+  const worksheet = workbook.getWorksheet(preferred)
+    || workbook.getWorksheet("02_Usuarios")
+    || workbook.worksheets[0]
+
+  if (!worksheet) throw new Error("El archivo no contiene hojas legibles.")
+
+  const headers = normalizeHeaderRow(worksheet)
+  if (!headers.some((header) => normalize(header) === "email" || normalize(header) === "correo" || normalize(header) === "correoelectronico")) {
+    throw new Error("La hoja no tiene una columna Email/Correo en la primera fila.")
+  }
+
+  const users = []
+  let skipped = 0
+  worksheet.eachRow((row, rowNumber) => {
+    if (rowNumber === 1) return
+    const fields = {}
+    headers.forEach((header, colNumber) => {
+      if (!header) return
+      fields[header] = cellText(row.getCell(colNumber).value)
+    })
+    const user = toUser(fields)
+    if (user) users.push(user)
+    else skipped += 1
+  })
+  return { users, sheet: worksheet.name, skipped }
 }
 
 export async function findUserInExcel(rawUrl, email) {

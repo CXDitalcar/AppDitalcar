@@ -69,3 +69,32 @@ export async function saveAppUser(input, actorEmail) {
   await upsertUser(entity)
   return toDirectoryUser(await getUser(email))
 }
+
+// Importación masiva desde Excel (Usuarios › Importar Excel). Crea o actualiza usuarios APP.
+// No toca a quienes ya vienen del directorio oficial (LIST/Excel conectado).
+export async function importAppUsers(users, actorEmail) {
+  const summary = { leidos: users.length, nuevos: 0, actualizados: 0, omitidos: 0, errores: [] }
+  for (const item of users) {
+    try {
+      const existing = await getUser(normalizeEmail(item.email))
+      if (existing && existing.source !== "APP" && existing.passwordHash) { summary.omitidos += 1; continue }
+      await saveAppUser({
+        mode: existing ? "update" : "create",
+        email: item.email,
+        name: item.name && item.name !== item.email ? item.name : (existing?.name || item.email),
+        role: item.role,
+        local: item.localPrincipal || item.local || "",
+        assignedLocals: item.assignedLocals || [],
+        brands: item.brands || [],
+        zone: item.zone || "",
+        areaFunctional: item.areaFunctional || "",
+        active: item.active !== false,
+      }, actorEmail)
+      if (existing) summary.actualizados += 1
+      else summary.nuevos += 1
+    } catch (error) {
+      summary.errores.push(`${item.email}: ${error?.message || "error"}`)
+    }
+  }
+  return summary
+}

@@ -100,10 +100,28 @@ export function isBranchHeadOf(user, row) {
   return user?.role === "JEFATURA_LOCAL" && userLocals(user).some((l) => localMatches(l, row.localOriginal))
 }
 
-export function canSeeRow(user, row) {
-  if (isFullViewer(user) || NETWORK_VIEW_ROLES.has(user?.role)) return true
-  if (isSellerOf(user, row) || isBranchHeadOf(user, row)) return true
-  if (["GERENCIA_MARCA", "JEFATURA_MARCA"].includes(user?.role) && brandMatchesUser(user, row)) return true
+// Detalle de clientes (09-10): sólo Experiencia, PM y Asistente de Gerencia.
+// Con el interruptor "detallePropio", vendedores y jefaturas ven el detalle de sus propias NV.
+export function canSeeRow(user, row, rules = {}) {
+  if (isFullViewer(user)) return true
+  if (rules.detallePropio && (isSellerOf(user, row) || isBranchHeadOf(user, row))) return true
+  return false
+}
+
+// Ámbito de la vista "macro" (totales sin datos de clientes).
+const MACRO_NETWORK_ROLES = new Set([
+  "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "GERENCIA_GENERAL", "GERENCIA_ADMINISTRACION",
+  "JEFATURA_OPERACIONES_COMERCIALES", "JEFATURA_MARKETING", "JEFATURA_ADMINISTRACION",
+])
+export function inMacroScope(user, row) {
+  if (isFullViewer(user) || MACRO_NETWORK_ROLES.has(user?.role)) return true
+  if (["GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user?.role)) {
+    return brandMatchesUser(user, row) || userLocals(user).some((l) => localMatches(l, row.localOriginal))
+  }
+  if (["JEFATURA_LOCAL", "ASISTENTE_JUNIOR", "ADMINISTRATIVO"].includes(user?.role)) {
+    return userLocals(user).some((l) => localMatches(l, row.localOriginal))
+  }
+  if (user?.role === "VENDEDOR") return isSellerOf(user, row)
   return false
 }
 
@@ -141,7 +159,7 @@ export function computeSeguimiento({ siga, control, traslados }, seg, rules = DE
   const controlRecords = Object.values(control?.records || {})
   const controlByNv = new Map(controlRecords.filter((r) => r.nv).map((r) => [r.nv, r]))
   const controlByVin = new Map(controlRecords.filter((r) => r.vin).map((r) => [r.vin, r]))
-  const trasladoRecords = Object.values(traslados?.records || {})
+  const trasladoRecords = Object.values(traslados?.records || {}).filter((r) => r.fecha)
   const trasByVin = indexBy(trasladoRecords, (r) => r.vin)
   const trasByNv = indexBy(trasladoRecords, (r) => r.nv)
 
@@ -171,7 +189,7 @@ export function computeSeguimiento({ siga, control, traslados }, seg, rules = DE
     const trasList = [...(vin ? trasByVin.get(vin) || [] : []), ...(trasByNv.get(nv) || [])]
       .filter((t, i, arr) => arr.findIndex((x) => x.fecha === t.fecha && x.destino === t.destino) === i)
       .sort((a, b) => a.fecha.localeCompare(b.fecha))
-    const llegadaLocal = trasList.find((t) => !isBodega(t.destino))
+    const llegadaLocal = trasList.find((t) => !isBodega(t.destino, s.local))
     const fechaRecepcion = llegadaLocal?.fecha || s.fechaRecepcion || ""
     const enCamino = Boolean(vin && ctrl && (ctrl.fechaLlegada || ctrl.llegadaMes))
     const entrega = seg.entregas[nv] || null
@@ -320,9 +338,9 @@ export function computeSeguimiento({ siga, control, traslados }, seg, rules = DE
 }
 
 export function trasladosForRow(row, traslados) {
-  const list = Object.values(traslados?.records || {}).filter((t) => (row.vin && t.vin === row.vin) || (t.nv && t.nv === row.nv))
+  const list = Object.values(traslados?.records || {}).filter((t) => t.fecha).filter((t) => (row.vin && t.vin === row.vin) || (t.nv && t.nv === row.nv))
   return list.sort((a, b) => a.fecha.localeCompare(b.fecha)).map((t) => ({
     fecha: t.fecha, retiro: destinoDisplay(t.retiro), destino: destinoDisplay(t.destino),
-    llegadaLocal: !isBodega(t.destino), tipo: t.tipo, estado: t.estado,
+    llegadaLocal: !isBodega(t.destino, row.localOriginal), tipo: t.tipo, estado: t.estado,
   }))
 }

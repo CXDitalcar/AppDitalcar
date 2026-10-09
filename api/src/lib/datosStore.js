@@ -12,7 +12,7 @@ const LOG_KEY = "DATOS_IMPORT_LOG"
 const MAX_CHANGES = 25
 const memory = new Map()
 
-async function readJsonBlob(name) {
+export async function readJsonBlob(name) {
   const container = await appFilesContainer()
   const client = container.getBlockBlobClient(name)
   try {
@@ -24,7 +24,7 @@ async function readJsonBlob(name) {
   }
 }
 
-async function writeJsonBlob(name, value) {
+export async function writeJsonBlob(name, value) {
   const container = await appFilesContainer()
   const body = Buffer.from(JSON.stringify(value))
   await container.getBlockBlobClient(name).uploadData(body, {
@@ -77,6 +77,8 @@ export async function mergeMaster(kind, records, { fileName, userEmail }) {
     for (const [field, value] of Object.entries(fields)) {
       // Un dato vacío en la nueva lectura no borra un dato ya conocido (por ejemplo, VIN asignado).
       if ((value === "" || value === null || value === undefined) && existing[field]) continue
+      // Gespark: una vez visto el Estado Color 32768 (realizado), una lectura posterior no lo revierte.
+      if (kind === "extranet" && field === "color" && existing.color === 32768) continue
       if (!sameValue(existing[field], value)) {
         changes.push({ at: now, field, from: existing[field] ?? "", to: value })
         existing[field] = value
