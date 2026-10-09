@@ -1,3 +1,4 @@
+import AcademiaRecursos from "../components/AcademiaRecursos"
 import {
   useMemo,
   useState,
@@ -96,6 +97,7 @@ function getAudience(user: UserScope): AcademyAudience {
   }
   if (user.role === "JEFATURA_LOCAL") return "JEFATURA"
   if (user.role === "VENDEDOR") return "VENTAS"
+  if (user.role === "ASISTENTE_JUNIOR") return "JUNIOR"
   if (
     user.role === "ADMINISTRATIVO" &&
     ["junior", "operacion", "operación"].some((token) =>
@@ -258,9 +260,11 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
     )
   }, [audience, admin, courseSearch, storeVersion])
 
-  const assignedCourses = visibleCourses.filter((course) =>
-    course.assignedTo.includes(audience)
-  )
+  // La Asistente de Gerencia no tiene cursos asignados: solo opcionales y recursos.
+  const noAssignments = currentUser.role === "ASISTENTE_GERENCIA"
+  const assignedCourses = noAssignments
+    ? []
+    : visibleCourses.filter((course) => course.assignedTo.includes(audience))
   const continuingCourses = assignedCourses.filter((course) => {
     const progress = getCourseProgress(course)
     return progress > 0 && progress < 100
@@ -289,7 +293,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
         ))
   )
   const pendingEvaluations = visibleEvaluations.filter((evaluation) => {
-    if (!evaluation.assignedTo.includes(audience)) return false
+    if (noAssignments || !evaluation.assignedTo.includes(audience)) return false
     const attempts = getEvaluationAttempts(evaluation.id)
     return !attempts.some((attempt) => attempt.passed) && attempts.length < evaluation.attempts
   })
@@ -465,6 +469,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
           </small>
         </div>
       </section>
+
+      <AcademiaRecursos admin={admin} />
 
       <section className="academy-now">
         <div className="academy-now-head">

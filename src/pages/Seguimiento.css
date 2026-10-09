@@ -420,3 +420,18 @@
 .user-chip{border:1px solid rgba(255,255,255,.14);border-radius:999px;background:transparent;color:#cfcfd6;padding:6px 10px;font-size:13px;cursor:pointer}
 .user-chip.on{border-color:#e5484d;background:rgba(229,72,77,.16);color:#fff}
 .user-check{display:flex;align-items:center;gap:8px;color:#d8d8de;font-size:14px}
+.datos-tabs{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.datos-tabs button{border:1px solid rgba(255,255,255,.14);border-radius:999px;background:transparent;color:#cfcfd6;padding:8px 14px;font-size:14px;cursor:pointer}
+.datos-tabs button.on{border-color:#e5484d;background:rgba(229,72,77,.16);color:#fff}
+.datos-kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+
+/* Seguimiento · vista macro (09-10) */
+.macro-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;margin-bottom:18px}
+.macro-tile{display:grid;gap:6px}
+.macro-tile span{color:#a9a9b2;font-size:14px}
+.macro-tile strong{font-size:28px;color:#fff}
+.macro-tile small{color:#b9b9c2;font-size:13px}
+.macro-stages{display:grid;gap:10px}
+.macro-stage{display:grid;grid-template-columns:220px 1fr 60px;gap:12px;align-items:center;font-size:15px}
+.macro-stage strong{text-align:right}
+@media (max-width:640px){.macro-stage{grid-template-columns:1fr 50px}.macro-stage .datos-progress{grid-column:1/-1;grid-row:2}}

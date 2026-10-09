@@ -253,10 +253,11 @@ function ClaimsList({ reclamos }: { reclamos: Reclamo[] }) {
 function RulesPanel({ rules, onSaved }: { rules: SegLista["rules"]; onSaved: () => void }) {
   const [soloPromotores, setSoloPromotores] = useState(rules.stellantisSoloPromotores)
   const [dias, setDias] = useState(rules.diasCompraReciente)
+  const [detallePropio, setDetallePropio] = useState(Boolean(rules.detallePropio))
   const [msg, setMsg] = useState("")
   async function save() {
     try {
-      await guardarReglas({ stellantisSoloPromotores: soloPromotores, diasCompraReciente: dias })
+      await guardarReglas({ stellantisSoloPromotores: soloPromotores, diasCompraReciente: dias, detallePropio })
       setMsg("Reglas guardadas.")
       onSaved()
     } catch (err) {
@@ -274,6 +275,13 @@ function RulesPanel({ rules, onSaved }: { rules: SegLista["rules"]; onSaved: () 
             <span className="seg-fine-print">
               Ojo: la guía indica no relacionar el beneficio con una nota positiva, y las reglas de encuesta de marca suelen prohibir invitar sólo a clientes satisfechos. Validar con la gerencia de marca.
             </span>
+          </span>
+        </label>
+        <label style={{ display: "flex", gap: 10, alignItems: "flex-start", fontSize: 15 }}>
+          <input type="checkbox" checked={detallePropio} onChange={(e) => setDetallePropio(e.target.checked)} style={{ marginTop: 4 }} />
+          <span>
+            Vendedores y jefaturas ven el detalle de sus propias NV (clientes, etapa y último contacto).
+            <span className="seg-fine-print">Apagado: el resto de los perfiles sólo ve totales (vista macro).</span>
           </span>
         </label>
         <label className="seg-field" style={{ maxWidth: 320 }}>

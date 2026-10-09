@@ -292,8 +292,8 @@ export default function Aprobaciones({
         {!loading && !filtered.length && (
           <div className="approval-empty">
             <CheckCircle2 size={28} />
-            <strong>Sin pendientes en esta vista</strong>
-            <span>El contador y esta lista usan exactamente la misma regla de permisos y estado.</span>
+            <strong>Nada pendiente</strong>
+            <span>No tienes solicitudes por revisar o gestionar en este momento.</span>
           </div>
         )}
       </div>

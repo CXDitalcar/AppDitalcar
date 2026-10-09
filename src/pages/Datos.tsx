@@ -1,5 +1,9 @@
 import { useEffect, useRef, useState } from "react"
-import { Database, ExternalLink, FileSpreadsheet, FolderOpen, Tags, Trash2, Upload } from "lucide-react"
+import { Database, ExternalLink, FileSpreadsheet, FolderOpen, MapPin, Tags, Trash2, Upload } from "lucide-react"
+import { getLocals, loadLocals, saveLocals, type LocalDef } from "../services/localesStore"
+import { getKpiSourceInfo, KPI_MANUAL_FIELDS, parsePastedKpi, saveKpiManual, saveKpiSourceUrl, uploadKpiWorkbook, type KpiSourceInfo } from "../services/kpiApi"
+import { prepareUploadFile } from "../services/fileUtils"
+import { BarChart3 } from "lucide-react"
 import SignalLight from "../components/SignalLight"
 import { getDatosEstado, uploadAndProcess, type DataKind, type DataSource, type ImportLogEntry } from "../services/datosApi"
 import { fmtDate } from "../services/seguimientoApi"
@@ -11,7 +15,12 @@ import {
   saveAcademyResources,
   type ModelBrand,
 } from "../services/catalogoApi"
+import GesparkPanel from "../components/GesparkPanel"
+import { Link } from "react-router-dom"
 import "./Seguimiento.css"
+import "./Ops.css"
+
+const OPS_KINDS: DataKind[] = ["extranet", "frogmi", "notificados"]
 
 // Descripción de cada planilla, según los archivos reales recibidos (08-10-2026).
 const SOURCE_INFO: Record<DataKind, { uso: string; formato: string }> = {
@@ -35,11 +44,21 @@ const SOURCE_INFO: Record<DataKind, { uso: string; formato: string }> = {
     uso: "Historial del Excel operativo de seguimiento (estados de envío y teléfonos sin WhatsApp).",
     formato: "Seguimiento clientes OPERATIVO, hoja “Enviar a clientes”.",
   },
+  extranet: {
+    uso: "Gespark: estado de cada VIN en la extranet del transportista (Estado Color 32768 = realizado). Se cruza con la planilla T.",
+    formato: "Listado de salidas del transportista (.xlsx) con VIN y Estado Color (y, si vienen, Fecha, Marca, Modelo, Destino, Estado Chasis).",
+  },
+  frogmi: {
+    uso: "Formularios Frogmi realizados (Recepción, Stock, Control previo, Preparación y Entrega) con el VIN digitado.",
+    formato: "Exportación “data 2”, hoja Export: Zona, Cadena, Fecha, Tienda, Actividad, VIN del Vehículo, Marca, Modelo, ID Evento.",
+  },
+  notificados: {
+    uso: "Universo Frogmi: VIN notificados a la marca. Se consolida del 15 al 15 por Fecha Venta; local y vendedor salen del cruce con SIGA.",
+    formato: "Informe de Notificación de Venta (Chile) del portal de marca (.xlsx), con la fila de encabezados “Vehículo: VIN”.",
+  },
 }
 
 const IN_CONSTRUCTION = [
-  { title: "Extranet · Gespark", text: "Listado de salidas de la extranet para el cierre Gespark. Se activa en la próxima entrega." },
-  { title: "Frogmi", text: "Exportación de formularios Frogmi e informe de notificación de venta. Se activa en la próxima entrega." },
   { title: "Encuestas", text: "Reportes de encuestas Astara y Stellantis (NPS, SSI, bonificación)." },
 ]
 
@@ -81,16 +100,22 @@ export default function Datos() {
       {loading && <div className="seg-empty">Cargando estado de las fuentes…</div>}
 
       <section className="seg-section">
+        <h2>KPI comercial</h2>
+        <KpiSourceCard />
+      </section>
+
+      <section className="seg-section">
         <h2>Solicitudes y Academia</h2>
         <div className="datos-grid">
           <PriceListCard onDone={load} />
           <ResourcesCard />
+          <LocalsCard />
         </div>
       </section>
 
-      <h2 className="datos-subtitle">Seguimiento de clientes</h2>
+      <h2 className="datos-subtitle">Seguimiento de clientes y Ventas</h2>
       <div className="datos-grid">
-        {fuentes.map((fuente) => (
+        {fuentes.filter((fuente) => !OPS_KINDS.includes(fuente.kind)).map((fuente) => (
           <SourceCard key={fuente.kind} fuente={fuente} onDone={load} />
         ))}
         {IN_CONSTRUCTION.map((item) => (
@@ -101,6 +126,27 @@ export default function Datos() {
           </article>
         ))}
       </div>
+
+      <section className="seg-section">
+        <h2>Frogmi</h2>
+        <p className="datos-note">Sube el Informe de Notificación de Venta y la exportación de Frogmi. La medición se ve en <Link to="/frogmi">Gestión › Frogmi</Link>, donde también se aprueban los cruces de VIN, los locales activos y el Tour Manager.</p>
+        <div className="datos-grid">
+          {fuentes.filter((fuente) => fuente.kind === "notificados" || fuente.kind === "frogmi").map((fuente) => (
+            <SourceCard key={fuente.kind} fuente={fuente} onDone={load} />
+          ))}
+        </div>
+      </section>
+
+      <section className="seg-section">
+        <h2>Gespark</h2>
+        <p className="datos-note">Se usa la planilla T ya cargada (acumulada) y el listado de la extranet del transportista.</p>
+        <div className="datos-grid">
+          {fuentes.filter((fuente) => fuente.kind === "extranet").map((fuente) => (
+            <SourceCard key={fuente.kind} fuente={fuente} onDone={load} />
+          ))}
+        </div>
+        <GesparkPanel version={log.length} />
+      </section>
 
       <section className="seg-section">
         <h2>Historial de cargas</h2>
@@ -357,6 +403,210 @@ function ResourcesCard() {
           <a className="seg-btn" href={saved} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Probar enlace</a>
         )}
       </div>
+    </article>
+  )
+}
+
+
+// ======================================================
+// LOCALES DE LA RED
+// ======================================================
+
+function LocalsCard() {
+  const [locals, setLocals] = useState<LocalDef[]>(getLocals(true))
+  const [name, setName] = useState("")
+  const [brands, setBrands] = useState<string[]>([])
+  const [dirty, setDirty] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const [showAll, setShowAll] = useState(false)
+
+  useEffect(() => { void loadLocals().then((list) => setLocals([...list])) }, [])
+
+  function update(next: LocalDef[]) { setLocals(next); setDirty(true); setMessage("") }
+
+  function add() {
+    const clean = name.trim()
+    if (!clean) return
+    if (locals.some((local) => local.name.toLowerCase() === clean.toLowerCase())) { setError("Ese local ya existe."); return }
+    setError("")
+    update([...locals, { name: clean, brands, operation: brands.includes("Geely") ? "GEELY" : brands.some((b) => ["Jeep", "RAM", "Peugeot", "Fiat", "Citroën", "Leapmotor"].includes(b)) ? "STELLANTIS" : "GENERAL", active: true }])
+    setName("")
+    setBrands([])
+  }
+
+  async function save() {
+    setError("")
+    try {
+      const result = await saveLocals(locals)
+      setLocals([...result.locales])
+      setDirty(false)
+      setMessage(result.message)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "No fue posible guardar.")
+    }
+  }
+
+  const sorted = [...locals].sort((a, b) => a.name.localeCompare(b.name, "es"))
+  const visible = showAll ? sorted : sorted.slice(0, 8)
+
+  return (
+    <article className="seg-card datos-card">
+      <div className="seg-chip"><SignalLight tone="green" compact /> {locals.filter((l) => l.active).length} locales activos</div>
+      <h3><MapPin size={18} style={{ verticalAlign: "-3px", marginRight: 6 }} />Locales</h3>
+      <p>Los locales que aparecen en usuarios, solicitudes y filtros. Escríbelos igual que en 02_Usuarios.</p>
+      <div className="datos-brand-list" style={{ borderTop: 0, paddingTop: 0 }}>
+        {visible.map((local) => (
+          <div key={local.name} className="datos-brand">
+            <span className="datos-brand-name" style={{ opacity: local.active ? 1 : 0.5 }}>
+              <strong>{local.name}</strong>{local.brands.length ? ` · ${local.brands.join(", ")}` : ""}
+            </span>
+            <button className="seg-btn small" onClick={() => update(locals.map((l) => l.name === local.name ? { ...l, active: !l.active } : l))}>
+              {local.active ? "Desactivar" : "Activar"}
+            </button>
+          </div>
+        ))}
+        {sorted.length > 8 && (
+          <button className="seg-btn small" onClick={() => setShowAll((v) => !v)}>{showAll ? "Ver menos" : `Ver todos (${sorted.length})`}</button>
+        )}
+      </div>
+      <div className="datos-inline-form">
+        <input className="seg-input" placeholder="Nombre del local nuevo" value={name} onChange={(e) => setName(e.target.value)} />
+        <div className="user-chips">
+          {DEFAULT_BRANDS.map((brand) => (
+            <button key={brand} type="button" className={`user-chip ${brands.includes(brand) ? "on" : ""}`} onClick={() => setBrands((cur) => cur.includes(brand) ? cur.filter((b) => b !== brand) : [...cur, brand])}>{brand}</button>
+          ))}
+        </div>
+        <button className="seg-btn" disabled={!name.trim()} onClick={add}>Agregar local</button>
+      </div>
+      {error && <div className="seg-error" style={{ marginTop: 10 }}>{error}</div>}
+      {message && <div className="seg-meta" style={{ color: "#8fe3a6", marginTop: 8 }}>{message}</div>}
+      <button className="seg-btn primary" style={{ marginTop: 12 }} disabled={!dirty} onClick={() => void save()}>Guardar cambios</button>
+    </article>
+  )
+}
+
+
+// ======================================================
+// KPI · 4 formas de cargar (archivo, enlace, pegar datos, foto + cifras)
+// ======================================================
+
+type KpiTab = "ARCHIVO" | "ENLACE" | "PEGAR" | "FOTO"
+const KPI_TABS: { key: KpiTab; label: string }[] = [
+  { key: "ARCHIVO", label: "Subir archivo" },
+  { key: "ENLACE", label: "Enlace Excel Online" },
+  { key: "PEGAR", label: "Pegar datos" },
+  { key: "FOTO", label: "Foto + cifras" },
+]
+const MODE_LABEL: Record<string, string> = { upload: "Archivo subido", url: "Excel Online por enlace", manual: "Cifras ingresadas (pegadas o con foto)" }
+
+function KpiSourceCard() {
+  const [info, setInfo] = useState<KpiSourceInfo | null>(null)
+  const [tab, setTab] = useState<KpiTab>("ARCHIVO")
+  const [progress, setProgress] = useState<number | null>(null)
+  const [url, setUrl] = useState("")
+  const [pasted, setPasted] = useState("")
+  const [values, setValues] = useState<Record<string, string>>({ month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()) })
+  const [photo, setPhoto] = useState<File | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState("")
+  const [error, setError] = useState("")
+  const input = useRef<HTMLInputElement>(null)
+
+  async function refresh() {
+    try { const value = await getKpiSourceInfo(); setInfo(value); setUrl(value.url || "") } catch { setInfo(null) }
+  }
+  useEffect(() => { void refresh() }, [])
+
+  async function run(task: () => Promise<{ message: string }>) {
+    setBusy(true); setError(""); setMessage("")
+    try { const result = await task(); setMessage(result.message); await refresh() }
+    catch (err) { setError(err instanceof Error ? err.message : "No fue posible guardar.") }
+    finally { setBusy(false); setProgress(null) }
+  }
+
+  function applyPaste() {
+    const { found, unknown } = parsePastedKpi(pasted)
+    const count = Object.keys(found).length
+    setValues((current) => ({ ...current, ...found }))
+    setTab("FOTO")
+    setMessage(count ? `Reconocí ${count} cifras. Revísalas y guarda.${unknown.length ? ` No reconocí: ${unknown.slice(0, 5).join(", ")}.` : ""}` : "")
+    setError(count ? "" : "No reconocí cifras. Pega dos columnas: indicador y valor.")
+  }
+
+  async function saveManual() {
+    await run(async () => {
+      const prepared = photo ? await prepareUploadFile(photo) : null
+      return saveKpiManual(values, prepared ? { fileName: prepared.name, contentType: prepared.type, dataBase64: prepared.base64 } : null, !photo)
+    })
+    setPhoto(null)
+  }
+
+  return (
+    <article className="seg-card datos-card" style={{ maxWidth: "none" }}>
+      <div className="seg-chip"><SignalLight tone={info?.activeMode ? "green" : "neutral"} compact /> {info?.activeMode ? `Fuente activa: ${MODE_LABEL[info.activeMode] ?? info.activeMode}` : "Sin fuente"}{info?.lastSnapshotAt ? ` · ${fmtDate(info.lastSnapshotAt)}` : ""}</div>
+      <h3><BarChart3 size={18} style={{ verticalAlign: "-3px", marginRight: 6 }} />Fuente KPI del dashboard</h3>
+      <p>Elige la forma que te acomode. La última que uses queda como fuente activa para Inicio y KPI.</p>
+      <div className="datos-tabs">
+        {KPI_TABS.map((item) => (
+          <button key={item.key} type="button" className={tab === item.key ? "on" : ""} onClick={() => { setTab(item.key); setError(""); setMessage("") }}>{item.label}</button>
+        ))}
+      </div>
+
+      {tab === "ARCHIVO" && (
+        <div className="datos-inline-form">
+          <span className="seg-fine-print">Excel del Dashboard (.xlsx / .xlsm) con hojas DASHBOARD y GRAFICOS. Se sube por partes, aunque pese 60 MB o más.</span>
+          {progress !== null && <div className="datos-progress"><i style={{ width: `${progress}%` }} /></div>}
+          <label className="seg-btn primary" style={{ position: "relative" }}>
+            <Upload size={16} /> {busy ? "Subiendo y validando…" : "Subir archivo KPI"}
+            <input ref={input} type="file" accept=".xlsx,.xlsm" className="datos-file-input" disabled={busy}
+              onChange={(e) => { const file = e.target.files?.[0]; if (file) void run(() => uploadKpiWorkbook(file, setProgress)); e.target.value = "" }} />
+          </label>
+        </div>
+      )}
+
+      {tab === "ENLACE" && (
+        <div className="datos-inline-form">
+          <input className="seg-input" placeholder="https://…/dashboard.xlsx" value={url} onChange={(e) => setUrl(e.target.value)} />
+          <span className="seg-fine-print">Debe abrirse sin iniciar sesión (enlace de descarga). Si Microsoft lo pide, usa "Subir archivo".</span>
+          <button className="seg-btn primary" disabled={busy || !url.trim()} onClick={() => void run(() => saveKpiSourceUrl(url.trim()))}>Guardar, probar y activar</button>
+        </div>
+      )}
+
+      {tab === "PEGAR" && (
+        <div className="datos-inline-form">
+          <span className="seg-fine-print">Copia desde Excel dos columnas (indicador y valor) y pégalas aquí. Ej.: "Meta	309" · "Facturación mes · nuevos	205".</span>
+          <textarea className="seg-input" style={{ minHeight: 140 }} value={pasted} onChange={(e) => setPasted(e.target.value)} placeholder={"Meta\t309\nFacturación mes · nuevos\t205\nFacturación mes · usados\t18"} />
+          <button className="seg-btn primary" disabled={!pasted.trim()} onClick={applyPaste}>Leer datos pegados</button>
+        </div>
+      )}
+
+      {tab === "FOTO" && (
+        <div className="datos-inline-form">
+          <span className="seg-fine-print">Sube una foto o captura del dashboard (se muestra tal cual en KPI) y escribe las cifras principales. La foto no se lee automáticamente.</span>
+          <label className="seg-btn" style={{ position: "relative", justifySelf: "start" }}>
+            <Upload size={16} /> {photo ? photo.name : "Elegir foto (opcional)"}
+            <input type="file" accept="image/*" className="datos-file-input" onChange={(e) => setPhoto(e.target.files?.[0] ?? null)} />
+          </label>
+          <div className="datos-kpi-grid">
+            <label className="seg-field"><span>Mes</span>
+              <select className="seg-select" value={values.month} onChange={(e) => setValues({ ...values, month: e.target.value })}>
+                {["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"].map((m, i) => <option key={m} value={String(i + 1)}>{m}</option>)}
+              </select>
+            </label>
+            <label className="seg-field"><span>Año</span><input className="seg-input" value={values.year} onChange={(e) => setValues({ ...values, year: e.target.value })} /></label>
+            {KPI_MANUAL_FIELDS.map((field) => (
+              <label key={field.key} className="seg-field"><span>{field.label}</span>
+                <input className="seg-input" inputMode="decimal" value={values[field.key] ?? ""} onChange={(e) => setValues({ ...values, [field.key]: e.target.value })} />
+              </label>
+            ))}
+          </div>
+          <button className="seg-btn primary" disabled={busy} onClick={() => void saveManual()}>Guardar cifras KPI</button>
+        </div>
+      )}
+
+      {error && <div className="seg-error" style={{ marginTop: 10 }}>{error}</div>}
+      {message && <div className="seg-meta" style={{ color: "#8fe3a6", marginTop: 8 }}>{message}</div>}
     </article>
   )
 }

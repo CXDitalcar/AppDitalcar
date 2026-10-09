@@ -935,10 +935,10 @@ function RequestDetailContent({
 
         <div className="request-detail-empty">
           <ShieldCheck size={34} />
-          <h2>Sin acceso</h2>
+          <h2>Esta solicitud no está a tu cargo</h2>
           <p>
-            Tu perfil no tiene permisos
-            para visualizar esta solicitud.
+            No tienes acciones pendientes en ella. Si necesitas
+            información, consulta con quien la ingresó o con Experiencia de Clientes.
           </p>
         </div>
       </div>

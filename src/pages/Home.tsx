@@ -18,11 +18,12 @@ import {
 } from "../services/academyStore"
 import { getRequestPermissions } from "../services/permissions"
 import { listRequests } from "../services/requestRepository"
-import { getAllRequestAssignments } from "../services/requestCatalog"
+import { getAllRequestAssignments, getProcessesForUser } from "../services/requestCatalog"
 import type { RequestItem, UserScope } from "../types"
 import "./Home.css"
 import { hasExperienceAccess } from "../services/experienceAccess"
 import SeguimientoPendientes from "../components/SeguimientoPendientes"
+import FrogmiPendientes from "../components/FrogmiPendientes"
 
 type KpiData = {
   summary: {
@@ -42,6 +43,17 @@ async function getKpiData(): Promise<KpiData> {
     throw new Error(payload?.message || `Error ${response.status}`)
   }
   return payload as KpiData
+}
+
+// Base de sugerencias mientras no haya historial (acordado el 09-10).
+const SUGGESTED_BY_ROLE: Record<string, string[]> = {
+  VENDEDOR: ["COL-CRE-01", "EXP-FEE-01", "EXP-SEG-01", "EXP-HOR-01"],
+  ASISTENTE_JUNIOR: ["COL-CRE-01", "EXP-FEE-01", "EXP-SEG-01", "EXP-HOR-01"],
+  JEFATURA_LOCAL: ["EXP-SEN-01", "INS-ZEX-01", "INS-MOB-01", "COM-PME-01"],
+  GERENCIA_MARCA: ["INS-ZEX-01", "INS-MAN-01", "COM-MAT-01"],
+  JEFATURA_MARKETING: ["COM-MAT-01", "COM-OTR-01"],
+  EQUIPO_COMERCIAL: ["COM-MAT-01", "COM-OTR-01"],
+  DEFAULT: ["COL-CRE-01", "COL-FIR-01"],
 }
 
 type ActivityItem = {
@@ -275,6 +287,38 @@ export default function Home({
         }
       })
 
+    // Solicitudes sugeridas: lo que más pide la persona → lo que más pide su rol → base por perfil.
+    const requestable = getProcessesForUser(currentUser).filter(
+      (process) => (process.availability ?? "ACTIVO") === "ACTIVO"
+    )
+    const allowed = new Set(requestable.map((process) => process.code))
+    const score = new Map<string, number>()
+    requests.forEach((request) => {
+      if (!allowed.has(request.processCode) || request.isTest) return
+      const mine = normalize(request.requesterEmail) === normalize(currentUser.email)
+      const sameRole = request.requesterRole === currentUser.role
+      if (mine) score.set(request.processCode, (score.get(request.processCode) ?? 0) + 100)
+      else if (sameRole) score.set(request.processCode, (score.get(request.processCode) ?? 0) + 1)
+    })
+    const defaults = SUGGESTED_BY_ROLE[currentUser.role] ?? SUGGESTED_BY_ROLE.DEFAULT
+    defaults.forEach((code, index) => {
+      if (allowed.has(code)) score.set(code, (score.get(code) ?? 0) + 0.5 - index * 0.01)
+    })
+    const suggested = [...score.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([code]) => requestable.find((process) => process.code === code)!)
+      .filter(Boolean)
+    suggested.forEach((process) => {
+      actions.push({
+        id: `sugerida-${process.code}`,
+        title: `Solicitar · ${process.name}`,
+        detail: "Solicitud frecuente para tu perfil.",
+        to: `/solicitudes/nueva?process=${encodeURIComponent(process.code)}`,
+        tone: "neutral",
+      })
+    })
+
     return {
       needsAction: dedupeActivities(actions).slice(0, 10),
       pendingItems: dedupeActivities(pending).slice(0, 12),
@@ -293,6 +337,7 @@ export default function Home({
       </section>
 
       <SeguimientoPendientes currentUser={currentUser} />
+      <FrogmiPendientes currentUser={currentUser} />
 
       <section className="activity-hub-grid home-primary-grid">
         <ActivityPanel

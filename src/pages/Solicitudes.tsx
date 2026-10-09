@@ -138,7 +138,7 @@ export default function Solicitudes({
       )}
 
       {!loading && !error && visible.length === 0 && (
-        <div className="empty">No hay solicitudes visibles para este perfil.</div>
+        <div className="empty"><strong>Nada pendiente por ahora.</strong> Aquí verás las solicitudes que ingreses y las que te toque revisar o gestionar.</div>
       )}
     </div>
   )

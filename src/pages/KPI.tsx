@@ -14,6 +14,7 @@ import {
 import type { UserScope } from "../types"
 import "./KPI.css"
 import { hasExperienceAccess } from "../services/experienceAccess"
+import { Link } from "react-router-dom"
 
 type KpiPeriod = { monthNumber: number; month: string; year: number }
 type KpiSummary = {
@@ -112,24 +113,32 @@ async function saveKpiSource(url: string) {
   })
 }
 
-async function uploadKpiFile(file: File) {
-  const response = await fetch("/api/kpi/upload", {
+// Carga por bloques de 4 MB: Azure Static Web Apps rechaza (413) un archivo grande en una sola petición.
+async function uploadKpiFile(file: File, onProgress?: (percent: number) => void) {
+  const start = await apiJson<{ uploadId: string; chunkBytes: number; totalChunks: number }>("/api/uploads/start", {
     method: "POST",
-    credentials: "include",
-    headers: {
-      "Content-Type": file.type || "application/octet-stream",
-      "x-file-name": encodeURIComponent(file.name),
-    },
-    body: file,
+    body: JSON.stringify({ kind: "kpi", fileName: file.name, size: file.size, contentType: file.type || "application/octet-stream" }),
   })
-  const payload = await response.json().catch(() => ({}))
-  if (!response.ok) throw new Error(payload?.message || `Error ${response.status}`)
-  return payload as {
+  for (let index = 0; index < start.totalChunks; index++) {
+    const blob = file.slice(index * start.chunkBytes, (index + 1) * start.chunkBytes)
+    const response = await fetch(`/api/uploads/chunk?uploadId=${encodeURIComponent(start.uploadId)}&index=${index}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/octet-stream" },
+      body: blob,
+    })
+    if (!response.ok) {
+      const payload = await response.json().catch(() => ({}))
+      throw new Error(payload?.message || `No fue posible subir el archivo (error ${response.status}).`)
+    }
+    onProgress?.(Math.round(((index + 1) / start.totalChunks) * 90))
+  }
+  return apiJson<{
     message: string
     data: KpiData
     activeMode: "upload"
     uploadedFile: { fileName: string; uploadedAt?: string; size?: number }
-  }
+  }>("/api/uploads/finalize", { method: "POST", body: JSON.stringify({ uploadId: start.uploadId }) })
 }
 
 async function getKpiData() {
@@ -166,6 +175,7 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadPct, setUploadPct] = useState(0)
   const [sourceInfo, setSourceInfo] = useState<KpiSourceInfo | null>(null)
   const [message, setMessage] = useState("")
   const [error, setError] = useState("")
@@ -223,7 +233,8 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
     setMessage("")
     setError("")
     try {
-      const result = await uploadKpiFile(file)
+      setUploadPct(0)
+      const result = await uploadKpiFile(file, setUploadPct)
       setData(result.data)
       setSourceInfo((previous) => ({
         configured: true,
@@ -271,93 +282,16 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
       </section>
 
       {experienceView && (
-        <section className="kpi-source-card">
-          <div className="kpi-source-title">
-            <div className="kpi-source-icon"><FileSpreadsheet size={22} /></div>
-            <div>
-              <span className="kpi-eyebrow">SOLO TU PERFIL · EXPERIENCIA</span>
-              <strong>Administrar fuente KPI</strong>
-              <small>Elige la opción que te acomode. La última que uses queda como fuente activa.</small>
-            </div>
-            <div className={`kpi-source-state ${data ? "ok" : "pending"}`}>
-              {data ? <CheckCircle2 size={15} /> : <Link2 size={15} />}
-              {sourceInfo?.activeMode === "upload" ? "ARCHIVO ACTIVO" : sourceInfo?.activeMode === "url" ? "LINK ACTIVO" : "SIN CONEXIÓN"}
-            </div>
-          </div>
-
-          <div className="kpi-source-options">
-            <article className={`kpi-source-option ${sourceInfo?.activeMode === "upload" ? "active" : ""}`}>
-              <div className="kpi-option-heading">
-                <div className="kpi-option-number">1</div>
-                <div>
-                  <strong>Subir desde mi computador</strong>
-                  <small>Recomendado mientras Graph sigue pendiente.</small>
-                </div>
-                {sourceInfo?.activeMode === "upload" && <b>FUENTE ACTIVA</b>}
-              </div>
-              <div className="kpi-upload-zone">
-                <Upload size={21} />
-                <div>
-                  <strong>{uploading ? "Subiendo y validando…" : "Reemplazar archivo KPI"}</strong>
-                  <span>Admite .xlsm y .xlsx · misma estructura DASHBOARD / GRAFICOS</span>
-                </div>
-                <label className={`kpi-upload-button ${uploading ? "disabled" : ""}`}>
-                  {uploading ? "Procesando…" : "Seleccionar archivo"}
-                  <input
-                    type="file"
-                    accept=".xlsm,.xlsx,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    disabled={uploading}
-                    onChange={(event) => {
-                      const file = event.currentTarget.files?.[0]
-                      void handleUpload(file)
-                      event.currentTarget.value = ""
-                    }}
-                  />
-                </label>
-              </div>
-              {sourceInfo?.uploadedFile && (
-                <div className="kpi-option-meta">
-                  <span>Último archivo</span>
-                  <strong>{sourceInfo.uploadedFile.fileName}</strong>
-                  <small>{sourceInfo.uploadedFile.uploadedAt ? `Subido ${dateLabel(sourceInfo.uploadedFile.uploadedAt)}` : "Guardado en Azure"}</small>
-                </div>
-              )}
-            </article>
-
-            <article className={`kpi-source-option ${sourceInfo?.activeMode === "url" ? "active" : ""}`}>
-              <div className="kpi-option-heading">
-                <div className="kpi-option-number">2</div>
-                <div>
-                  <strong>Usar enlace Excel Online</strong>
-                  <small>Déjalo preparado para SharePoint / OneDrive.</small>
-                </div>
-                {sourceInfo?.activeMode === "url" && <b>FUENTE ACTIVA</b>}
-              </div>
-              <label className="kpi-url-field">
-                <span>LINK DEL ARCHIVO KPI</span>
-                <input
-                  type="url"
-                  value={url}
-                  onChange={(event) => setUrl(event.target.value)}
-                  placeholder="https://.../dashboard.xlsm"
-                />
-                <small>Si Microsoft exige inicio de sesión, usa por mientras la opción 1.</small>
-              </label>
-              <div className="kpi-source-actions">
-                <button type="button" className="kpi-save" onClick={() => void handleSave()} disabled={saving || !url.trim()}>
-                  <Save size={16} /> {saving ? "Probando enlace…" : "Guardar, probar y activar"}
-                </button>
-              </div>
-            </article>
-          </div>
-
-          <div className="kpi-source-footer">
-            <span>Fuente actual</span>
-            <strong>{sourceInfo?.activeMode === "upload" ? "Archivo subido desde tu equipo" : sourceInfo?.activeMode === "url" ? "Excel Online por link" : "Sin definir"}</strong>
-            {data?.meta.checkedAt && <small>Última lectura válida: {dateLabel(data.meta.checkedAt)}</small>}
-          </div>
-        </section>
+        <div className="kpi-alert">
+          <FileSpreadsheet size={17} /> La fuente KPI se administra en <Link to="/datos">Gestión › Datos</Link>: archivo, enlace, pegar datos o foto + cifras.
+        </div>
       )}
+
+      {(data?.meta as { photo?: unknown } | undefined)?.photo ? (
+        <section className="kpi-photo">
+          <img src="/api/kpi/foto" alt="Foto del dashboard KPI" />
+        </section>
+      ) : null}
 
       {message && <div className="kpi-alert success"><CheckCircle2 size={17} /> {message}</div>}
       {error && <div className="kpi-alert error"><XCircle size={17} /> {error}</div>}
@@ -367,7 +301,7 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
         <section className="kpi-empty">
           <BarChart3 size={28} />
           <strong>{loading ? "Leyendo Excel KPI…" : "Todavía no hay datos KPI disponibles"}</strong>
-          <span>{experienceView ? "Sube el archivo desde tu equipo o conecta un link arriba." : "Experiencia debe conectar primero la fuente KPI."}</span>
+          <span>{experienceView ? "Carga la fuente en Gestión › Datos." : "Los indicadores aparecerán aquí cuando estén cargados."}</span>
         </section>
       ) : (
         <>

@@ -98,9 +98,18 @@ export default function Gestion({
         {
           key: "datos",
           title: "Datos",
-          description: "Carga de planillas (SIGA, Control, T, listas de precios…) y enlace de Recursos de Academia.",
+          description: "Carga de planillas (SIGA, Control, T, Frogmi, extranet Gespark, listas de precios…), Gespark y enlace de Recursos de Academia.",
           to: "/datos",
           icon: Database,
+          tone: "green",
+          status: "Disponible",
+        },
+        {
+          key: "frogmi",
+          title: "Frogmi",
+          description: "Medición junior según notificados, Entrega, Tour Manager, cruces de VIN por aprobar y locales activos.",
+          to: "/frogmi",
+          icon: ClipboardList,
           tone: "green",
           status: "Disponible",
         },
@@ -129,7 +138,6 @@ export default function Gestion({
       {administration.length > 0 && (
         <section className="gestion-section">
           <h2>Administración</h2>
-          <p className="gestion-section-note">Visible sólo para Experiencia de Clientes y Project Manager.</p>
           <div className="gestion-grid">
             {administration.map((item) => (
               <GestionCard key={item.key} item={item} />

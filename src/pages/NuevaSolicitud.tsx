@@ -78,12 +78,12 @@ const familyInfo: Record<
   },
   COMERCIAL: {
     label: "Marketing",
-    description: "Patentes de modelo o exhibición, banderas y materiales.",
+    description: "Banderas, materiales y otras solicitudes de Marketing.",
     icon: Megaphone,
   },
   DOCUMENTACION: {
     label: "Documentación de unidades",
-    description: "PAI / precio, eficiencia energética, seguridad opcional y fichas de producto.",
+    description: "PAI / precio, patentes por modelo, eficiencia energética, seguridad opcional y fichas de producto.",
     icon: FileText,
   },
   UNIDADES: {
