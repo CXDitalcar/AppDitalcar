@@ -66,6 +66,9 @@ export function canAccessPilotModule(
   // Permite revisar la experiencia de todos los cargos sin cambiar las reglas
   // que tendrá un usuario real en el piloto.
   if (user.testingView) {
+    if (user.role === "ASISTENTE_JUNIOR") {
+      return module === "HOME" || module === "SOLICITUDES" || module === "ACADEMIA"
+    }
     if (
       module === "HOME" ||
       module === "SOLICITUDES" ||
@@ -108,12 +111,13 @@ export function canAccessPilotModule(
     }
   }
 
-  if (
-    module === "HOME" ||
-    module === "SOLICITUDES" ||
-    module === "ACADEMIA" ||
-    module === "KPI"
-  ) {
+  // Desde el 08-10 Inicio, Academia y Solicitudes están abiertos a todos los perfiles activos
+  // (el catálogo define qué puede pedir cada uno). KPI sigue acotado y el Junior no lo ve.
+  if (module === "HOME" || module === "SOLICITUDES" || module === "ACADEMIA") {
+    return true
+  }
+
+  if (module === "KPI") {
     return PILOT_ACTIVE_ROLES.includes(user.role)
   }
 
