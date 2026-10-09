@@ -53,6 +53,7 @@ const validRoles: UserRole[] = [
   "JEFATURA_MARKETING",
   "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
   "ASISTENTE_GERENCIA",
+  "ASISTENTE_JUNIOR",
   "ADMINISTRATIVO",
   "EQUIPO_COMERCIAL",
   "GERENCIA_GENERAL",
@@ -61,6 +62,8 @@ const validRoles: UserRole[] = [
 function mapRole(value: unknown): UserRole {
   const raw = text(value)
   const upper = raw.toUpperCase().replace(/\s+/g, "_")
+  // Rol eliminado el 08-10: Jefatura Comercial y Clientes ahora es Gerencia de Marca.
+  if (upper === "JEFATURA_COMERCIAL_CLIENTES") return "GERENCIA_MARCA"
   if (validRoles.includes(upper as UserRole)) return upper as UserRole
 
   const normalized = normalize(raw)
@@ -74,8 +77,8 @@ function mapRole(value: unknown): UserRole {
     gerenciademarca: "GERENCIA_MARCA",
     gerenciamarca: "GERENCIA_MARCA",
     gerenciaventas: "GERENCIA_VENTAS",
-    jefaturacomercialyclientes: "JEFATURA_COMERCIAL_CLIENTES",
-    jefaturacomercialclientes: "JEFATURA_COMERCIAL_CLIENTES",
+    jefaturacomercialyclientes: "GERENCIA_MARCA",
+    jefaturacomercialclientes: "GERENCIA_MARCA",
     jefaturaoperacionescomerciales: "JEFATURA_OPERACIONES_COMERCIALES",
     jefaturaadministracion: "JEFATURA_ADMINISTRACION",
     gerenciaadministracion: "GERENCIA_ADMINISTRACION",
@@ -91,7 +94,9 @@ function mapRole(value: unknown): UserRole {
     asistenciadegerencia: "ASISTENTE_GERENCIA",
     asistenciagerencia: "ASISTENTE_GERENCIA",
     administrativo: "ADMINISTRATIVO",
-    junior: "ADMINISTRATIVO",
+    junior: "ASISTENTE_JUNIOR",
+    asistentejunior: "ASISTENTE_JUNIOR",
+    juniorpreparador: "ASISTENTE_JUNIOR",
     equipocomercial: "EQUIPO_COMERCIAL",
     gerenciageneral: "GERENCIA_GENERAL",
   }

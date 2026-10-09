@@ -29,7 +29,7 @@ export function roleLabel(role: UserRole) {
     JEFATURA_ZONAL: "Gerencia de Marca",
     GERENCIA_MARCA: "Gerencia de Marca",
     GERENCIA_VENTAS: "Gerencia de Ventas",
-    JEFATURA_COMERCIAL_CLIENTES: "Jefatura Comercial y Clientes",
+    JEFATURA_COMERCIAL_CLIENTES: "Gerencia de Marca",
     JEFATURA_OPERACIONES_COMERCIALES: "Jefatura Operaciones Comerciales",
     JEFATURA_ADMINISTRACION: "Jefatura Administración",
     GERENCIA_ADMINISTRACION: "Gerencia Administración",
@@ -38,6 +38,7 @@ export function roleLabel(role: UserRole) {
     EXPERIENCIA_CLIENTES: "Experiencia de Clientes",
     PROJECT_MANAGER: "Project Manager",
     ASISTENTE_GERENCIA: "Asistente de Gerencia",
+    ASISTENTE_JUNIOR: "Junior",
     ADMINISTRATIVO: "Administración",
     EQUIPO_COMERCIAL: "Equipo Comercial",
     GERENCIA_GENERAL: "Gerencia General",
@@ -117,7 +118,8 @@ export function requiresLocalReview(
 
   if (process.localReviewRule === "NUNCA") return false
   if (process.localReviewRule === "SOLO_VENDEDOR") {
-    return user.role === "VENDEDOR"
+    // Vendedor y Junior pueden pedir, pero la solicitud pasa primero por su jefe.
+    return user.role === "VENDEDOR" || user.role === "ASISTENTE_JUNIOR"
   }
 
   // SIEMPRE no obliga a una persona a aprobarse a sí misma.
@@ -250,6 +252,17 @@ export function initialRequestRouting(
   local: string,
   runtimeSla?: RuntimeSla
 ) {
+  // Beta: solicitudes de prueba. No se asignan a nadie ni generan gestión real.
+  if (getRequestProcess(processCode)?.availability === "BETA") {
+    return {
+      status: "RECIBIDA" as const,
+      approvalContext: undefined,
+      currentResponsibleEmail: undefined,
+      currentResponsibleName: "Solicitud de prueba",
+      currentResponsibleLabel: "Sin gestión (prueba)",
+    }
+  }
+
   if (local && requiresLocalReview(user, processCode)) {
     const reviewer = getSellerLocalReviewer(local)
 
@@ -343,5 +356,104 @@ export function budgetApprovalRouting(request: RequestItem) {
     resolutionSLAPausedAt:
       request.resolutionSLAPausedAt ?? new Date().toISOString(),
     slaPausedReason: "Esperando aprobación",
+  }
+}
+
+
+// ======================================================
+// SLA EN DÍAS (catálogo v2)
+// ======================================================
+
+// Horas corridas que equivalen a N días hábiles desde una fecha (lunes a viernes).
+export function businessDaysToHours(days: number, from = new Date()) {
+  const start = new Date(from)
+  const end = new Date(from)
+  let remaining = days
+  while (remaining > 0) {
+    end.setDate(end.getDate() + 1)
+    const weekday = end.getDay()
+    if (weekday !== 0 && weekday !== 6) remaining -= 1
+  }
+  return Math.round((end.getTime() - start.getTime()) / 3600000)
+}
+
+export function processSlaHours(processCode: string, from = new Date()) {
+  const process = getRequestProcess(processCode)
+  if (!process?.slaDays) return undefined
+  return process.slaCalendarDays ? process.slaDays * 24 : businessDaysToHours(process.slaDays, from)
+}
+
+export function processSlaLabel(processCode: string) {
+  const process = getRequestProcess(processCode)
+  if (!process?.slaDays) return undefined
+  const unit = process.slaCalendarDays ? "días" : "días hábiles"
+  return `${process.slaDays} ${unit}${process.slaDefault ? " (por defecto)" : ""}`
+}
+
+// ======================================================
+// FLUJO "CON PROPUESTA" (Zonas, Mobiliario, Instalaciones y Otra con monto)
+// Experiencia ⇄ Gerencia de Marca (con imágenes) → acuerdo → Gerencia Comercial (pausa) → ejecución → cierre con foto.
+// ======================================================
+
+export function findBrandManagerForLocal(local: string) {
+  const target = local.trim().toLowerCase()
+  const users = getAllOperationalUsers().filter((item) => item.active && item.role === "GERENCIA_MARCA")
+  const byLocal = users.find((item) =>
+    [item.local, item.localPrincipal, ...(item.assignedLocals ?? [])]
+      .filter(Boolean)
+      .some((value) => value!.trim().toLowerCase() === target)
+  )
+  if (byLocal) return byLocal
+  return users.find((item) => item.brands?.some((brand) => target.includes(brand.trim().toLowerCase())))
+}
+
+export function sendProposalToBrandRouting(request: RequestItem) {
+  const manager = findBrandManagerForLocal(request.local)
+  const round = (request.proposal?.round ?? 0) + 1
+  return {
+    status: "PENDIENTE_APROBACION" as const,
+    approvalContext: "PROPUESTA_MARCA" as const,
+    currentResponsibleEmail: manager?.email,
+    currentResponsibleName: manager?.name ?? "Gerencia de Marca",
+    currentResponsibleLabel: "Gerencia de Marca",
+    proposal: {
+      ...(request.proposal ?? { round: 0, stage: "EXPERIENCIA" as const }),
+      round,
+      stage: "MARCA" as const,
+      brandManagerEmail: manager?.email,
+      brandManagerName: manager?.name,
+    },
+  }
+}
+
+function backToExperience(request: RequestItem) {
+  return {
+    status: "EN_GESTION" as const,
+    approvalContext: undefined,
+    currentResponsibleEmail: request.managementOwnerEmail,
+    currentResponsibleName: request.managementOwnerName ?? "Experiencia de Clientes",
+    currentResponsibleLabel: request.managementOwnerLabel ?? "Experiencia de Clientes",
+  }
+}
+
+export function brandAgreesRouting(request: RequestItem) {
+  return {
+    ...backToExperience(request),
+    proposal: { ...(request.proposal ?? { round: 1 }), stage: "ACUERDO" as const, agreedAt: new Date().toISOString() },
+  }
+}
+
+export function brandRequestsChangesRouting(request: RequestItem) {
+  return {
+    ...backToExperience(request),
+    proposal: { ...(request.proposal ?? { round: 1 }), stage: "EXPERIENCIA" as const, agreedAt: undefined },
+  }
+}
+
+export function sendToCommercialRouting(request: RequestItem) {
+  return {
+    ...budgetApprovalRouting(request),
+    slaPausedReason: "En aprobación de Gerencia Comercial",
+    proposal: { ...(request.proposal ?? { round: 1 }), stage: "GERENCIA_COMERCIAL" as const, sentToCommercialAt: new Date().toISOString() },
   }
 }

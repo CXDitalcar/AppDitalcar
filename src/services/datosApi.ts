@@ -49,9 +49,10 @@ export function getDatosEstado() {
 }
 
 export async function uploadAndProcess(
-  kind: DataKind,
+  kind: DataKind | "precios",
   file: File,
-  onProgress?: (label: string, percent: number) => void
+  onProgress?: (label: string, percent: number) => void,
+  extra: Record<string, string> = {}
 ): Promise<ImportLogEntry> {
   onProgress?.("Preparando carga…", 0)
   const start = await apiJson<{ uploadId: string; chunkBytes: number; totalChunks: number }>("/api/uploads/start", {
@@ -74,7 +75,7 @@ export async function uploadAndProcess(
   }
   await apiJson("/api/uploads/finalize", { method: "POST", body: JSON.stringify({ uploadId: start.uploadId }) })
   onProgress?.("Procesando datos…", 90)
-  const result = await apiJson<ImportLogEntry>("/api/datos/procesar", { method: "POST", body: JSON.stringify({ kind }) })
+  const result = await apiJson<ImportLogEntry>("/api/datos/procesar", { method: "POST", body: JSON.stringify({ kind, ...extra }) })
   onProgress?.("Listo", 100)
   return result
 }

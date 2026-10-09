@@ -7,10 +7,9 @@ import {
   requestFields as fallbackFields,
   requestProcesses as fallbackProcesses,
 } from "../data/requestConfig"
-import {
-  getPilotRequestCodesForUser,
-  PILOT_LOCAL,
-} from "../data/pilotStellantis"
+import { PILOT_LOCAL } from "../data/pilotStellantis"
+import { applyCatalogV2 } from "../data/requestCatalogV2"
+import { hasExperienceAccess } from "./experienceAccess"
 import { fetchOperationalCatalog, type OperationalCatalogMeta, type UsersCatalogMeta } from "./operationalCatalogApi"
 import type {
   ProcessAssignment,
@@ -49,10 +48,12 @@ type RuntimeState = {
   usersMeta?: UsersCatalogMeta
 }
 
+const fallbackV2 = applyCatalogV2({ processes: fallbackProcesses, fields: fallbackFields, assignments: fallbackAssignments })
+
 let runtime: RuntimeState = {
-  processes: fallbackProcesses,
-  fields: fallbackFields,
-  assignments: fallbackAssignments,
+  processes: fallbackV2.processes,
+  fields: fallbackV2.fields,
+  assignments: fallbackV2.assignments,
   users: mockUsers,
   meta: { source: "FALLBACK", warning: "Usando snapshot temporal hasta cargar las LIST operativas." },
 }
@@ -61,10 +62,13 @@ export async function loadOperationalCatalog(force = false) {
   try {
     const result = await fetchOperationalCatalog(force)
     const hasLiveCatalog = result.processes.length > 0
+    const catalog = hasLiveCatalog
+      ? applyCatalogV2({ processes: result.processes, fields: result.fields, assignments: result.assignments })
+      : fallbackV2
     runtime = {
-      processes: hasLiveCatalog ? result.processes : fallbackProcesses,
-      fields: hasLiveCatalog ? result.fields : fallbackFields,
-      assignments: hasLiveCatalog ? result.assignments : fallbackAssignments,
+      processes: catalog.processes,
+      fields: catalog.fields,
+      assignments: catalog.assignments,
       users: result.users?.length ? result.users : mockUsers,
       meta: hasLiveCatalog ? result.meta : { ...result.meta, source: "FALLBACK" },
       usersMeta: result.usersMeta,
@@ -72,9 +76,9 @@ export async function loadOperationalCatalog(force = false) {
   } catch (error) {
     runtime = {
       ...runtime,
-      processes: fallbackProcesses,
-      fields: fallbackFields,
-      assignments: fallbackAssignments,
+      processes: fallbackV2.processes,
+      fields: fallbackV2.fields,
+      assignments: fallbackV2.assignments,
       meta: { source: "FALLBACK", warning: error instanceof Error ? error.message : "LIST operativas no disponibles." },
     }
   }
@@ -104,11 +108,19 @@ function migratedRoleMatches(userRole: UserScope["role"], configuredRole?: UserS
   return false
 }
 
+// Procesos que el perfil ve al crear una solicitud. Los "OCULTO" solo los ve Experiencia/PM;
+// los "CONSTRUCCION" se muestran deshabilitados y los "BETA" generan solicitudes de prueba.
 export function getProcessesForUser(user: UserScope) {
-  const pilotCodes = runtime.meta.source === "FALLBACK" ? getPilotRequestCodesForUser(user) : null
+  const experience = hasExperienceAccess(user)
   return runtime.processes
-    .filter((process) => process.active && process.manualRequest && process.requesterRoles.some((role) => migratedRoleMatches(user.role, role)) && (pilotCodes === null || pilotCodes.has(process.code)))
+    .filter((process) => process.active && process.manualRequest)
+    .filter((process) => process.availability !== "OCULTO" || experience)
+    .filter((process) => experience || process.requesterRoles.some((role) => migratedRoleMatches(user.role, role)))
     .sort((a, b) => a.order - b.order)
+}
+
+export function isProcessRequestable(process: ProcessConfig) {
+  return !process.availability || process.availability === "ACTIVO" || process.availability === "BETA"
 }
 
 export function getRequestFields(processCode: string) {

@@ -7,11 +7,11 @@ import type {
 } from "../types"
 import { hasExperienceAccess } from "./experienceAccess"
 
+// Experiencia y PM ven todas las solicitudes (seguimiento y futuro dashboard).
+// Gerencia Comercial ya no tiene vista amplia: ve lo que se le envía a aprobación.
 const broadVisibilityRoles: UserScope["role"][] = [
   "GERENCIA_VENTAS",
-  "GERENCIA_COMERCIAL",
   "GERENCIA_ADMINISTRACION",
-  "JEFATURA_COMERCIAL_CLIENTES",
   "EXPERIENCIA_CLIENTES", "PROJECT_MANAGER",
 ]
 
@@ -73,6 +73,12 @@ export function canViewRequest(
   if (broadVisibilityRoles.includes(user.role)) {
     return true
   }
+
+  const email = normalized(user.email)
+  if (normalized(request.managementOwnerEmail) === email) return true
+  if ((request.participants ?? []).some((value) => normalized(value) === email)) return true
+  if ((request.audience?.emails ?? []).some((value) => normalized(value) === email)) return true
+  if ((request.audience?.roles ?? []).includes(user.role)) return true
 
   if (user.role === "GERENCIA_MARCA") {
     // La Gerencia de Marca ve los locales asignados a su perfil.
@@ -136,6 +142,11 @@ export function canApproveRequest(
 
   if (request.approvalContext === "PRESUPUESTO_COMERCIAL") {
     return user.role === "GERENCIA_COMERCIAL"
+  }
+
+  if (request.approvalContext === "PROPUESTA_MARCA") {
+    if (isExactCurrentResponsible(user, request)) return true
+    return user.role === "GERENCIA_MARCA" && userHasLocal(user, request.local)
   }
 
   return assignments.some(
@@ -227,7 +238,6 @@ export function canViewLocalDetail(user: UserScope, local: string): boolean {
   if (
     user.role === "GERENCIA_VENTAS" ||
     user.role === "GERENCIA_COMERCIAL" ||
-    user.role === "JEFATURA_COMERCIAL_CLIENTES" ||
     hasExperienceAccess(user)
   ) {
     return true

@@ -1,6 +1,6 @@
 import { mockUsers } from "../data/mockData"
 import { requestAssignments } from "../data/requestConfig"
-import { getKnownPersonName } from "./requestCatalog"
+import { getKnownPersonName, getOperationalUserByEmail } from "./requestCatalog"
 import type {
   RequestItem,
   RequestStatus,
@@ -29,7 +29,7 @@ export function roleLabel(role?: UserRole) {
     JEFATURA_ZONAL: "Gerencia de Marca",
     GERENCIA_MARCA: "Gerencia de Marca",
     GERENCIA_VENTAS: "Gerencia de Ventas",
-    JEFATURA_COMERCIAL_CLIENTES: "Jefatura Comercial y Clientes",
+    JEFATURA_COMERCIAL_CLIENTES: "Gerencia de Marca",
     JEFATURA_OPERACIONES_COMERCIALES: "Jefatura Operaciones Comerciales",
     JEFATURA_ADMINISTRACION: "Jefatura Administración",
     GERENCIA_ADMINISTRACION: "Gerencia Administración",
@@ -38,6 +38,7 @@ export function roleLabel(role?: UserRole) {
     EXPERIENCIA_CLIENTES: "Experiencia de Clientes",
     PROJECT_MANAGER: "Project Manager",
     ASISTENTE_GERENCIA: "Asistente de Gerencia",
+    ASISTENTE_JUNIOR: "Junior",
     ADMINISTRATIVO: "Administración",
     EQUIPO_COMERCIAL: "Equipo Comercial",
   }
@@ -51,9 +52,10 @@ export function canSeeExactManager(user: UserScope) {
 
 function roleFromEmail(email?: string) {
   if (!email) return undefined
-  return mockUsers.find(
-    (item) => item.email.toLowerCase() === email.toLowerCase()
-  )?.role
+  return (
+    getOperationalUserByEmail(email)?.role ??
+    mockUsers.find((item) => item.email.toLowerCase() === email.toLowerCase())?.role
+  )
 }
 
 function assignmentLabelFromEmail(email?: string) {
@@ -77,6 +79,12 @@ export function responsibleLabel(
       }`
     }
     return request.currentResponsibleLabel ?? "Jefatura de Sucursal"
+  }
+
+  if (request.approvalContext === "PROPUESTA_MARCA") {
+    return request.currentResponsibleName && request.currentResponsibleName !== "Gerencia de Marca"
+      ? `${request.currentResponsibleName} · Gerencia de Marca`
+      : "Gerencia de Marca"
   }
 
   if (request.approvalContext === "PRESUPUESTO_COMERCIAL") {
@@ -154,6 +162,17 @@ export function visibleStatusLabel(
 }
 
 export function stageLabel(request: RequestItem) {
+  if (request.isTest) return "Prueba (Beta)"
+  if (request.waitingApproval) return "En espera de aprobación"
+  if (request.flow === "PROPUESTA" && request.status !== "RESUELTA" && request.status !== "RECHAZADA") {
+    const stage = request.proposal?.stage
+    if (request.status === "RESUELTA_POR_CONFIRMAR") return "Implementada · falta foto del local"
+    if (stage === "MARCA") return `Propuesta en Gerencia de Marca (vuelta ${request.proposal?.round ?? 1})`
+    if (stage === "ACUERDO") return "Propuesta acordada"
+    if (stage === "GERENCIA_COMERCIAL") return "En aprobación"
+    if (stage === "EJECUCION") return "En ejecución"
+    if (request.status === "EN_GESTION") return "Preparando propuesta"
+  }
   if (
     request.status === "PENDIENTE_APROBACION" &&
     request.approvalContext === "JEFATURA_LOCAL"
