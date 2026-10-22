@@ -87,3 +87,6 @@
 .portal-editor-row.off .seg-input{opacity:.5}
 .portal-editor-groups{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;color:#a6a6ae;font-size:13px}
 @media (max-width:860px){.portal-editor-row{grid-template-columns:1fr}}
+.showroom-editor-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-bottom:8px}
+.showroom-editor-row{display:grid;grid-template-columns:1.2fr 1.5fr 1fr auto;gap:8px;align-items:center;padding:6px 0}
+@media (max-width:760px){.showroom-editor-row{grid-template-columns:1fr}}

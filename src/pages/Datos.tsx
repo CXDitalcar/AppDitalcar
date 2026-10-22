@@ -17,6 +17,7 @@ import {
 } from "../services/catalogoApi"
 import GesparkPanel from "../components/GesparkPanel"
 import PortalAccessEditor from "../components/PortalAccessEditor"
+import ShowroomAccessEditor from "../components/ShowroomAccessEditor"
 import { Link } from "react-router-dom"
 import "./Seguimiento.css"
 import "./Ops.css"
@@ -116,7 +117,10 @@ export default function Datos() {
 
       <section className="seg-section">
         <h2>Inicio y accesos</h2>
-        <PortalAccessEditor />
+        <div className="datos-grid">
+          <PortalAccessEditor />
+          <ShowroomAccessEditor />
+        </div>
       </section>
 
       <h2 className="datos-subtitle">Seguimiento de clientes y Ventas</h2>

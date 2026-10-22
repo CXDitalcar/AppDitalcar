@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { Link, useLocation, useSearchParams } from "react-router-dom"
-import { ArrowRight, CheckCircle2, ClipboardCheck, Plus, Route as RouteIcon } from "lucide-react"
+import { ArrowRight, ArrowUpRight, Check, CheckCircle2, ClipboardCheck, ClipboardList, Copy, Plus, Route as RouteIcon } from "lucide-react"
 import SignalLight, { signalFromRequest } from "../components/SignalLight"
 import { getProcessesForUser, isExperienceProcess, isProcessRequestable } from "../services/requestCatalog"
 import { stageLabel } from "../services/requestPresentation"
@@ -9,6 +9,8 @@ import { listRouteExecutions, getRouteMetrics, type RouteExecution, type RouteMe
 import { showroomTasks, useShowroomRequests } from "../services/showroomData"
 import { hasExperienceAccess } from "../services/experienceAccess"
 import type { RequestFamily, UserScope } from "../types"
+import { userLocalList } from "../services/userLocals"
+import { accountsForUser, getShowroomAccess, type FrogmiAccount, type ShowroomAccess } from "../services/showroomAccess"
 import "./Portal.css"
 import "./Showroom.css"
 
@@ -66,7 +68,7 @@ export default function Showroom({ currentUser, canRoute, canLocalBoard }: { cur
     <div className="portal-page showroom-page">
       <section className="portal-hello">
         <h1>Hola, {firstName}</h1>
-        <p>{currentUser.local ? `${currentUser.local} · ` : ""}Lo que necesita tu showroom: solicitudes de experiencia y Ruta de Experiencia.</p>
+        <p>{userLocalList(currentUser).length ? `${userLocalList(currentUser).join(" · ")} · ` : ""}Lo que necesita tu showroom: solicitudes de experiencia y Ruta de Experiencia.</p>
       </section>
 
       {canRoute && (
@@ -179,9 +181,11 @@ function RutaPanel({ currentUser, canLocalBoard, network }: { currentUser: UserS
     getRouteMetrics(network ? undefined : currentUser.local).then(setMetrics).catch(() => setMetrics(null))
   }, [currentUser.email, currentUser.local, network])
 
-  const isBranchHead = currentUser.role === "JEFATURA_LOCAL"
+  // La Ruta la puede realizar cualquier perfil (no solo la Jefatura de Sucursal).
   const since = weekStart().toISOString()
-  const thisWeek = (executions ?? []).find((e) => e.mode === "RUTA" && e.status === "SUBMITTED" && (e.submittedAt ?? e.updatedAt) >= since && (!currentUser.local || e.local === currentUser.local))
+  const myLocals = userLocalList(currentUser)
+  const submittedThisWeek = (executions ?? []).filter((e) => e.mode === "RUTA" && e.status === "SUBMITTED" && (e.submittedAt ?? e.updatedAt) >= since)
+  const weekByLocal = myLocals.map((local) => ({ local, done: submittedThisWeek.find((e) => e.local === local) }))
   const draft = (executions ?? []).find((e) => e.status === "DRAFT" && e.completedByEmail?.toLowerCase() === currentUser.email.toLowerCase())
 
   const byLocal = useMemo(() => {
@@ -199,20 +203,32 @@ function RutaPanel({ currentUser, canLocalBoard, network }: { currentUser: UserS
 
   return (
     <>
-      {isBranchHead && (
-        <section className="portal-today" aria-labelledby="semana-title">
-          <div className="portal-section-head"><h2 id="semana-title">Esta semana</h2></div>
-          {executions === null ? <div className="portal-empty muted">Cargando…</div> : thisWeek ? (
-            <div className="portal-empty"><CheckCircle2 size={18} /> Ruta enviada el {fmt(thisWeek.submittedAt ?? thisWeek.updatedAt)}. {pct(thisWeek) !== null ? `Cumplimiento ${pct(thisWeek)}%.` : ""}</div>
-          ) : (
-            <Link to="/formularios" className="showroom-cta">
-              <RouteIcon size={22} />
-              <span><strong>{draft ? "Continuar la Ruta de Experiencia" : "Realizar la Ruta de Experiencia"}</strong><small>Recorrido semanal del local. Tarda unos minutos y puedes adjuntar fotos.</small></span>
-              <ArrowRight size={18} />
-            </Link>
-          )}
-        </section>
-      )}
+      <section className="portal-today" aria-labelledby="semana-title">
+        <div className="portal-section-head"><h2 id="semana-title">Esta semana</h2></div>
+        <Link to={draft ? `/ruta-experiencia?id=${encodeURIComponent(draft.id)}` : "/ruta-experiencia"} className="showroom-cta">
+          <RouteIcon size={22} />
+          <span>
+            <strong>{draft ? `Continuar la Ruta de Experiencia${draft.local ? ` · ${draft.local}` : ""}` : "Realizar la Ruta de Experiencia"}</strong>
+            <small>Recorrido semanal del local. Tarda unos minutos y puedes adjuntar fotos.</small>
+          </span>
+          <ArrowRight size={18} />
+        </Link>
+        {executions !== null && weekByLocal.length > 0 && (
+          <ul className="showroom-week">
+            {weekByLocal.map(({ local, done }) => (
+              <li key={local} className={done ? "done" : ""}>
+                {done ? <CheckCircle2 size={16} /> : <span className="showroom-week-dot" aria-hidden="true" />}
+                <span><strong>{local}</strong> · {done ? `enviada el ${fmt(done.submittedAt ?? done.updatedAt)} por ${done.completedByName}` : "pendiente esta semana"}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {executions !== null && weekByLocal.length === 0 && submittedThisWeek.length > 0 && (
+          <p className="showroom-week-note">{submittedThisWeek.length} Ruta{submittedThisWeek.length > 1 ? "s" : ""} enviada{submittedThisWeek.length > 1 ? "s" : ""} esta semana en la red.</p>
+        )}
+      </section>
+
+      <OtherForms currentUser={currentUser} />
 
       <section className="portal-section" aria-labelledby="tablero-title">
         <div className="portal-section-head">
@@ -247,5 +263,76 @@ function RutaPanel({ currentUser, canLocalBoard, network }: { currentUser: UserS
         </div>
       </section>
     </>
+  )
+}
+
+// Otros formularios: Tour Manager y Frogmi (visibles para todos), con la cuenta Frogmi del local.
+function OtherForms({ currentUser }: { currentUser: UserScope }) {
+  const [access, setAccess] = useState<ShowroomAccess | null>(null)
+  const [showAll, setShowAll] = useState(false)
+  useEffect(() => { getShowroomAccess().then(setAccess) }, [])
+  if (!access) return null
+  const { mine, others } = accountsForUser(currentUser, access.cuentas)
+  const list = mine.length ? mine : others
+  const visible = mine.length ? (showAll ? [...mine, ...others] : mine) : (showAll ? others : others.slice(0, 3))
+  const hidden = access.cuentas.length - visible.length
+  return (
+    <section className="portal-section" aria-labelledby="otros-title">
+      <div className="portal-section-head">
+        <h2 id="otros-title">Otros formularios</h2>
+        <p>Se abren en otra pestaña.</p>
+      </div>
+      <div className="showroom-forms">
+        {access.tourManagerUrl && (
+          <a className="showroom-form-card" href={access.tourManagerUrl} target="_blank" rel="noopener noreferrer">
+            <span className="portal-tile-icon"><ClipboardList size={22} /></span>
+            <span className="showroom-form-text"><strong>Tour Manager Resumido · Stellantis</strong><small>Formulario de Microsoft Forms.</small></span>
+            <ArrowUpRight size={18} />
+          </a>
+        )}
+        {access.frogmiUrl && (
+          <div className="showroom-form-card frogmi">
+            <a className="showroom-form-link" href={access.frogmiUrl} target="_blank" rel="noopener noreferrer">
+              <span className="portal-tile-icon"><ClipboardCheck size={22} /></span>
+              <span className="showroom-form-text"><strong>Formularios Frogmi</strong><small>Entra con la cuenta de tu local.</small></span>
+              <ArrowUpRight size={18} />
+            </a>
+            {list.length > 0 && (
+              <div className="showroom-accounts">
+                <span className="showroom-accounts-title">{mine.length ? (mine.length > 1 ? "Cuentas de tus locales" : "Cuenta de tu local") : "Cuentas por local"}</span>
+                {visible.map((c) => <AccountRow key={c.usuario} account={c} clave={c.clave || access.clave} />)}
+                {hidden > 0 || showAll ? (
+                  <button type="button" className="portal-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "Ver menos" : "Ver las cuentas de todos los locales"}</button>
+                ) : null}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  )
+}
+
+function AccountRow({ account, clave }: { account: FrogmiAccount; clave?: string }) {
+  return (
+    <div className="showroom-account">
+      <strong>{account.local}</strong>
+      <CopyField label="Usuario" value={account.usuario} />
+      {clave && <CopyField label="Clave" value={clave} />}
+    </div>
+  )
+}
+
+function CopyField({ label, value }: { label: string; value: string }) {
+  const [copied, setCopied] = useState(false)
+  async function copy() {
+    try { await navigator.clipboard.writeText(value); setCopied(true); window.setTimeout(() => setCopied(false), 1500) } catch { /* sin portapapeles */ }
+  }
+  return (
+    <span className="showroom-copy">
+      <small>{label}</small>
+      <code>{value}</code>
+      <button type="button" onClick={() => void copy()} aria-label={`Copiar ${label.toLowerCase()}`}>{copied ? <Check size={14} /> : <Copy size={14} />}</button>
+    </span>
   )
 }

@@ -10,6 +10,7 @@ import { computeHomeActivities } from "../services/homeActivities"
 import { useNavBadges } from "../services/navBadges"
 import { getPortalConfig, resolvePortalCards, type PortalCard, type PortalOverride, type PortalPermissions } from "../services/portalAccess"
 import type { RequestItem, UserScope } from "../types"
+import { userLocalList } from "../services/userLocals"
 import "./Portal.css"
 
 const ICONS: Record<PortalCard["icon"], LucideIcon> = {
@@ -64,7 +65,7 @@ export default function Portal({ currentUser, permissions }: { currentUser: User
     <div className="portal-page">
       <section className="portal-hello">
         <h1>{greeting()}, {firstName}</h1>
-        <p>{currentUser.local ? `${currentUser.local} · ` : ""}Aquí tienes lo de hoy, tus tableros y tus accesos.</p>
+        <p>{userLocalList(currentUser).length ? `${userLocalList(currentUser).join(" · ")} · ` : ""}Aquí tienes lo de hoy, tus tableros y tus accesos.</p>
       </section>
 
       <section id="para-hoy" className="portal-today" aria-labelledby="para-hoy-title">

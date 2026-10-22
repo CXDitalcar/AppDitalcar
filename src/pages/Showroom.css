@@ -30,3 +30,26 @@
 .showroom-cta small{color:#ffe0e2;font-size:13px}
 .showroom-links{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
 .portal-empty.muted{color:#a6a6ae}
+.showroom-week{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px}
+.showroom-week li{display:flex;align-items:center;gap:10px;color:#d4d4da;font-size:14px}
+.showroom-week li.done{color:#7fe0a8}
+.showroom-week li.done strong{color:#fff}
+.showroom-week-dot{width:10px;height:10px;border-radius:50%;border:2px solid #f0b041;flex:0 0 auto}
+.showroom-week-note{margin:10px 0 0;color:#a6a6ae;font-size:14px}
+.showroom-forms{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px;align-items:start}
+.showroom-form-card{display:flex;align-items:center;gap:14px;padding:16px;border:1px solid #26262c;border-radius:16px;background:#141418;color:#fff;text-decoration:none}
+a.showroom-form-card:hover,.showroom-form-link:hover{border-color:#e1262f}
+.showroom-form-card.frogmi{display:grid;gap:12px;align-items:stretch}
+.showroom-form-link{display:flex;align-items:center;gap:14px;color:#fff;text-decoration:none;border:1px solid transparent;border-radius:12px}
+.showroom-form-text{flex:1;display:grid;gap:3px}
+.showroom-form-text strong{font-size:16px}
+.showroom-form-text small{color:#a6a6ae;font-size:13px}
+.showroom-accounts{display:grid;gap:8px;padding-top:10px;border-top:1px solid #26262c}
+.showroom-accounts-title{color:#8d8d96;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+.showroom-account{display:grid;gap:6px;padding:10px 12px;border-radius:12px;background:#1b1b20}
+.showroom-account>strong{font-size:14px}
+.showroom-copy{display:flex;align-items:center;gap:8px;min-width:0}
+.showroom-copy small{flex:0 0 52px;color:#8d8d96;font-size:12px}
+.showroom-copy code{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:#fff}
+.showroom-copy button{flex:0 0 36px;height:36px;border-radius:8px;border:1px solid #33333a;background:transparent;color:#d4d4da;display:grid;place-items:center;cursor:pointer}
+.showroom-copy button:hover{border-color:#e1262f;color:#fff}
