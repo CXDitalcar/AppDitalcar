@@ -37,8 +37,8 @@ function pick(fields, aliases) {
 
 function split(value) {
   return cellText(value)
-    .split(/[;,]/)
-    .map((item) => item.trim())
+    .split(/;#|[;,]/)
+    .map((item) => item.replace(/^#/, "").trim())
     .filter(Boolean)
 }
 
@@ -131,7 +131,9 @@ function toUser(fields) {
 
   const role = mapRole(pick(fields, ["RolApp", "Rol", "CargoApp", "Cargo"]))
   const assignedLocals = split(pick(fields, ["LocalesAsignados", "Locales", "SucursalesAsignadas"]))
-  const localPrincipal = cellText(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))
+  const principalList = split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))
+  const localPrincipal = principalList[0] || ""
+  for (const item of principalList) if (!assignedLocals.includes(item)) assignedLocals.push(item)
   const scope = mapScope(pick(fields, ["Alcance", "Scope"]), role, assignedLocals)
   const local = localPrincipal || assignedLocals[0] || undefined
 

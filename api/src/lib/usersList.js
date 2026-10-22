@@ -79,8 +79,9 @@ function pick(fields, aliases) {
   return undefined
 }
 
+// Acepta listas separadas por ";", "," o "|" y valores múltiples de SharePoint ("A;#B").
 function split(value) {
-  return text(value).split(/[;,|]/).map((item) => item.trim()).filter(Boolean)
+  return text(value).split(/;#|[;,|]/).map((item) => item.replace(/^#/, "").trim()).filter(Boolean)
 }
 
 function bool(value, fallback = true) {
@@ -118,7 +119,10 @@ function toUser(fields) {
 
   const role = mapRole(pick(fields, ["RolApp", "Rol", "CargoApp"]))
   const assignedLocals = split(pick(fields, ["LocalesAsignados", "Locales", "SucursalesAsignadas"]))
-  const localPrincipal = text(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))
+  // LocalPrincipal a veces llega con varios locales ("A;#B"): el primero es el principal y todos quedan asignados.
+  const principalList = split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))
+  const localPrincipal = principalList[0] || ""
+  for (const item of principalList) if (!assignedLocals.includes(item)) assignedLocals.push(item)
   const local = localPrincipal || assignedLocals[0] || undefined
 
   return {

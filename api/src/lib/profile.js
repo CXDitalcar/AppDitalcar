@@ -67,7 +67,7 @@ function pick(fields, aliases) {
   return undefined
 }
 function split(value) {
-  return String(value ?? "").split(/[;,]/).map(x => x.trim()).filter(Boolean)
+  return String(value ?? "").split(/;#|[;,]/).map(x => x.replace(/^#/, "").trim()).filter(Boolean)
 }
 
 export async function refreshProfileFromSharePoint(email) {
@@ -113,9 +113,10 @@ export async function refreshProfileFromSharePoint(email) {
     email: normalized,
     name: String(pick(fields, ["Nombre", "Title"]) || existing?.name || normalized),
     role,
-    local: String(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]) || "") || undefined,
-    localPrincipal: String(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]) || "") || undefined,
-    assignedLocals: JSON.stringify(split(pick(fields, ["LocalesAsignados"]))),
+    // LocalPrincipal puede venir con varios locales ("A;#B"): el primero es el principal y todos quedan asignados.
+    local: split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))[0] || undefined,
+    localPrincipal: split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))[0] || undefined,
+    assignedLocals: JSON.stringify([...new Set([...split(pick(fields, ["LocalesAsignados"])), ...split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))])]),
     scope: String(pick(fields, ["Alcance"]) || defaultScope).toUpperCase(),
     zone: String(pick(fields, ["Zona"]) || "") || undefined,
     brands: JSON.stringify(split(pick(fields, ["Marcas"]))),
