@@ -211,6 +211,54 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
     }),
   })
 
+  // ================= GESTIÓN DE SHOWROOM · OTROS FORMULARIOS =================
+  // Enlaces (Tour Manager, Frogmi) y cuentas de Frogmi por local. La clave NO vive en el código:
+  // Experiencia la ingresa en Gestión › Datos y solo se entrega a usuarios con sesión.
+  const SHOWROOM_DEFAULTS = {
+    tourManagerUrl: "https://forms.cloud.microsoft/Pages/ResponsePage.aspx?id=hSzArnhODUilGQQSUxh3cWkTgPCss7NNnCuYtKwOFnpUM0VJVkc3SDI0UUpTRVc5RkpQR1RVNTZaNC4u",
+    frogmiUrl: "https://we.frogmi.com/home",
+    clave: "",
+    cuentas: [
+      { local: "Cantagallo", usuario: "Ditalcar.cantagalloventa@ditalcar.cl" },
+      { local: "Mall Plaza Norte", usuario: "mpnventa@ditalcar.cl" },
+      { local: "Mall Plaza Alameda", usuario: "mpaventa@ditalcar.cl" },
+      { local: "Mall Plaza Tobalaba (Chery · Exeed)", usuario: "Ditalcar.mptcheryexeed@ditalcar.cl" },
+      { local: "Nueva Tobalaba (KGM · JMC · GAC)", usuario: "Ditalcar.mptcfcgac@ditalcar.cl" },
+      { local: "Costanera", usuario: "Ditalcar.costaneravn@ditalcar.cl" },
+      { local: "Mall Plaza Vespucio", usuario: "ditalcar.mpvvn@ditalcar.cl" },
+    ],
+  }
+  app.http("showroom-accesos", {
+    methods: ["GET", "POST"], authLevel: "anonymous", route: "showroom/accesos",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      const stored = await getAppConfig("SHOWROOM_ACCESOS")
+      let config = { ...SHOWROOM_DEFAULTS }
+      try { config = { ...config, ...JSON.parse(String(stored?.value || "{}")) } } catch { /* valores por defecto */ }
+      if (request.method === "GET") return json(200, config)
+      if (!isExperienceUser(user)) return forbidden()
+      const data = await body(request)
+      const url = (value, fallback) => {
+        const text = String(value ?? fallback ?? "").trim()
+        if (text && !/^https:\/\//i.test(text)) throw new Error("Los enlaces deben empezar con https://")
+        return text
+      }
+      const next = {
+        tourManagerUrl: url(data.tourManagerUrl, config.tourManagerUrl),
+        frogmiUrl: url(data.frogmiUrl, config.frogmiUrl),
+        clave: String(data.clave ?? config.clave ?? "").trim().slice(0, 60),
+        cuentas: (Array.isArray(data.cuentas) ? data.cuentas : config.cuentas).slice(0, 30)
+          .map((c) => ({ local: String(c.local || "").trim().slice(0, 80), usuario: String(c.usuario || "").trim().slice(0, 120), clave: String(c.clave || "").trim().slice(0, 60) || undefined }))
+          .filter((c) => c.local && c.usuario),
+        updatedAt: new Date().toISOString(),
+        updatedBy: user.email,
+      }
+      await setAppConfig("SHOWROOM_ACCESOS", JSON.stringify(next))
+      return json(200, { ...next, message: "Accesos de Gestión de Showroom guardados." })
+    }),
+  })
+
   // ================= GESPARK =================
   app.http("gespark", {
     methods: ["GET"], authLevel: "anonymous", route: "gespark",
