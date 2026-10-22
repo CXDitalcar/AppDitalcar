@@ -141,9 +141,12 @@ export function localExclusion(local) {
 // Bodegas y centros logísticos: una llegada aquí NO es "recibido en el local de venta".
 const BODEGAS = ["CASONA", "RENCA", "CORRAL", "NOVICIADO", "KARLOGISTIC", "MITTA", "BODENOR", "CAMINOELOLIVO", "SITIODETOBAR", "AEROPUERTO", "ECONORENT", "VALLEGRANDE", "PARQUEENEA", "LOGAUTO"]
 
-export function isBodega(destino) {
+// Excepción: CASONA está junto a Tobalaba, así que para ventas de un local
+// "Tobalaba" o "Nueva Tobalaba" la llegada a CASONA cuenta como recibido.
+export function isBodega(destino, saleLocal = "") {
   const key = normKey(destino)
   if (!key) return true
+  if (key.includes("CASONA") && normKey(saleLocal).includes("TOBALABA")) return false
   return BODEGAS.some((b) => key.includes(b))
 }
 
