@@ -24,8 +24,11 @@ type AuthView = "LOGIN" | "ACTIVATE" | "ACTIVATE_REQUEST" | "RESET_REQUEST" | "R
 
 export default function AuthScreen({
   onAuthenticated,
+  product,
 }: {
   onAuthenticated: (user: UserScope) => void
+  // Interfaz separada (por ejemplo "Gestión de Showroom"): mismo ingreso y mismos usuarios.
+  product?: { name: string; description: string }
 }) {
   const params = useMemo(() => new URLSearchParams(window.location.search), [])
   const activationToken = params.get("activation") ?? ""
@@ -220,9 +223,9 @@ export default function AuthScreen({
       <div className="auth-card">
         <Brand large />
         <div className="auth-title">
-          <span>DITALAPP</span>
-          <h1>{titleFor(view)}</h1>
-          <p>{descriptionFor(view)}</p>
+          <span>{product ? "INGRESA CON TU CUENTA DITALAPP" : "DITALAPP"}</span>
+          <h1>{view === "LOGIN" && product ? product.name : titleFor(view)}</h1>
+          <p>{view === "LOGIN" && product ? product.description : descriptionFor(view)}</p>
         </div>
 
         <div className="auth-pilot-banner">

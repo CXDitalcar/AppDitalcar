@@ -712,3 +712,7 @@
 ====================================================== */
 .app-sidebar-link-text{min-width:0}
 .app-sidebar-link-badge{margin-left:auto;flex:0 0 auto;padding:4px 6px;border:1px solid rgba(243,168,59,.28);border-radius:999px;background:rgba(243,168,59,.08);color:#f3bd6b;font-size:7px;font-weight:900;letter-spacing:.05em;white-space:nowrap}
+/* Avisos del menú (09-10) */
+.app-sidebar-link-count{margin-left:auto;flex:0 0 auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#e1262f;color:#fff;font-size:11px;font-weight:800;line-height:20px;text-align:center;white-space:nowrap}
+.app-mobile-menu-button{position:relative}
+.app-mobile-menu-dot{position:absolute;top:6px;right:6px;width:9px;height:9px;border-radius:50%;background:#e1262f;box-shadow:0 0 0 2px #0d0d10}

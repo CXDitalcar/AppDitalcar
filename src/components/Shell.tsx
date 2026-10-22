@@ -32,6 +32,7 @@ import type {
   UserScope,
 } from "../types"
 import { canSeeSeguimiento } from "../services/experienceAccess"
+import { useNavBadges } from "../services/navBadges"
 import {
   canAccessPilotModule,
   type PilotModule,
@@ -194,6 +195,17 @@ export default function Shell({
 
 
   const { pathname } = useLocation()
+  const badges = useNavBadges(currentUser)
+
+  // Aviso por ítem del menú: número de cosas por hacer o "Nuevo".
+  function navCount(item: NavigationItem): string {
+    if (item.to === "/") return badges.inicio ? String(badges.inicio) : ""
+    if (item.to === "/academia") return badges.academia ? String(badges.academia) : ""
+    if (item.to === "/mi-local") return badges.miLocal ? "Nuevo" : ""
+    if (item.to === "/seguimiento") return badges.seguimiento ? String(badges.seguimiento) : ""
+    return ""
+  }
+  const anyBadge = Boolean(badges.inicio || badges.academia || badges.miLocal || badges.seguimiento)
 
   const visibleNavigation = mainNavigation.filter((item) => {
     if (item.visible) return item.visible(currentUser)
@@ -311,6 +323,10 @@ export default function Shell({
 
                     {item.badge && (
                       <span className="app-sidebar-link-badge">{item.badge}</span>
+                    )}
+
+                    {navCount(item) && (
+                      <span className="app-sidebar-link-count" aria-label={`${navCount(item)} pendientes`}>{navCount(item)}</span>
                     )}
 
                   </NavLink>
@@ -476,6 +492,7 @@ export default function Shell({
             <Menu
               size={21}
             />
+            {anyBadge && <span className="app-mobile-menu-dot" aria-label="Tienes avisos nuevos" />}
           </button>
 
 
@@ -509,7 +526,7 @@ export default function Shell({
 // INICIALES
 // ======================================================
 
-function getInitials(
+export function getInitials(
   name: string
 ) {
   return name
@@ -529,7 +546,7 @@ function getInitials(
 // NOMBRE VISIBLE DEL ROL
 // ======================================================
 
-function formatRole(
+export function formatRole(
   role: UserScope["role"]
 ) {
   const labels: Record<
