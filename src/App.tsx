@@ -191,6 +191,7 @@ export default function App() {
   }
 
   // Link propio "Gestión de Showroom" (/showroom): solicitudes de Experiencia y Ruta de Experiencia.
+  // La Ruta la puede realizar cualquier perfil (pedido 23-10), aunque esté asignada a la Jefatura.
   if (interfaceId === "showroom") {
     return (
       <BrowserRouter>
@@ -202,7 +203,7 @@ export default function App() {
           viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
           viewAsEmail={viewAsUser?.email ?? baseUserEmail}
           onViewAs={experienceCanViewAs ? handleViewAs : undefined}
-          canRoute={canSeeFormularios}
+          canRoute={true}
           canLocalBoard={canSeeMiLocal}
         />
       </BrowserRouter>
