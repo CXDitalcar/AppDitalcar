@@ -1,3 +1,4 @@
+import { localMatches } from "./localMatch"
 import { assignmentMatchesUser } from "./requestCatalog"
 import type {
   ProcessAssignment,
@@ -29,7 +30,8 @@ function userHasLocal(user: UserScope, local: string) {
     .filter(Boolean)
     .map((value) => normalized(value))
 
-  return locals.includes(target)
+  // Mismo local escrito distinto ("Vespucio" ↔ "Chery-Renault Vespucio", "JMC-KGM" ↔ "KGM-JMC").
+  return locals.includes(target) || [user.local, user.localPrincipal, ...(user.assignedLocals ?? [])].some((value) => localMatches(value, local))
 }
 
 function isGeelyLocal(local: string) {
