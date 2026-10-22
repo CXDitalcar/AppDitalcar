@@ -4,8 +4,8 @@
    burdeos de fondo, crema en superficies, rojo Scarlet Sage de acento,
    Montserrat SemiBold en títulos e Inter en textos.
    ===================================================================== */
-@font-face { font-family: "Montserrat"; src: url("/assets/fonts/Montserrat-Variable.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
-@font-face { font-family: "Inter"; src: url("/assets/fonts/Inter-Variable.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Montserrat"; src: url("/assets/Montserrat-Variable.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: "Inter"; src: url("/assets/Inter-Variable.ttf") format("truetype"); font-weight: 100 900; font-display: swap; }
 
 .theme-ditalcar, .auth-ditalcar {
   --dc-rojo: #9D202F;
