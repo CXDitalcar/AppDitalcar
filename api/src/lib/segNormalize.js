@@ -173,9 +173,29 @@ export function firstName(value) {
   return titleCase(first)
 }
 
+// Un local de 02_Usuarios ("Chery Norte", "JMC-KGM Nueva Tobalaba", "Vespucio") contra el local de
+// SIGA ("Vehiculos Chery Plaza Norte", "Vehiculos JMC Nueva Tobalaba", "Vehiculos Chery Plaza Vespucio").
+// Calza si es el mismo sector y, cuando el local del usuario nombra marcas, comparten al menos una.
+const SITES = ["NUEVA TOBALABA", "TOBALABA", "NORTE", "ALAMEDA", "VESPUCIO", "COSTANERA", "CANTAGALLO", "FLORIDA"]
+const LOCAL_BRANDS = ["CHERY", "GEELY", "MITSUBISHI", "STELLANTIS", "ASTARA", "JMC", "KGM", "GAC", "SEMINUEVOS", "USADOS", "EXEED", "NISSAN", "RENAULT"]
+
+function parseLocal(value) {
+  const t = normText(String(value ?? "").replace(/^\s*veh[ií]culos\s+/i, ""))
+    .replace(/\bCFC\b/g, "STELLANTIS").replace(/CANTA\s+GALLO/g, "CANTAGALLO").replace(/SSANGYONG/g, "KGM").replace(/\bMMC\b/g, "MITSUBISHI")
+  const site = SITES.find((s) => t.includes(s)) || ""
+  const brands = LOCAL_BRANDS.filter((b) => new RegExp(`\\b${b}\\b`).test(t))
+  if (brands.includes("USADOS")) brands.push("SEMINUEVOS")
+  return { site, brands, key: normKey(t) }
+}
+
 export function localMatches(userLocal, nvLocal) {
-  const u = normKey(String(userLocal ?? "").replace(/^\s*veh[ií]culos\s+/i, "").replace(/\bCFC\b/gi, "Stellantis"))
-  const n = normKey(String(nvLocal ?? "").replace(/^\s*veh[ií]culos\s+/i, "").replace(/\bCFC\b/gi, "Stellantis"))
-  if (!u || !n || u.length < 4) return false
-  return n.includes(u) || u.includes(n)
+  const u = parseLocal(userLocal)
+  const n = parseLocal(nvLocal)
+  if (!u.key || !n.key || u.key.length < 4) return false
+  if (u.site && n.site) {
+    if (u.site !== n.site) return false
+    if (!u.brands.length) return true
+    return u.brands.some((b) => n.brands.includes(b))
+  }
+  return n.key.includes(u.key) || u.key.includes(n.key)
 }

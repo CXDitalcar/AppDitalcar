@@ -3,6 +3,7 @@
 // temporal como fallback (ver rutas users/directory y operations/catalog).
 
 import { readNamedList } from "./graphLists.js"
+import { localsFrom, mapRoleText, mapScopeText, splitList } from "./userFields.js"
 
 const VALID_ROLES = new Set([
   "VENDEDOR","JEFATURA_LOCAL","JEFATURA_MARCA","JEFATURA_ZONAL","GERENCIA_MARCA",
@@ -117,12 +118,10 @@ function toUser(fields) {
   const email = text(pick(fields, ["Email", "Correo", "CorreoElectronico", "Correo Electrónico"])).toLowerCase()
   if (!email || !email.includes("@")) return null
 
-  const role = mapRole(pick(fields, ["RolApp", "Rol", "CargoApp"]))
-  const assignedLocals = split(pick(fields, ["LocalesAsignados", "Locales", "SucursalesAsignadas"]))
-  // LocalPrincipal a veces llega con varios locales ("A;#B"): el primero es el principal y todos quedan asignados.
-  const principalList = split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))
-  const localPrincipal = principalList[0] || ""
-  for (const item of principalList) if (!assignedLocals.includes(item)) assignedLocals.push(item)
+  // Cada usuario queda limitado a sus locales ("Local(es)"); sin locales y con Alcance Red, ve la red.
+  const { localPrincipal, assignedLocals } = localsFrom(pick, fields)
+  const mapped = mapRoleText(pick(fields, ["RolApp", "Rol", "CargoApp"]), assignedLocals)
+  const role = mapped.role
   const local = localPrincipal || assignedLocals[0] || undefined
 
   return {
@@ -132,10 +131,11 @@ function toUser(fields) {
     local,
     localPrincipal: localPrincipal || undefined,
     assignedLocals: assignedLocals.length ? assignedLocals : local ? [local] : undefined,
-    scope: mapScope(pick(fields, ["Alcance", "Scope"]), role, assignedLocals),
+    scope: mapScopeText(pick(fields, ["Alcance", "Scope"]), role, assignedLocals),
     zone: text(pick(fields, ["Zona"])) || undefined,
-    brands: split(pick(fields, ["Marcas", "Marca"])),
-    areaFunctional: text(pick(fields, ["AreaFuncional", "ÁreaFuncional", "Area", "Área"])) || undefined,
+    brands: splitList(pick(fields, ["Marcas", "Marca"])),
+    areaFunctional: text(pick(fields, ["AreaFuncional", "ÁreaFuncional", "Area", "Área"])) || mapped.areaFunctional || undefined,
+    escalationEmail: text(pick(fields, ["EscalamientoVentasEmail", "Escalamiento"])).toLowerCase() || undefined,
     active: bool(pick(fields, ["Activo", "Activa", "Estado"]), true),
   }
 }

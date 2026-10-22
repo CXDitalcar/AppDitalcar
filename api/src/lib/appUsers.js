@@ -37,14 +37,18 @@ export async function saveAppUser(input, actorEmail) {
   if (!ROLES.has(role)) throw new Error("Elige un rol válido.")
   const assignedLocals = list(input.assignedLocals)
   const local = String(input.local || assignedLocals[0] || "").trim()
-  if (!NETWORK.has(role) && !["GERENCIA_MARCA","JEFATURA_MARCA","JEFATURA_ZONAL"].includes(role) && !local) {
+  // Alcance de 02_Usuarios: si viene, se respeta (Red sin locales = toda la red; con locales = limitado a ellos).
+  const inputScope = String(input.scope || "").toUpperCase()
+  const validScope = ["LOCAL", "MULTILOCAL", "MARCA", "ZONA", "RED"].includes(inputScope) ? inputScope : ""
+  if (!NETWORK.has(role) && !["GERENCIA_MARCA","JEFATURA_MARCA","JEFATURA_ZONAL"].includes(role) && !local && validScope !== "RED") {
     throw new Error("Indica el local de la persona.")
   }
   const existing = await getUser(email)
   if (existing && existing.source !== "APP" && input.mode === "create") {
     throw new Error("Esa persona ya existe en el directorio (02_Usuarios o Excel). Edítala allí.")
   }
-  const scope = NETWORK.has(role) ? "RED"
+  const scope = validScope ? validScope
+    : NETWORK.has(role) ? "RED"
     : ["GERENCIA_MARCA","JEFATURA_MARCA"].includes(role) ? "MARCA"
     : role === "JEFATURA_ZONAL" ? "ZONA"
     : assignedLocals.length > 1 ? "MULTILOCAL" : "LOCAL"
@@ -88,6 +92,7 @@ export async function importAppUsers(users, actorEmail) {
         brands: item.brands || [],
         zone: item.zone || "",
         areaFunctional: item.areaFunctional || "",
+        scope: item.scope || "",
         active: item.active !== false,
       }, actorEmail)
       if (existing) summary.actualizados += 1

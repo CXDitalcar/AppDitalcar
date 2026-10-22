@@ -1,4 +1,5 @@
 import { normalizeEmail } from "./security.js"
+import { localsFrom, mapRoleText, mapScopeText, splitList } from "./userFields.js"
 import { getUser, upsertUser } from "./store.js"
 
 const validRoles = new Set([
@@ -106,21 +107,24 @@ export async function refreshProfileFromSharePoint(email) {
   if (!active) return null
 
   const existing = await getUser(normalized)
-  const role = String(pick(fields, ["RolApp", "Rol"]) || existing?.role || "VENDEDOR").toUpperCase().replace(/\s+/g, "_")
-  // Sin columna Alcance, los roles de red (Experiencia, Project Manager, gerencias) quedan con alcance RED.
-  const defaultScope = NETWORK_ROLES.has(role) ? "RED" : (existing?.scope || "LOCAL")
+  const { localPrincipal, assignedLocals } = localsFrom(pick, fields)
+  const rawRole = pick(fields, ["RolApp", "Rol"])
+  const mapped = rawRole ? mapRoleText(rawRole, assignedLocals) : { role: existing?.role || "VENDEDOR" }
+  const role = mapped.role
+  // Cada usuario queda limitado a sus locales ("Local(es)"); sin locales y con Alcance Red, ve la red.
+  const rawScope = pick(fields, ["Alcance"])
+  const scope = rawScope ? mapScopeText(rawScope, role, assignedLocals) : (NETWORK_ROLES.has(role) ? "RED" : (existing?.scope || mapScopeText("", role, assignedLocals)))
   const user = {
     email: normalized,
     name: String(pick(fields, ["Nombre", "Title"]) || existing?.name || normalized),
     role,
-    // LocalPrincipal puede venir con varios locales ("A;#B"): el primero es el principal y todos quedan asignados.
-    local: split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))[0] || undefined,
-    localPrincipal: split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))[0] || undefined,
-    assignedLocals: JSON.stringify([...new Set([...split(pick(fields, ["LocalesAsignados"])), ...split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))])]),
-    scope: String(pick(fields, ["Alcance"]) || defaultScope).toUpperCase(),
+    local: localPrincipal || undefined,
+    localPrincipal: localPrincipal || undefined,
+    assignedLocals: JSON.stringify(assignedLocals),
+    scope,
     zone: String(pick(fields, ["Zona"]) || "") || undefined,
-    brands: JSON.stringify(split(pick(fields, ["Marcas"]))),
-    areaFunctional: String(pick(fields, ["AreaFuncional", "ÁreaFuncional"]) || "") || undefined,
+    brands: JSON.stringify(splitList(pick(fields, ["Marcas"]))),
+    areaFunctional: String(pick(fields, ["AreaFuncional", "ÁreaFuncional"]) || "") || mapped.areaFunctional || undefined,
     active: true,
     passwordHash: existing?.passwordHash,
     activatedAt: existing?.activatedAt,

@@ -1,4 +1,5 @@
 import ExcelJS from "exceljs"
+import { localsFrom, mapRoleText, mapScopeText, parseCsvRows, splitList } from "./userFields.js"
 
 const VALID_ROLES = new Set([
   "VENDEDOR","JEFATURA_LOCAL","JEFATURA_MARCA","JEFATURA_ZONAL","GERENCIA_MARCA",
@@ -127,14 +128,13 @@ function normalizeHeaderRow(worksheet) {
 
 function toUser(fields) {
   const email = cellText(pick(fields, ["Email", "Correo", "CorreoElectronico", "Correo Electrónico"])).toLowerCase()
-  if (!email) return null
+  if (!email || !email.includes("@")) return null
 
-  const role = mapRole(pick(fields, ["RolApp", "Rol", "CargoApp", "Cargo"]))
-  const assignedLocals = split(pick(fields, ["LocalesAsignados", "Locales", "SucursalesAsignadas"]))
-  const principalList = split(pick(fields, ["LocalPrincipal", "Local", "Sucursal"]))
-  const localPrincipal = principalList[0] || ""
-  for (const item of principalList) if (!assignedLocals.includes(item)) assignedLocals.push(item)
-  const scope = mapScope(pick(fields, ["Alcance", "Scope"]), role, assignedLocals)
+  // Cada usuario queda limitado a sus locales ("Local(es)"); sin locales y con Alcance Red, ve la red.
+  const { localPrincipal, assignedLocals } = localsFrom(pick, fields)
+  const mapped = mapRoleText(pick(fields, ["RolApp", "Rol", "CargoApp", "Cargo"]), assignedLocals)
+  const role = mapped.role
+  const scope = mapScopeText(pick(fields, ["Alcance", "Scope"]), role, assignedLocals)
   const local = localPrincipal || assignedLocals[0] || undefined
 
   return {
@@ -146,8 +146,9 @@ function toUser(fields) {
     assignedLocals: assignedLocals.length ? assignedLocals : local ? [local] : undefined,
     scope,
     zone: cellText(pick(fields, ["Zona"])) || undefined,
-    brands: split(pick(fields, ["Marcas", "Marca"])),
-    areaFunctional: cellText(pick(fields, ["AreaFuncional", "ÁreaFuncional", "Area", "Área"])) || undefined,
+    brands: splitList(pick(fields, ["Marcas", "Marca"])),
+    areaFunctional: cellText(pick(fields, ["AreaFuncional", "ÁreaFuncional", "Area", "Área"])) || mapped.areaFunctional || undefined,
+    escalationEmail: cellText(pick(fields, ["EscalamientoVentasEmail", "Escalamiento"])).toLowerCase() || undefined,
     active: bool(pick(fields, ["Activo", "Activa", "Estado"]), true),
   }
 }
@@ -211,6 +212,25 @@ export async function loadUsersFromExcel(rawUrl, options = {}) {
 
 // Lee un libro de usuarios (mismo formato que 02_Usuarios: encabezados en la primera fila).
 export async function parseUsersWorkbook(buffer, options = {}) {
+  // CSV (exportación de la LIST): mismo formato, encabezados en la primera fila.
+  const isZip = buffer.length > 4 && buffer[0] === 0x50 && buffer[1] === 0x4b
+  if (!isZip) {
+    const rows = parseCsvRows(buffer.toString("utf8"))
+    const headers = (rows[0] || []).map((h) => String(h || "").trim())
+    if (!headers.some((header) => ["email", "correo", "correoelectronico"].includes(normalize(header)))) {
+      throw new Error("El archivo no tiene una columna Email/Correo en la primera fila.")
+    }
+    const users = []
+    let skipped = 0
+    for (const row of rows.slice(1)) {
+      const fields = {}
+      headers.forEach((header, i) => { if (header) fields[header] = row[i] ?? "" })
+      const user = toUser(fields)
+      if (user) users.push(user)
+      else skipped += 1
+    }
+    return { users, sheet: "csv", skipped }
+  }
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
 

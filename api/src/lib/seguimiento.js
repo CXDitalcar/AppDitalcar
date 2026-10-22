@@ -115,6 +115,9 @@ const MACRO_NETWORK_ROLES = new Set([
 ])
 export function inMacroScope(user, row) {
   if (isFullViewer(user) || MACRO_NETWORK_ROLES.has(user?.role)) return true
+  // Con locales asignados en 02_Usuarios, cada perfil queda limitado a ellos (vendedor de Vespucio = Vespucio).
+  // Sin locales y con Alcance Red (por ejemplo, supervisión o call center), ve la red.
+  if (user?.role !== "VENDEDOR" && !userLocals(user).length && user?.scope === "RED") return true
   if (["GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user?.role)) {
     return brandMatchesUser(user, row) || userLocals(user).some((l) => localMatches(l, row.localOriginal))
   }
