@@ -5,7 +5,7 @@ import { frogmiLocal } from "./lib/datosParsers.js"
 import { readAllMasters, readJsonBlob, readMaster, writeJsonBlob } from "./lib/datosStore.js"
 import { readSegData } from "./lib/segStore.js"
 import { DEFAULT_RULES, computeSeguimiento, inMacroScope, isFullViewer } from "./lib/seguimiento.js"
-import { getAppConfig } from "./lib/store.js"
+import { getAppConfig, setAppConfig } from "./lib/store.js"
 import { buildVenta, matchesQuery } from "./lib/ventas.js"
 import { EVOLUTIVO_BASE, JUNIOR_FORMS, JUNIOR_LOCALS, TM_LOCALS, UMBRAL, computeFrogmi, formsSummary } from "./lib/frogmi.js"
 import { computeGespark } from "./lib/gespark.js"
@@ -173,6 +173,41 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
       config.updatedBy = user.email
       await writeJsonBlob(FROGMI_CONFIG, config)
       return json(200, { message: "Configuración guardada." })
+    }),
+  })
+
+
+  // ================= INICIO · ACCESOS =================
+  // Experiencia/PM ajusta nombre, descripción, enlace y visibilidad de cada tarjeta del inicio,
+  // y agrega accesos a otros sistemas. Las tarjetas internas tienen valores por defecto en la app.
+  app.http("portal-accesos", {
+    methods: ["GET", "POST"], authLevel: "anonymous", route: "portal/accesos",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      const stored = await getAppConfig("PORTAL_ACCESOS")
+      let config = { items: [] }
+      try { config = { items: [], ...JSON.parse(String(stored?.value || "{}")) } } catch { /* sin configuración */ }
+      if (request.method === "GET") return json(200, config)
+      if (!isExperienceUser(user)) return forbidden()
+      const data = await body(request)
+      const clean = (Array.isArray(data.items) ? data.items : []).slice(0, 40).map((item) => {
+        const url = String(item.url || "").trim()
+        if (url && !url.startsWith("/") && !/^https:\/\//i.test(url)) throw new Error(`El enlace de «${item.nombre || item.id}» debe empezar con https://`)
+        return {
+          id: String(item.id || "").replace(/[^a-z0-9-]/gi, "").slice(0, 40),
+          seccion: item.seccion === "TABLEROS" ? "TABLEROS" : "ACCESOS",
+          nombre: String(item.nombre || "").trim().slice(0, 60),
+          descripcion: String(item.descripcion || "").trim().slice(0, 160),
+          url,
+          activo: item.activo !== false,
+          custom: Boolean(item.custom),
+          grupos: Array.isArray(item.grupos) ? item.grupos.map(String).slice(0, 10) : undefined,
+        }
+      }).filter((item) => item.id)
+      const next = { items: clean, updatedAt: new Date().toISOString(), updatedBy: user.email }
+      await setAppConfig("PORTAL_ACCESOS", JSON.stringify(next))
+      return json(200, { ...next, message: "Accesos del inicio guardados." })
     }),
   })
 
