@@ -50,6 +50,7 @@ import {
 } from "./lib/routeStore.js"
 import { saveRouteEvidence } from "./lib/routeEvidence.js"
 import { registerSegRoutes } from "./segRoutes.js"
+import { localMatches } from "./lib/segNormalize.js"
 import { registerOpsRoutes } from "./opsRoutes.js"
 import { importAppUsers, listAppDirectoryUsers, saveAppUser } from "./lib/appUsers.js"
 import { parseUsersWorkbook } from "./lib/usersExcel.js"
@@ -108,7 +109,7 @@ function canSeeStoredRequest(user, item) {
   if ((audience.roles || []).includes(user.role)) return true
   if (["JEFATURA_LOCAL", "GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user.role)) {
     const locals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
-    if (locals.some((local) => sameText(local, item.local))) return true
+    if (locals.some((local) => sameText(local, item.local) || localMatches(local, item.local))) return true
     if (user.role === "GERENCIA_MARCA" && canAccessRouteLocal(user, item.local)) return true
   }
   return false
@@ -158,12 +159,18 @@ function normalizedRouteValue(value) {
 function canAccessRouteLocal(user, local) {
   if (!user || !local) return false
   if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "JEFATURA_COMERCIAL_CLIENTES", "GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS"].includes(user.role)) return true
+  const hasLocals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].some(Boolean)
+  // Sin locales asignados y con Alcance Red (por ejemplo, Operaciones Comerciales o supervisión de ventas): toda la red.
+  if (!hasLocals && user.scope === "RED" && user.role !== "VENDEDOR") return true
 
   const localKey = normalizedRouteValue(local)
   const explicitLocals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])]
     .filter(Boolean)
     .map(normalizedRouteValue)
   if (explicitLocals.includes(localKey)) return true
+  // Nombres distintos para el mismo local ("Vespucio" ↔ "Chery-Renault Vespucio", "JMC-KGM" ↔ "KGM-JMC").
+  const rawLocals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
+  if (rawLocals.some((value) => localMatches(value, local))) return true
 
   if (["GERENCIA_MARCA", "JEFATURA_MARCA"].includes(user.role) || user.scope === "MARCA") {
     const userBrands = (Array.isArray(user.brands) ? user.brands : []).map(normalizedRouteValue)
