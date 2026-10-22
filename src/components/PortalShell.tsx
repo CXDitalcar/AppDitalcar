@@ -6,6 +6,7 @@ import PilotFeedback from "./PilotFeedback"
 import { formatRole, getInitials } from "./Shell"
 import { useNavBadges } from "../services/navBadges"
 import type { UserScope } from "../types"
+import { userLocalList } from "../services/userLocals"
 import "./PortalShell.css"
 
 // Marco sin menú lateral para todos los perfiles que no son Experiencia/PM:
@@ -93,7 +94,7 @@ export default function PortalShell({ children, currentUser, authenticatedUser, 
                     <div>
                       <strong>{currentUser?.name}</strong>
                       <span>{currentUser ? formatRole(currentUser.role) : ""}</span>
-                      {currentUser?.local && <small>{currentUser.local}</small>}
+                      {currentUser && userLocalList(currentUser).length > 0 && <small>{userLocalList(currentUser).join(" · ")}</small>}
                     </div>
                   </div>
                   {onLeave && (
