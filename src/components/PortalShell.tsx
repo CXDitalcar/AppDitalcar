@@ -8,6 +8,7 @@ import { useNavBadges } from "../services/navBadges"
 import type { UserScope } from "../types"
 import { userLocalList } from "../services/userLocals"
 import "./PortalShell.css"
+import "../styles/ditalcar-theme.css"
 
 // Marco sin menú lateral para todos los perfiles que no son Experiencia/PM:
 // barra superior con Avisos, Mi cuenta y Salir; dentro de cada pantalla, "Volver al inicio".
@@ -51,7 +52,7 @@ export default function PortalShell({ children, currentUser, authenticatedUser, 
   }, [accountOpen])
 
   return (
-    <div className="portal-shell">
+    <div className={`portal-shell ${productName ? "theme-ditalcar" : ""}`}>
       {viewAsOptions && onViewAs && (
         <div className="portal-viewas">
           <span>{viewingAs ? `Estás viendo DitalApp como ${currentUser?.name} · ${formatRole(currentUser!.role)}` : "Vista de prueba"}</span>
@@ -124,7 +125,7 @@ export default function PortalShell({ children, currentUser, authenticatedUser, 
 function ProductBrand({ name }: { name: string }) {
   return (
     <div className="portal-product-brand">
-      <img src="/assets/logo-ditalcar-blanco.png" alt="Ditalcar" />
+      <img src="/assets/brand/logo-sin-slogan.png" alt="Ditalcar" />
       <span aria-hidden="true" />
       <strong>{name}</strong>
     </div>

@@ -153,8 +153,8 @@ export default function AgregarUsuario({ onSaved }: { onSaved: () => void }) {
               <UserPlus size={16} /> Nuevo usuario
             </button>
             <label className="seg-btn" style={{ position: "relative" }}>
-              <FileUp size={16} /> {importing ? "Importando…" : "Importar Excel"}
-              <input type="file" accept=".xlsx,.xlsm" className="datos-file-input" disabled={importing} onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = "" }} />
+              <FileUp size={16} /> {importing ? "Importando…" : "Importar Excel o CSV"}
+              <input type="file" accept=".xlsx,.xlsm,.csv" className="datos-file-input" disabled={importing} onChange={(e) => { void importFile(e.target.files?.[0]); e.target.value = "" }} />
             </label>
           </div>
         )}
@@ -241,7 +241,7 @@ export default function AgregarUsuario({ onSaved }: { onSaved: () => void }) {
           )}
         </div>
       )}
-      <div className="seg-meta" style={{ marginTop: 6 }}>Importar Excel: mismo formato que 02_Usuarios (Email, Nombre, RolApp, Activo, Alcance, LocalPrincipal, LocalesAsignados, Marcas), con títulos en la primera fila.</div>
+      <div className="seg-meta" style={{ marginTop: 6 }}>Importar Excel o CSV: mismo formato que 02_Usuarios (Email, Title, Rol, Activo, Alcance, Local(es)), con títulos en la primera fila. Cada persona queda limitada a sus locales.</div>
 
       {appUsers.length > 0 && (
         <div className="seg-table-wrap" style={{ marginTop: 14 }}>

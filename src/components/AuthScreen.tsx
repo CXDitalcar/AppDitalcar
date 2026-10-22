@@ -19,6 +19,7 @@ import {
 } from "../services/auth"
 import type { UserScope } from "../types"
 import "./AuthScreen.css"
+import "../styles/ditalcar-theme.css"
 
 type AuthView = "LOGIN" | "ACTIVATE" | "ACTIVATE_REQUEST" | "RESET_REQUEST" | "RESET" | "MANUAL_SETUP" | "TEMP_KEY"
 
@@ -219,9 +220,9 @@ export default function AuthScreen({
   }
 
   return (
-    <div className="auth-page">
+    <div className={`auth-page ${product ? "auth-ditalcar" : ""}`}>
       <div className="auth-card">
-        <Brand large />
+        {product ? <img className="auth-brand-logo" src="/assets/brand/logo-principal-con-slogan.png" alt="Ditalcar · Experiencia que te lleva lejos" /> : <Brand large />}
         <div className="auth-title">
           <span>{product ? "INGRESA CON TU CUENTA DITALAPP" : "DITALAPP"}</span>
           <h1>{view === "LOGIN" && product ? product.name : titleFor(view)}</h1>
