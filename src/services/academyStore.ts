@@ -93,6 +93,8 @@ function readState(): AcademyState {
 
 function writeState(state: AcademyState) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+  // Avisa al menú lateral para recalcular el número de cursos pendientes.
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("ditalapp-badges"))
 }
 
 export function getAcademyState() {

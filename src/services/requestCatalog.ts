@@ -119,6 +119,16 @@ export function getProcessesForUser(user: UserScope) {
     .sort((a, b) => a.order - b.order)
 }
 
+// Procesos que gestiona Experiencia de Clientes (los que se ven en "Gestión de Showroom").
+export function isExperienceProcess(code: string) {
+  return runtime.assignments.some(
+    (assignment) =>
+      assignment.processCode === code &&
+      assignment.type === "MANAGER" &&
+      (assignment.role === "EXPERIENCIA_CLIENTES" || /experiencia de clientes/i.test(assignment.areaFunctional ?? ""))
+  )
+}
+
 export function isProcessRequestable(process: ProcessConfig) {
   return !process.availability || process.availability === "ACTIVO" || process.availability === "BETA"
 }

@@ -185,6 +185,26 @@ export function canConfirmResolution(
   return user.role === "JEFATURA_LOCAL" && userHasLocal(user, request.local)
 }
 
+// La persona forma parte del proceso de la solicitud: tiene una asignación activa
+// (cualquier tipo) en ese proceso, es la responsable actual o participa en ella.
+export function isProcessParticipant(
+  user: UserScope,
+  request: RequestItem,
+  assignments: ProcessAssignment[]
+): boolean {
+  if (!user.active) return false
+  const email = normalized(user.email)
+  if (isExactCurrentResponsible(user, request)) return true
+  if (normalized(request.managementOwnerEmail) === email) return true
+  if ((request.participants ?? []).some((value) => normalized(value) === email)) return true
+  return assignments.some(
+    (assignment) =>
+      assignment.processCode === request.processCode &&
+      assignment.active !== false &&
+      assignmentMatchesUser(user, assignment)
+  )
+}
+
 export function getRequestPermissions(
   user: UserScope,
   request: RequestItem,
