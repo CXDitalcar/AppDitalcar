@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
+import { localMatches } from "../services/localMatch"
+import { userLocalList } from "../services/userLocals"
 import { useNavigate, useSearchParams } from "react-router-dom"
 import {
   ArrowRight,
@@ -128,10 +130,11 @@ export default function RutaExperiencia({ currentUser }: { currentUser: UserScop
   const localOptions = useMemo(() => {
     if (broadRouteAccess(currentUser)) return routeLocals
 
-    const explicit = [currentUser.local, currentUser.localPrincipal, ...(currentUser.assignedLocals || [])]
-      .filter(Boolean) as string[]
-    const explicitRouteLocals = [...new Set(explicit)].filter((local) => routeLocals.includes(local))
+    // Cada usuario queda limitado a sus locales de 02_Usuarios (aunque el nombre del local en la Ruta sea distinto).
+    const explicit = userLocalList(currentUser)
+    const explicitRouteLocals = routeLocals.filter((route) => explicit.some((local) => local === route || localMatches(local, route)))
     if (explicitRouteLocals.length) return explicitRouteLocals
+    if (explicit.length) return explicit
 
     if (["GERENCIA_MARCA", "JEFATURA_MARCA"].includes(currentUser.role) || currentUser.scope === "MARCA") {
       const brands = (currentUser.brands || []).map((brand) => brand.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase())

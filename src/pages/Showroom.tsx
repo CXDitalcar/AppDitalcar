@@ -10,6 +10,7 @@ import { showroomTasks, useShowroomRequests } from "../services/showroomData"
 import { hasExperienceAccess } from "../services/experienceAccess"
 import type { RequestFamily, UserScope } from "../types"
 import { userLocalList } from "../services/userLocals"
+import { localMatches } from "../services/localMatch"
 import { accountsForUser, getShowroomAccess, type FrogmiAccount, type ShowroomAccess } from "../services/showroomAccess"
 import "./Portal.css"
 import "./Showroom.css"
@@ -185,7 +186,7 @@ function RutaPanel({ currentUser, canLocalBoard, network }: { currentUser: UserS
   const since = weekStart().toISOString()
   const myLocals = userLocalList(currentUser)
   const submittedThisWeek = (executions ?? []).filter((e) => e.mode === "RUTA" && e.status === "SUBMITTED" && (e.submittedAt ?? e.updatedAt) >= since)
-  const weekByLocal = myLocals.map((local) => ({ local, done: submittedThisWeek.find((e) => e.local === local) }))
+  const weekByLocal = myLocals.map((local) => ({ local, done: submittedThisWeek.find((e) => e.local === local || localMatches(local, e.local)) }))
   const draft = (executions ?? []).find((e) => e.status === "DRAFT" && e.completedByEmail?.toLowerCase() === currentUser.email.toLowerCase())
 
   const byLocal = useMemo(() => {
@@ -273,9 +274,11 @@ function OtherForms({ currentUser }: { currentUser: UserScope }) {
   useEffect(() => { getShowroomAccess().then(setAccess) }, [])
   if (!access) return null
   const { mine, others } = accountsForUser(currentUser, access.cuentas)
-  const list = mine.length ? mine : others
-  const visible = mine.length ? (showAll ? [...mine, ...others] : mine) : (showAll ? others : others.slice(0, 3))
-  const hidden = access.cuentas.length - visible.length
+  // Con locales asignados, la persona ve solo las cuentas de sus locales. Sin locales (perfiles de red), todas.
+  const scoped = userLocalList(currentUser).length > 0
+  const list = scoped ? mine : access.cuentas
+  const visible = scoped ? mine : (showAll ? others : others.slice(0, 3))
+  const hidden = scoped ? 0 : access.cuentas.length - visible.length
   return (
     <section className="portal-section" aria-labelledby="otros-title">
       <div className="portal-section-head">
@@ -299,7 +302,7 @@ function OtherForms({ currentUser }: { currentUser: UserScope }) {
             </a>
             {list.length > 0 && (
               <div className="showroom-accounts">
-                <span className="showroom-accounts-title">{mine.length ? (mine.length > 1 ? "Cuentas de tus locales" : "Cuenta de tu local") : "Cuentas por local"}</span>
+                <span className="showroom-accounts-title">{scoped ? (mine.length > 1 ? "Cuentas de tus locales" : "Cuenta de tu local") : "Cuentas por local"}</span>
                 {visible.map((c) => <AccountRow key={c.usuario} account={c} clave={c.clave || access.clave} />)}
                 {hidden > 0 || showAll ? (
                   <button type="button" className="portal-more" onClick={() => setShowAll((v) => !v)}>{showAll ? "Ver menos" : "Ver las cuentas de todos los locales"}</button>
