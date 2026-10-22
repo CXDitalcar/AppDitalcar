@@ -2,6 +2,12 @@ import { useEffect, useState } from "react"
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom"
 
 import Shell from "./components/Shell"
+import PortalShell from "./components/PortalShell"
+import Portal from "./pages/Portal"
+import Showroom from "./pages/Showroom"
+import { INTERFACES, currentInterface, leaveInterface } from "./services/interfaceMode"
+import { showroomTasks, useShowroomRequests } from "./services/showroomData"
+import { isExperienceProcess } from "./services/requestCatalog"
 import AuthScreen from "./components/AuthScreen"
 
 import Home from "./pages/Home"
@@ -127,8 +133,10 @@ export default function App() {
     )
   }
 
+  const interfaceId = currentInterface()
+
   if (!apiUser) {
-    return <AuthScreen onAuthenticated={setApiUser} />
+    return <AuthScreen onAuthenticated={setApiUser} product={interfaceId ? INTERFACES[interfaceId] : undefined} />
   }
 
   const baseUser = apiUser
@@ -155,6 +163,15 @@ export default function App() {
   const showGestion = showApprovals || canSeeSolicitudes || canSeeKPI || canSeeFormularios || experienceCanViewAs
 
   // “Ver como” es una herramienta administrativa de Experiencia, no una vía de ingreso.
+  // Experiencia y PM usan DitalApp completa (menú lateral). El resto entra a un inicio
+  // por tarjetas ("Para hoy", "Tus tableros", "Tus accesos") sin menú lateral.
+  const fullApp = hasExperienceAccess(currentUser)
+  const Frame = fullApp ? Shell : PortalShell
+  const portalPermissions = {
+    kpi: canSeeKPI, miLocal: canSeeMiLocal, solicitudes: canSeeSolicitudes || currentUser.role === "ASISTENTE_JUNIOR",
+    bandeja: showApprovals, academia: canSeeAcademia, formularios: canSeeFormularios,
+  }
+
   const operationalUsers = getAllOperationalUsers().filter((user) => user.active)
   void catalogVersion
   const viewAsOptions = (directoryUsers.length ? directoryUsers : operationalUsers.length ? operationalUsers : demoViewUsers).map((user) => ({
@@ -173,9 +190,28 @@ export default function App() {
     setViewAsUser(profile ?? null)
   }
 
+  // Link propio "Gestión de Showroom" (/showroom): solicitudes de Experiencia y Ruta de Experiencia.
+  if (interfaceId === "showroom") {
+    return (
+      <BrowserRouter>
+        <ShowroomApp
+          currentUser={currentUser}
+          baseUser={baseUser}
+          branch={currentBranch}
+          onLogout={exitApi}
+          viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
+          viewAsEmail={viewAsUser?.email ?? baseUserEmail}
+          onViewAs={experienceCanViewAs ? handleViewAs : undefined}
+          canRoute={canSeeFormularios}
+          canLocalBoard={canSeeMiLocal}
+        />
+      </BrowserRouter>
+    )
+  }
+
   return (
     <BrowserRouter>
-      <Shell
+      <Frame
         currentUser={currentUser}
         authenticatedUser={baseUser}
         userName={currentUser.name}
@@ -192,12 +228,16 @@ export default function App() {
           <Route
             path="/"
             element={
-              <Home
-                userName={currentUser.name}
-                branch={currentBranch}
-                currentUser={currentUser}
-                demoMode={dataPilotMode}
-              />
+              fullApp ? (
+                <Home
+                  userName={currentUser.name}
+                  branch={currentBranch}
+                  currentUser={currentUser}
+                  demoMode={dataPilotMode}
+                />
+              ) : (
+                <Portal currentUser={currentUser} permissions={portalPermissions} />
+              )
             }
           />
 
@@ -215,7 +255,8 @@ export default function App() {
           <Route
             path="/gestion"
             element={
-              showGestion ? (
+              // Sin menú lateral, Gestión no existe para los demás perfiles: sus accesos están en el inicio.
+              showGestion && fullApp ? (
                 <Gestion
                   showApprovals={showApprovals}
                   showRequests={canSeeSolicitudes}
@@ -361,7 +402,49 @@ export default function App() {
             }
           />
         </Routes>
-      </Shell>
+      </Frame>
     </BrowserRouter>
+  )
+}
+
+function ShowroomApp({
+  currentUser, baseUser, branch, onLogout, viewAsOptions, viewAsEmail, onViewAs, canRoute, canLocalBoard,
+}: {
+  currentUser: UserScope
+  baseUser: UserScope
+  branch: string
+  onLogout: () => Promise<void>
+  viewAsOptions?: UserScope[]
+  viewAsEmail?: string
+  onViewAs?: (email: string) => void
+  canRoute: boolean
+  canLocalBoard: boolean
+}) {
+  const requests = useShowroomRequests(currentUser)
+  const avisos = showroomTasks(currentUser, requests ?? []).length
+  return (
+    <PortalShell
+      currentUser={currentUser}
+      authenticatedUser={baseUser}
+      onLogout={onLogout}
+      viewAsOptions={viewAsOptions}
+      viewAsEmail={viewAsEmail}
+      onViewAs={onViewAs}
+      homePath={INTERFACES.showroom.home}
+      productName={INTERFACES.showroom.name}
+      avisosOverride={avisos}
+      onLeave={leaveInterface}
+    >
+      <Routes>
+        <Route path="/showroom" element={<Showroom currentUser={currentUser} canRoute={canRoute} canLocalBoard={canLocalBoard} />} />
+        <Route path="/solicitudes/nueva" element={<NuevaSolicitud currentUser={currentUser} processFilter={isExperienceProcess} />} />
+        <Route path="/solicitudes/:requestId" element={<SolicitudDetalle currentUser={currentUser} />} />
+        {canRoute && <Route path="/formularios" element={<Formularios currentUser={currentUser} />} />}
+        {canRoute && <Route path="/formularios/:executionId" element={<FormularioDetalle currentUser={currentUser} />} />}
+        {canRoute && <Route path="/ruta-experiencia" element={<RutaExperiencia currentUser={currentUser} />} />}
+        {canLocalBoard && <Route path="/mi-local" element={<MiLocal branch={branch} currentUser={currentUser} />} />}
+        <Route path="*" element={<Navigate to="/showroom" replace />} />
+      </Routes>
+    </PortalShell>
   )
 }
