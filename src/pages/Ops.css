@@ -80,3 +80,10 @@
 .fr-page .seg-back { display: block; margin-bottom: 8px; }
 .ops-meta { display: flex; flex-wrap: wrap; gap: 4px 14px; }
 .fr-tiles { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); }
+.portal-editor{grid-column:1/-1}
+.portal-editor p{color:#a6a6ae;font-size:14px}
+.portal-editor-group h4{margin:16px 0 8px;font-size:15px}
+.portal-editor-row{display:grid;grid-template-columns:110px 1fr 1.6fr 1.4fr;gap:8px;align-items:center;padding:8px 0;border-top:1px solid #222228}
+.portal-editor-row.off .seg-input{opacity:.5}
+.portal-editor-groups{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:4px 14px;align-items:center;color:#a6a6ae;font-size:13px}
+@media (max-width:860px){.portal-editor-row{grid-template-columns:1fr}}

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { markMiLocalSeen } from "../services/homeActivities"
 import {
   AlertTriangle,
   BadgeCheck,
@@ -90,6 +91,9 @@ export default function MiLocal({
 
   const metricsLocalName = local?.name ?? (visibleLocals.length === 1 ? visibleLocals[0]?.name : "")
   const [routeMetrics, setRouteMetrics] = useState<RouteMetrics | null>(null)
+
+  // Al entrar a Mi local se da por vista la última Ruta/Auditoría (apaga el aviso del menú).
+  useEffect(() => { markMiLocalSeen(currentUser.email) }, [currentUser.email])
 
   useEffect(() => {
     let active = true

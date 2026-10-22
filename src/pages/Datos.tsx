@@ -16,6 +16,7 @@ import {
   type ModelBrand,
 } from "../services/catalogoApi"
 import GesparkPanel from "../components/GesparkPanel"
+import PortalAccessEditor from "../components/PortalAccessEditor"
 import { Link } from "react-router-dom"
 import "./Seguimiento.css"
 import "./Ops.css"
@@ -111,6 +112,11 @@ export default function Datos() {
           <ResourcesCard />
           <LocalsCard />
         </div>
+      </section>
+
+      <section className="seg-section">
+        <h2>Inicio y accesos</h2>
+        <PortalAccessEditor />
       </section>
 
       <h2 className="datos-subtitle">Seguimiento de clientes y Ventas</h2>

@@ -1,5 +1,6 @@
 import AcademiaRecursos from "../components/AcademiaRecursos"
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react"
@@ -169,6 +170,29 @@ function isContentVisible(status: string, admin: boolean) {
   return status !== "ARCHIVADO" && (admin || status !== "BORRADOR")
 }
 
+type ConsultaLens = "VENDEDOR" | "JEFATURA" | "GERENCIA" | "SENALES" | "MEDICION" | "PLAYBOOKS"
+const CONSULTA_LENSES: { id: ConsultaLens; label: string }[] = [
+  { id: "VENDEDOR", label: "Para el vendedor" },
+  { id: "JEFATURA", label: "Para la jefatura" },
+  { id: "GERENCIA", label: "Para la gerencia" },
+  { id: "SENALES", label: "Se ve bien cuando" },
+  { id: "MEDICION", label: "Cómo se mide" },
+  { id: "PLAYBOOKS", label: "Playbooks" },
+]
+
+// Pestañas agrupadas (opción A, 15-10): Aprender y Consultar.
+const TAB_GROUPS: { label: string; tabs: AcademyTab[] }[] = [
+  { label: "Aprender", tabs: ["CURSOS", "EVALUACIONES"] },
+  { label: "Consultar", tabs: ["MODELO", "PLAYBOOKS", "BIBLIOTECA"] },
+]
+const TAB_LABELS: Record<AcademyTab, string> = {
+  MODELO: "Modelo",
+  PLAYBOOKS: "Playbooks",
+  CURSOS: "Cursos",
+  EVALUACIONES: "Evaluaciones",
+  BIBLIOTECA: "Biblioteca",
+}
+
 export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get("tab")?.toUpperCase() as AcademyTab | undefined
@@ -185,6 +209,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const [tab, setTab] = useState<AcademyTab>(initialTab)
   const [vehicleRoute, setVehicleRoute] = useState<"NUEVOS" | "USADOS">("NUEVOS")
   const [selectedConsulta, setSelectedConsulta] = useState("C")
+  const [consultaLens, setConsultaLens] = useState<ConsultaLens>("VENDEDOR")
   const [selectedSello, setSelectedSello] = useState(selloExperiencia[0]?.title ?? "")
   const [selectedPlaybook, setSelectedPlaybook] = useState(salesPlaybooks[0]?.id ?? "")
   const [selectedJuniorPlaybook, setSelectedJuniorPlaybook] = useState(
@@ -375,6 +400,19 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const dashboardBrands = Array.from(new Set(teamRows.map((row) => row.brand))).sort()
   const dashboardLocals = Array.from(new Set(teamRows.map((row) => row.local))).sort()
 
+  // Pestañas sin contenido para este perfil no se muestran.
+  const tabHasContent: Record<AcademyTab, boolean> = {
+    MODELO: true,
+    PLAYBOOKS: (salesPlaybookAudience ? salesPlaybooks.length : juniorPlaybooks.length) > 0,
+    CURSOS: visibleCourses.length > 0,
+    EVALUACIONES: visibleEvaluations.length > 0,
+    BIBLIOTECA: visibleLibrary.length > 0,
+  }
+
+  useEffect(() => {
+    if (!tabHasContent[tab]) setTab("MODELO")
+  }, [tab, tabHasContent.CURSOS, tabHasContent.EVALUACIONES, tabHasContent.BIBLIOTECA, tabHasContent.PLAYBOOKS])
+
   function changeTab(next: AcademyTab) {
     setTab(next)
     setSearchParams({ tab: next.toLowerCase() })
@@ -482,6 +520,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
         </div>
 
         <div className="academy-route-overview">
+          {/* Regla: lo que el perfil no tiene asignado no aparece ni como título. */}
+          {(assignedCourses.length > 0 || pendingEvaluations.length > 0) && (
           <article className={`academy-route-box assigned ${assignedOverviewOpen ? "open" : ""}`}>
             <button
               type="button"
@@ -548,6 +588,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
               </div>
             )}
           </article>
+          )}
 
           <article className={`academy-route-box optional ${optionalOverviewOpen ? "open" : ""}`}>
             <button
@@ -603,107 +644,147 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
         )}
       </section>
 
-      <nav className="academy-tabs" aria-label="Academia Ditalcar">
-        {(
-          ["MODELO", "PLAYBOOKS", "CURSOS", "EVALUACIONES", "BIBLIOTECA"] as AcademyTab[]
-        ).map((item) => (
-          <button
-            type="button"
-            key={item}
-            className={tab === item ? "active" : ""}
-            onClick={() => changeTab(item)}
-          >
-            {item === "MODELO" && <Target size={17} />}
-            {item === "PLAYBOOKS" && <BookOpen size={17} />}
-            {item === "CURSOS" && <GraduationCap size={17} />}
-            {item === "EVALUACIONES" && <ClipboardCheck size={17} />}
-            {item === "BIBLIOTECA" && <Library size={17} />}
-            {item.charAt(0) + item.slice(1).toLowerCase()}
-          </button>
+      <nav className="academy-tabs academy-tabs-grouped" aria-label="Academia Ditalcar">
+        {TAB_GROUPS.filter((group) => group.tabs.some((item) => tabHasContent[item])).map((group) => (
+          <div className="academy-tab-group" key={group.label}>
+            <span className="academy-tab-group-label">{group.label}</span>
+            <div className="academy-tab-group-items">
+              {group.tabs.filter((item) => tabHasContent[item]).map((item) => (
+                <button
+                  type="button"
+                  key={item}
+                  className={tab === item ? "active" : ""}
+                  aria-current={tab === item ? "page" : undefined}
+                  onClick={() => changeTab(item)}
+                >
+                  {item === "MODELO" && <Target size={17} />}
+                  {item === "PLAYBOOKS" && <BookOpen size={17} />}
+                  {item === "CURSOS" && <GraduationCap size={17} />}
+                  {item === "EVALUACIONES" && <ClipboardCheck size={17} />}
+                  {item === "BIBLIOTECA" && <Library size={17} />}
+                  {TAB_LABELS[item]}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
       {tab === "MODELO" &&
         (salesModelAudience ? (
-          <section className={`academy-panel ${!admin ? "academy-model-limited" : ""}`}>
+          <section className="academy-panel">
             <div className="academy-panel-head">
               <div>
                 <span className="academy-eyebrow">MODELO CONSULTA</span>
                 <h2>Comprender antes de ofrecer.</h2>
                 <p>
                   Ocho principios que funcionan como lenguaje común durante todo el viaje
-                  del cliente. El modelo se mantiene para Nuevos y Usados; cambian controles,
-                  información y documentación.
+                  del cliente. Elige una letra para ver qué hacer, qué evitar y cómo decirlo.
                 </p>
               </div>
               <RouteToggle value={vehicleRoute} onChange={setVehicleRoute} />
             </div>
 
-            {!admin && (
-              <div className="academy-model-compact-note">
-                <Target size={18} />
-                <div>
-                  <strong>Modelo CONSULTA · resumen visible</strong>
-                  <span>Durante el piloto se muestran los 8 principios como referencia. El detalle completo se mantiene disponible para Experiencia de Clientes.</span>
-                </div>
-              </div>
-            )}
-
-            <div className="consulta-strip">
+            <div className="consulta-word" role="tablist" aria-label="Principios CONSULTA">
               {consultaDetailed.map((item) => (
                 <button
                   type="button"
+                  role="tab"
                   key={item.code}
+                  aria-selected={selectedConsulta === item.code}
+                  aria-label={`${item.code}: ${item.title}`}
+                  title={item.title}
                   className={selectedConsulta === item.code ? "active" : ""}
                   onClick={() => setSelectedConsulta(item.code)}
                 >
-                  <span>{item.code}</span>
-                  <strong>{item.title}</strong>
+                  {item.code}
                 </button>
               ))}
             </div>
 
-            <div className="consulta-detail consulta-detail-rich">
-              <div className="consulta-letter">{currentConsulta.code}</div>
-              <div className="consulta-copy consulta-main-copy">
-                <span>PRINCIPIO</span>
-                <h3>{currentConsulta.title}</h3>
-                <strong>{currentConsulta.principle}</strong>
-                <p>{currentConsulta.meaning}</p>
-                <div className="consulta-why">
-                  <span>POR QUÉ IMPORTA</span>
-                  <p>{currentConsulta.why}</p>
-                </div>
-              </div>
-              <InfoColumn title="Conductas esperadas" items={currentConsulta.behaviors} />
-              <InfoColumn title="Se ve bien cuando…" items={currentConsulta.signals} />
-              <InfoColumn title="Qué evitar" items={currentConsulta.avoid} danger />
-              <InfoColumn title="Preguntas / frases" items={currentConsulta.questions} />
-              <InfoColumn title="Cómo se mide" items={currentConsulta.indicators} />
-              <div className="consulta-example">
-                <span>EJEMPLO APLICADO</span>
-                <p>“{currentConsulta.example}”</p>
-              </div>
-            </div>
+            {(() => {
+              const index = consultaDetailed.findIndex((item) => item.code === currentConsulta.code)
+              const prev = consultaDetailed[index - 1]
+              const next = consultaDetailed[index + 1]
+              const lensContent: Record<ConsultaLens, { title: string; items: string[] }> = {
+                VENDEDOR: { title: "Para el vendedor", items: [currentConsulta.sellerLens] },
+                JEFATURA: { title: "Para la jefatura local", items: [currentConsulta.managerLens] },
+                GERENCIA: { title: "Para la gerencia de marca y ventas", items: [currentConsulta.managementLens] },
+                SENALES: { title: "Se ve bien cuando…", items: currentConsulta.signals },
+                MEDICION: { title: "Cómo se mide", items: currentConsulta.indicators },
+                PLAYBOOKS: { title: "Playbooks relacionados", items: currentConsulta.relatedPlaybooks },
+              }
+              const lens = lensContent[consultaLens]
+              return (
+                <article className="consulta-card" aria-live="polite">
+                  <header className="consulta-card-head">
+                    <div className="consulta-card-letter">{currentConsulta.code}</div>
+                    <div>
+                      <span className="academy-eyebrow">PRINCIPIO {index + 1} DE {consultaDetailed.length}</span>
+                      <h3>{currentConsulta.title}</h3>
+                      <p>{currentConsulta.principle}</p>
+                    </div>
+                  </header>
 
-            <div className="consulta-lenses consulta-lenses-wide">
-              <div>
-                <span>VENDEDOR</span>
-                <p>{currentConsulta.sellerLens}</p>
-              </div>
-              <div>
-                <span>JEFATURA LOCAL</span>
-                <p>{currentConsulta.managerLens}</p>
-              </div>
-              <div>
-                <span>GERENCIA DE MARCA / VENTAS</span>
-                <p>{currentConsulta.managementLens}</p>
-              </div>
-              <div>
-                <span>PLAYBOOKS RELACIONADOS</span>
-                <p>{currentConsulta.relatedPlaybooks.join(" · ")}</p>
-              </div>
-            </div>
+                  <p className="consulta-card-meaning">{currentConsulta.meaning}</p>
+                  <p className="consulta-card-why"><strong>Por qué importa:</strong> {currentConsulta.why}</p>
+
+                  <div className="consulta-card-pair">
+                    <section className="consulta-box do">
+                      <span><Check size={14} /> HACER</span>
+                      <ul>{currentConsulta.behaviors.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </section>
+                    <section className="consulta-box avoid">
+                      <span><XCircle size={14} /> EVITAR</span>
+                      <ul>{currentConsulta.avoid.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </section>
+                  </div>
+
+                  <div className="consulta-card-pair">
+                    <section className="consulta-box">
+                      <span>FRASES PARA USAR</span>
+                      <ul>{currentConsulta.questions.map((item) => <li key={item}>{item}</li>)}</ul>
+                    </section>
+                    <section className="consulta-box quote">
+                      <span>EJEMPLO APLICADO</span>
+                      <p>“{currentConsulta.example}”</p>
+                    </section>
+                  </div>
+
+                  <div className="consulta-lens-chips" role="tablist" aria-label="Más sobre este principio">
+                    {CONSULTA_LENSES.map((item) => (
+                      <button
+                        type="button"
+                        role="tab"
+                        key={item.id}
+                        aria-selected={consultaLens === item.id}
+                        className={consultaLens === item.id ? "active" : ""}
+                        onClick={() => setConsultaLens(item.id)}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                  <section className="consulta-box lens">
+                    <span>{lens.title.toUpperCase()}</span>
+                    {lens.items.length > 1 ? (
+                      <ul>{lens.items.map((item) => <li key={item}>{item}</li>)}</ul>
+                    ) : (
+                      <p>{lens.items[0]}</p>
+                    )}
+                  </section>
+
+                  <footer className="consulta-card-nav">
+                    <button type="button" disabled={!prev} onClick={() => prev && setSelectedConsulta(prev.code)}>
+                      ← {prev ? `${prev.code} · ${prev.title}` : "Inicio"}
+                    </button>
+                    <button type="button" className="next" disabled={!next} onClick={() => next && setSelectedConsulta(next.code)}>
+                      {next ? `Siguiente: ${next.code} · ${next.title}` : "Último principio"} →
+                    </button>
+                  </footer>
+                </article>
+              )
+            })()}
 
             <div className="academy-route-note">
               <CarRouteCopy vehicleRoute={vehicleRoute} />
@@ -719,7 +800,13 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <strong>{step.title}</strong>
                   <p>{step.detail}</p>
-                  <small>{step.consulta.join(" · ")}</small>
+                  <small className="journey-letters">
+                    {step.consulta.map((code) => (
+                      <button type="button" key={code} onClick={() => setSelectedConsulta(code)} aria-label={`Ver principio ${code}`}>
+                        {code}
+                      </button>
+                    ))}
+                  </small>
                 </article>
               ))}
             </div>

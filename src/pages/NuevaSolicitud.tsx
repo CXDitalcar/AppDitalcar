@@ -107,8 +107,11 @@ const BETA_NOTICE = "Estas solicitudes son de prueba y no tienen validez. El flu
 
 export default function NuevaSolicitud({
   currentUser,
+  processFilter,
 }: {
   currentUser: UserScope
+  // Interfaz "Gestión de Showroom": solo procesos de Experiencia.
+  processFilter?: (code: string) => boolean
 }) {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -208,7 +211,7 @@ export default function NuevaSolicitud({
   }, [localConfig.selected])
 
   const availableProcesses = useMemo(
-    () => getProcessesForUser(currentUser),
+    () => getProcessesForUser(currentUser).filter((process) => !processFilter || processFilter(process.code)),
     [currentUser]
   )
 
