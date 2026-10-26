@@ -101,3 +101,16 @@ button.conta-kpi:hover{transform:translateY(-1px)}
   .conta-card{padding:16px}
   .conta-search{max-width:none}
 }
+
+/* Marca y mes · condiciones por marca · flota y circulares */
+.conta-select{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--c-suave)}
+.conta-select select,.conta-canal{min-height:38px;padding:0 10px;border-radius:10px;border:1px solid var(--c-arena);background:#fff;color:var(--c-negro);font:inherit;font-size:14px}
+.conta-canal{min-height:32px;font-size:13px;max-width:170px}
+.conta-chips{margin-top:12px}
+.conta-conds{display:grid;gap:6px;min-width:150px}
+.conta-conds>span{display:flex;align-items:center;gap:8px}
+.conta-conds>span>small{min-width:44px;margin:0}
+button.conta-brand-row{font:inherit;text-align:left;cursor:pointer;color:inherit}
+button.conta-brand-row:hover{border-color:var(--c-rojo)}
+.conta-details summary{cursor:pointer;font-family:Montserrat,Inter,sans-serif;font-weight:600;font-size:16px}
+.conta-toolbar h2{margin:0}

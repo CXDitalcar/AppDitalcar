@@ -6,6 +6,7 @@ import { prepareUploadFile } from "../services/fileUtils"
 import { BarChart3 } from "lucide-react"
 import SignalLight from "../components/SignalLight"
 import { getDatosEstado, uploadAndProcess, type DataKind, type DataSource, type ImportLogEntry } from "../services/datosApi"
+import { releerListas, subirArchivoLista } from "../services/contabilidadApi"
 import { fmtDate } from "../services/seguimientoApi"
 import {
   DEFAULT_BRANDS,
@@ -109,6 +110,7 @@ export default function Datos() {
       <section className="seg-section">
         <h2>Solicitudes y Academia</h2>
         <div className="datos-grid">
+          <MonthlyListsCard onDone={load} />
           <PriceListCard onDone={load} />
           <ResourcesCard />
           <LocalsCard />
@@ -258,6 +260,98 @@ function SourceCard({ fuente, onDone }: { fuente: DataSource; onDone: () => void
   )
 }
 
+
+// ======================================================
+// CARPETA MENSUAL DE LISTAS → catálogo de modelos y Contabilidad
+// Se sube la carpeta tal como llega (una subcarpeta por marca, PDF y Excel).
+// Cada archivo se clasifica: lista retail (bonos), flota (aparte) o circular (respaldo).
+// ======================================================
+
+type ResultadoArchivo = { ruta: string; estado: string; tipo?: string; marca?: string | null; filas?: number; error?: string }
+const ESTADO_ARCHIVO: Record<string, string> = { OK: "Leída", REVISAR: "Revisar", FALTA_LECTOR: "Falta lector", GUARDADO: "Guardada", DUPLICADO: "Ya estaba" }
+
+function MonthlyListsCard({ onDone }: { onDone: () => void }) {
+  const carpeta = useRef<HTMLInputElement>(null)
+  const archivos = useRef<HTMLInputElement>(null)
+  const [progress, setProgress] = useState<{ label: string; percent: number } | null>(null)
+  const [resultados, setResultados] = useState<ResultadoArchivo[]>([])
+  const [message, setMessage] = useState("")
+
+  // Para elegir una carpeta completa (Chrome y Edge).
+  useEffect(() => { carpeta.current?.setAttribute("webkitdirectory", "") }, [])
+
+  async function subir(lista?: FileList | null) {
+    const files = [...(lista ?? [])].filter((f) => /\.(pdf|xlsx|xlsm)$/i.test(f.name) && !f.name.startsWith("~$"))
+    if (!files.length) return
+    setMessage("")
+    setResultados([])
+    const out: ResultadoArchivo[] = []
+    for (const [i, file] of files.entries()) {
+      const ruta = (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+      setProgress({ label: `Leyendo ${i + 1} de ${files.length}: ${file.name}`, percent: Math.round((i / files.length) * 100) })
+      try {
+        const r = await subirArchivoLista(file)
+        out.push({ ruta, estado: r.duplicado ? "DUPLICADO" : r.lista.estado, tipo: r.lista.tipo, marca: r.lista.marca, filas: r.lista.filas })
+      } catch (err) {
+        out.push({ ruta, estado: "ERROR", error: err instanceof Error ? err.message : "No se pudo cargar." })
+      }
+      setResultados([...out])
+    }
+    setProgress(null)
+    const leidas = out.filter((r) => r.estado === "OK").length
+    setMessage(`${files.length} archivos: ${leidas} listas leídas, ${out.filter((r) => r.estado === "FALTA_LECTOR").length} esperan lector, ${out.filter((r) => r.tipo === "FLOTA").length} de flota guardadas aparte.`)
+    if (carpeta.current) carpeta.current.value = ""
+    if (archivos.current) archivos.current.value = ""
+    onDone()
+  }
+
+  async function releer() {
+    setProgress({ label: "Volviendo a leer pendientes…", percent: 50 })
+    try { setMessage((await releerListas()).message) } catch (err) { setMessage(err instanceof Error ? err.message : "No fue posible volver a leer.") }
+    setProgress(null)
+  }
+
+  return (
+    <article className="seg-card datos-card">
+      <div className="seg-chip"><SignalLight tone={resultados.length ? "green" : "neutral"} compact /> Contabilidad y catálogo</div>
+      <h3><FolderOpen size={18} style={{ verticalAlign: "-3px", marginRight: 6 }} />Carpeta mensual de listas</h3>
+      <p>Sube la carpeta del mes tal como llega (una carpeta por marca). De aquí salen los modelos de las solicitudes y los bonos de Contabilidad.</p>
+      <div className="seg-meta">
+        <span className="seg-fine-print">PDF y Excel. Las listas de flota, flotillas y B2B se guardan aparte; las circulares quedan de respaldo. Volver a subir un archivo no lo duplica.</span>
+      </div>
+      {progress && (
+        <>
+          <div className="datos-progress"><i style={{ width: `${progress.percent}%` }} /></div>
+          <div className="seg-meta">{progress.label}</div>
+        </>
+      )}
+      {message && <div className="seg-meta" style={{ color: "#8fe3a6", marginTop: 8 }}>{message}</div>}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 12 }}>
+        <label className="seg-btn primary" style={{ position: "relative" }}>
+          <FolderOpen size={16} /> {progress ? "Cargando…" : "Subir carpeta del mes"}
+          <input ref={carpeta} className="datos-file-input" type="file" multiple disabled={Boolean(progress)} onChange={(e) => void subir(e.target.files)} />
+        </label>
+        <label className="seg-btn" style={{ position: "relative" }}>
+          <Upload size={16} /> Archivos sueltos
+          <input ref={archivos} className="datos-file-input" type="file" multiple accept=".pdf,.xlsx,.xlsm" disabled={Boolean(progress)} onChange={(e) => void subir(e.target.files)} />
+        </label>
+        <button type="button" className="seg-btn" disabled={Boolean(progress)} onClick={() => void releer()}>Volver a leer pendientes</button>
+      </div>
+      {resultados.length > 0 && (
+        <div className="datos-brand-list">
+          {resultados.map((r) => (
+            <div key={r.ruta} className="datos-brand">
+              <span className="datos-brand-name">
+                <strong>{r.marca || "—"}</strong> · {r.tipo === "FLOTA" ? "Flota" : r.tipo === "CIRCULAR" ? "Circular" : "Retail"} · {r.error || ESTADO_ARCHIVO[r.estado] || r.estado}{r.filas ? ` · ${r.filas} modelos` : ""}
+                <br /><small>{r.ruta}</small>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+    </article>
+  )
+}
 
 // ======================================================
 // LISTAS DE PRECIOS → modelos para las solicitudes

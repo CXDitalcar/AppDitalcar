@@ -33,7 +33,8 @@ async function writeBlob(name, data, contentType) {
 }
 
 const listaMeta = (e) => ({
-  sha: e.rowKey, marca: e.marca || null, estado: e.estado, lector: e.lector || null, archivo: e.archivo,
+  sha: e.rowKey, marca: e.marca || null, tipo: e.tipo || "RETAIL", mes: e.mes || null, ruta: e.ruta || e.archivo, extension: e.extension || "pdf",
+  estado: e.estado, lector: e.lector || null, archivo: e.archivo,
   titulo: e.titulo || null, canal: e.canal || null, desde: e.desde || null, hasta: e.hasta || null, filas: e.filas || 0,
   avisos: JSON.parse(e.avisos || "[]"), observaciones: JSON.parse(e.observaciones || "[]"),
   cargadoPor: e.cargadoPor, cargadoEn: e.cargadoEn,
@@ -54,22 +55,35 @@ export async function listListas() {
   return rows.sort((a, b) => String(b.cargadoEn).localeCompare(String(a.cargadoEn)))
 }
 
-// Listas vigentes con sus filas, para calcular bonos (solo las que el lector leyó bien).
+// Listas RETAIL con sus filas, para calcular bonos (solo las que el lector leyó bien; flota va aparte).
 export async function listasConFilas() {
-  const metas = (await listListas()).filter((l) => l.estado === "OK")
+  const metas = (await listListas()).filter((l) => l.estado === "OK" && l.tipo === "RETAIL")
   const conFilas = await Promise.all(metas.map(async (m) => ({ ...m, filas: (await readBlobJson(`contabilidad/listas/${m.sha}.json`))?.filas || [] })))
   return conFilas.filter((l) => l.filas.length)
 }
 
-export async function saveLista({ sha, buffer, archivo, lectura, cargadoPor }) {
-  const marca = (lectura.marca || "SIN_MARCA").toLowerCase()
-  await writeBlob(`contabilidad/pdf/${marca}/${sha}.pdf`, buffer, "application/pdf")
+const blobOriginal = (meta) => `contabilidad/archivos/${(meta.marca || "sin_marca").toLowerCase()}/${meta.sha}.${meta.extension}`
+
+// Archivo original guardado (para volver a leerlo cuando se agregue el lector de su marca).
+export async function readOriginal(meta) {
+  const container = await appFilesContainer()
+  return container.getBlockBlobClient(blobOriginal(meta)).downloadToBuffer()
+}
+
+export async function saveLista({ sha, buffer, archivo, ruta, lectura, cargadoPor, original = true }) {
+  const extension = /\.xlsx?$|\.xlsm$/i.test(archivo) ? archivo.split(".").pop().toLowerCase() : "pdf"
+  const meta = { sha, marca: lectura.marca, extension }
+  if (original) await writeBlob(blobOriginal(meta), buffer, extension === "pdf" ? "application/pdf" : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   await writeBlob(`contabilidad/listas/${sha}.json`, Buffer.from(JSON.stringify({ meta: lectura.meta, filas: lectura.filas })), "application/json")
   const client = await table("DitalcarAdmListas")
   await client.upsertEntity({
     partitionKey: "LISTA",
     rowKey: sha,
     marca: lectura.marca || "",
+    tipo: lectura.tipo || "RETAIL",
+    mes: lectura.meta.desde ? lectura.meta.desde.slice(0, 7) : (lectura.mes || ""),
+    ruta: String(ruta || archivo).slice(0, 300),
+    extension,
     estado: lectura.estado,
     lector: lectura.lector || "",
     archivo: String(archivo).slice(0, 200),
@@ -93,16 +107,19 @@ export async function listCondiciones() {
     out[e.rowKey] = {
       financiaScf: typeof e.financiaScf === "boolean" ? e.financiaScf : undefined,
       tieneRetoma: typeof e.tieneRetoma === "boolean" ? e.tieneRetoma : undefined,
+      canal: e.canal || undefined,
     }
   }
   return out
 }
 
 // null en un campo = "no se sabe" (vuelve a usar lo que diga SIGA, si dice algo).
-export async function saveCondicion(nv, { financiaScf, tieneRetoma }, actualizadoPor) {
+// canal (Stellantis): TMP todo medio de pago · CC crédito convencional · CI compra inteligente.
+export async function saveCondicion(nv, { financiaScf, tieneRetoma, canal }, actualizadoPor) {
   const client = await table("DitalcarAdmCondiciones")
   const entity = { partitionKey: "NV", rowKey: String(nv), actualizadoPor, actualizadoEn: new Date().toISOString() }
   if (typeof financiaScf === "boolean") entity.financiaScf = financiaScf
   if (typeof tieneRetoma === "boolean") entity.tieneRetoma = tieneRetoma
+  if (canal) entity.canal = canal
   await client.upsertEntity(entity, "Replace")
 }
