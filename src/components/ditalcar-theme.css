@@ -149,3 +149,13 @@
 .auth-ditalcar .auth-links, .auth-ditalcar .auth-links a, .auth-ditalcar .auth-links button,
 .auth-ditalcar .auth-back, .auth-ditalcar .auth-pilot-toggle { color: var(--dc-rojo); }
 .auth-ditalcar .auth-message { color: var(--dc-negro); }
+
+/* Celular: logo y nombre del producto caben sin desbordar la barra */
+@media (max-width:560px){
+  .theme-ditalcar .portal-product-brand{gap:8px;min-width:0}
+  .theme-ditalcar .portal-product-brand img{height:20px}
+  .theme-ditalcar .portal-product-brand span{height:20px}
+  .theme-ditalcar .portal-product-brand strong{font-size:13px;white-space:normal;line-height:1.15;max-width:110px}
+  .theme-ditalcar .portal-action{padding:0 8px}
+  .theme-ditalcar .portal-actions{gap:2px}
+}

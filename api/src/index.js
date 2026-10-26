@@ -52,6 +52,7 @@ import { saveRouteEvidence } from "./lib/routeEvidence.js"
 import { registerSegRoutes } from "./segRoutes.js"
 import { localMatches } from "./lib/segNormalize.js"
 import { registerOpsRoutes } from "./opsRoutes.js"
+import { registerAdmRoutes } from "./admRoutes.js"
 import { importAppUsers, listAppDirectoryUsers, saveAppUser } from "./lib/appUsers.js"
 import { parseUsersWorkbook } from "./lib/usersExcel.js"
 import {
@@ -1418,3 +1419,5 @@ app.http("auth-logout", {
 registerSegRoutes({ app, currentUser, isExperienceUser, publicUser, sessionDays: SESSION_DAYS })
 // Ventas, Frogmi y Gespark (ver opsRoutes.js).
 registerOpsRoutes({ app, currentUser, isExperienceUser })
+
+registerAdmRoutes({ app, currentUser, isExperienceUser })

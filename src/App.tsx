@@ -5,6 +5,8 @@ import Shell from "./components/Shell"
 import PortalShell from "./components/PortalShell"
 import Portal from "./pages/Portal"
 import Showroom from "./pages/Showroom"
+import Contabilidad from "./pages/Contabilidad"
+import { canAccessContabilidad } from "./services/contabilidadAccess"
 import { INTERFACES, currentInterface, leaveInterface } from "./services/interfaceMode"
 import { showroomTasks, useShowroomRequests } from "./services/showroomData"
 import { isExperienceProcess } from "./services/requestCatalog"
@@ -206,6 +208,36 @@ export default function App() {
           canRoute={true}
           canLocalBoard={canSeeMiLocal}
         />
+      </BrowserRouter>
+    )
+  }
+
+  // Link propio "Contabilidad" (/contabilidad): solo Administración y Experiencia/PM.
+  // A quien no le corresponde se le devuelve a DitalApp sin mostrar nada de Contabilidad.
+  if (interfaceId === "contabilidad") {
+    if (!canAccessContabilidad(currentUser)) {
+      leaveInterface()
+      return null
+    }
+    return (
+      <BrowserRouter>
+        <PortalShell
+          currentUser={currentUser}
+          authenticatedUser={baseUser}
+          onLogout={exitApi}
+          viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
+          viewAsEmail={viewAsUser?.email ?? baseUserEmail}
+          onViewAs={experienceCanViewAs ? handleViewAs : undefined}
+          homePath={INTERFACES.contabilidad.home}
+          productName={INTERFACES.contabilidad.name}
+          avisosOverride={0}
+          onLeave={leaveInterface}
+        >
+          <Routes>
+            <Route path="/contabilidad" element={<Contabilidad currentUser={currentUser} />} />
+            <Route path="*" element={<Navigate to="/contabilidad" replace />} />
+          </Routes>
+        </PortalShell>
       </BrowserRouter>
     )
   }
