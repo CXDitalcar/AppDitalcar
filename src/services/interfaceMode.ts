@@ -28,6 +28,12 @@ export function currentInterface(): InterfaceId | null {
   }
 }
 
+// Abre una ruta dentro de una interfaz (por ejemplo, los formularios se realizan en Gestión de Showroom).
+export function enterInterface(id: InterfaceId, path: string) {
+  try { sessionStorage.setItem(KEY, id) } catch { /* sin almacenamiento */ }
+  window.location.assign(path)
+}
+
 export function leaveInterface() {
   try { sessionStorage.removeItem(KEY) } catch { /* sin almacenamiento */ }
   // Desde el dominio propio de Showroom se vuelve al dominio principal de DitalApp si está configurado.

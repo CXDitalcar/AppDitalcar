@@ -1,1026 +1,233 @@
-import {
-  ArrowLeft,
-  CheckCircle2,
-  CircleAlert,
-  ClipboardCheck,
-  Eye,
-  FileText,
-  Link2,
-  Plus,
-  TriangleAlert,
-} from "lucide-react"
-
-import {
-  useNavigate,
-  useParams,
-} from "react-router-dom"
-
+import { useEffect, useState } from "react"
+import { ArrowLeft, CheckCircle2, CircleAlert, ClipboardCheck, FileText, Link2, Plus, TriangleAlert, Wrench } from "lucide-react"
+import { useNavigate, useParams } from "react-router-dom"
 import "./FormularioDetalle.css"
+import { routeQuestions, type RouteAnswerStatus } from "../data/routeExperience"
+import { getRouteExecution, type RouteAnswer, type RouteExecution } from "../services/routeExperienceApi"
+import type { UserScope } from "../types"
 
-import {
-  mockFormBreaches,
-  mockFormExecutions,
-  mockForms,
-} from "../data/mockData"
+// Detalle de una Ruta o Auditoría Ruta enviada, leída desde Azure.
+export default function FormularioDetalle({ currentUser }: { currentUser: UserScope }) {
+  const { executionId = "" } = useParams()
+  const navigate = useNavigate()
+  const [execution, setExecution] = useState<RouteExecution | null>(null)
+  const [error, setError] = useState("")
 
-import type {
-  UserScope,
-} from "../types"
+  useEffect(() => {
+    let active = true
+    setExecution(null)
+    setError("")
+    getRouteExecution(executionId)
+      .then((r) => { if (active) setExecution(r.execution) })
+      .catch((err) => { if (active) setError(err instanceof Error ? err.message : "No fue posible abrir la revisión.") })
+    return () => { active = false }
+  }, [executionId, currentUser.email])
 
+  const back = (
+    <button type="button" className="form-detail-back" onClick={() => navigate("/formularios")}>
+      <ArrowLeft size={17} /> Volver a Formularios
+    </button>
+  )
 
-// ======================================================
-// PROPS
-// ======================================================
-
-type FormularioDetalleProps = {
-  currentUser: UserScope
-}
-
-
-// ======================================================
-// RESULTADO POR ÍTEM · DEMO
-//
-// Luego estos datos vendrán desde:
-// 13_EjecucionesFormulario
-// 14_BrechasFormulario
-// ======================================================
-
-type ItemResultStatus =
-  | "CUMPLE"
-  | "NO_CUMPLE"
-  | "SOLICITADO"
-
-
-type MockItemResult = {
-  id: string
-
-  executionId: string
-
-  section: string
-
-  question: string
-
-  status: ItemResultStatus
-
-  detail?: string
-
-  evidenceLabel?: string
-}
-
-
-const mockItemResults: MockItemResult[] = [
-  // ======================================================
-  // RUTA VESPUCIO
-  // ======================================================
-
-  {
-    id: "ITEM-RUTA-001",
-    executionId: "EJ-RUTA-001",
-    section: "Sala de Ventas",
-    question:
-      "¿La fachada y sala de ventas se encuentran limpias y ordenadas?",
-    status: "CUMPLE",
-  },
-
-  {
-    id: "ITEM-RUTA-002",
-    executionId: "EJ-RUTA-001",
-    section: "Sala de Ventas",
-    question:
-      "¿El material comercial vigente se encuentra correctamente exhibido?",
-    status: "CUMPLE",
-  },
-
-  {
-    id: "ITEM-RUTA-003",
-    executionId: "EJ-RUTA-001",
-    section: "Imagen del equipo",
-    question:
-      "¿Todos los colaboradores cuentan con su credencial?",
-    status: "NO_CUMPLE",
-    detail:
-      "Se identifica al menos un colaborador sin credencial.",
-    evidenceLabel:
-      "Evidencia registrada en formulario",
-  },
-
-  {
-    id: "ITEM-RUTA-004",
-    executionId: "EJ-RUTA-001",
-    section: "Imagen del equipo",
-    question:
-      "¿Los colaboradores cuentan con pie de firma corporativo?",
-    status: "SOLICITADO",
-    detail:
-      "La gestión ya fue solicitada.",
-  },
-
-  {
-    id: "ITEM-RUTA-005",
-    executionId: "EJ-RUTA-001",
-    section: "Zonas de Experiencia",
-    question:
-      "¿La zona de café se encuentra operativa y correctamente abastecida?",
-    status: "NO_CUMPLE",
-    detail:
-      "Se identifican faltantes que requieren seguimiento.",
-    evidenceLabel:
-      "Evidencia registrada en formulario",
-  },
-
-  {
-    id: "ITEM-RUTA-006",
-    executionId: "EJ-RUTA-001",
-    section: "Zonas de Experiencia",
-    question:
-      "¿La zona de niños se encuentra operativa y correctamente abastecida?",
-    status: "CUMPLE",
-  },
-
-  {
-    id: "ITEM-RUTA-007",
-    executionId: "EJ-RUTA-001",
-    section: "Atención y Recepción",
-    question:
-      "¿Los clientes son recibidos oportunamente al ingresar al local?",
-    status: "CUMPLE",
-  },
-
-  {
-    id: "ITEM-RUTA-008",
-    executionId: "EJ-RUTA-001",
-    section: "Unidades",
-    question:
-      "¿Las unidades en exhibición cuentan con los elementos requeridos?",
-    status: "CUMPLE",
-  },
-
-
-  // ======================================================
-  // TOUR STELLANTIS · DEMO
-  // ======================================================
-
-  {
-    id: "ITEM-TOUR-001",
-    executionId: "EJ-TOUR-001",
-    section: "Estándares de sala",
-    question:
-      "Presentación general del showroom",
-    status: "CUMPLE",
-  },
-
-  {
-    id: "ITEM-TOUR-002",
-    executionId: "EJ-TOUR-001",
-    section: "Experiencia",
-    question:
-      "Cumplimiento de elementos de experiencia definidos para el local",
-    status: "NO_CUMPLE",
-    detail:
-      "Se identificaron elementos pendientes de corrección.",
-  },
-
-  {
-    id: "ITEM-TOUR-003",
-    executionId: "EJ-TOUR-001",
-    section: "Unidades",
-    question:
-      "Presentación de vehículos en exhibición",
-    status: "CUMPLE",
-  },
-]
-
-
-// ======================================================
-// COMPONENTE
-// ======================================================
-
-export default function FormularioDetalle({
-  currentUser,
-}: FormularioDetalleProps) {
-  const {
-    executionId,
-  } = useParams()
-
-
-  const navigate =
-    useNavigate()
-
-
-  const execution =
-    mockFormExecutions.find(
-      (item) =>
-        item.id ===
-        executionId
-    )
-
-
-  if (!execution) {
+  if (error || !execution) {
     return (
       <div className="form-detail-page">
-
-        <button
-          type="button"
-          className="form-detail-back"
-          onClick={() =>
-            navigate(
-              "/formularios"
-            )
-          }
-        >
-          <ArrowLeft
-            size={17}
-          />
-
-          Volver a Formularios
-        </button>
-
-
+        {back}
         <div className="form-detail-empty">
-
-          <CircleAlert
-            size={32}
-          />
-
-
-          <h2>
-            Revisión no encontrada
-          </h2>
-
-
-          <p>
-            No encontramos esta ejecución
-            dentro de los datos disponibles.
-          </p>
-
+          {error ? <CircleAlert size={32} /> : <ClipboardCheck size={32} />}
+          <h2>{error ? "Revisión no disponible" : "Cargando revisión…"}</h2>
+          {error && <p>{error}</p>}
         </div>
-
       </div>
     )
   }
 
+  const answers = routeQuestions.map((question) => ({
+    question,
+    answer: execution.answers.find((a) => a.itemId === question.id) ?? ({ itemId: question.id } as RouteAnswer),
+  }))
+  const breaches = answers.filter(({ answer }) => answer.status === "NO_CUMPLE" || answer.status === "SOLICITADO")
+  const sections = [...new Set(routeQuestions.map((q) => q.section))]
+  const total = execution.compliant + execution.nonCompliant + execution.requested
+  const compliance = total ? Math.round((execution.compliant / total) * 100) : 0
+  const name = execution.mode === "AUDITORIA" ? "Auditoría Ruta Experiencia" : "Ruta de Experiencia"
 
-  const form =
-    mockForms.find(
-      (item) =>
-        item.code ===
-        execution.formCode
-    )
+  // Solicitud vinculada: la guarda la Ruta o, si se creó desde este detalle, queda en este navegador.
+  const linkedRequest = (answer: RouteAnswer) =>
+    answer.linkedRequestId || readLocal(`ditalcar.route.request.${execution.id}-${answer.itemId}`)
 
-
-  if (!form) {
-    return null
+  function createRequest(itemId: string) {
+    const item = answers.find((a) => a.question.id === itemId)
+    if (!item) return
+    const params = new URLSearchParams({
+      process: item.question.mappedProcesses?.[0]?.code ?? "",
+      breach: `${execution!.id}-${itemId}`,
+      originForm: execution!.mode === "AUDITORIA" ? "FOR-AUD-RUTA-01" : "FOR-RUTA-01",
+      originExecution: execution!.id,
+      originItem: itemId,
+      originLocal: execution!.local,
+      originSection: item.question.section,
+      originQuestion: item.question.question,
+      originDetail: item.answer.detail || "",
+      returnTo: `/formularios/${encodeURIComponent(execution!.id)}`,
+    })
+    navigate(`/solicitudes/nueva?${params.toString()}`)
   }
-
-
-  const items =
-    mockItemResults.filter(
-      (item) =>
-        item.executionId ===
-        execution.id
-    )
-
-
-  const breaches =
-    mockFormBreaches.filter(
-      (breach) =>
-        breach.executionId ===
-        execution.id
-    )
-
-
-  const groupedItems =
-    groupBySection(
-      items
-    )
-
-
-  const compliancePercentage =
-    calculateCompliance(
-      execution.compliant,
-      execution.nonCompliant,
-      execution.requested
-    )
-
 
   return (
     <div className="form-detail-page">
-
-      {/* ==================================================
-          VOLVER
-      ================================================== */}
-
-      <button
-        type="button"
-        className="form-detail-back"
-        onClick={() =>
-          navigate(
-            "/formularios"
-          )
-        }
-      >
-        <ArrowLeft
-          size={17}
-        />
-
-        Volver a Formularios
-      </button>
-
-
-      {/* ==================================================
-          CABECERA
-      ================================================== */}
+      {back}
 
       <div className="form-detail-head">
-
         <div>
-
-          <div className="eyebrow">
-            DETALLE DE REVISIÓN
-          </div>
-
-
-          <h1>
-            {
-              form.name
-            }
-          </h1>
-
-
-          <p>
-            Revisa el resultado por ítem,
-            identifica las brechas y accede
-            a las solicitudes asociadas.
-          </p>
-
+          <div className="eyebrow">{execution.status === "SUBMITTED" ? "DETALLE DE REVISIÓN" : "BORRADOR"}</div>
+          <h1>{name}</h1>
+          <p>Resultado por ítem, brechas detectadas y solicitudes asociadas.</p>
         </div>
-
-
         <div className="form-detail-local">
-
-          <ClipboardCheck
-            size={20}
-          />
-
-
-          <div>
-
-            <span>
-              Local
-            </span>
-
-
-            <strong>
-              {
-                execution.local
-              }
-            </strong>
-
-          </div>
-
+          <ClipboardCheck size={20} />
+          <div><span>Local</span><strong>{execution.local}</strong></div>
         </div>
-
       </div>
-
-
-      {/* ==================================================
-          INFORMACIÓN GENERAL
-      ================================================== */}
 
       <div className="form-detail-info-grid">
-
-        <InfoCard
-          label="Realizado por"
-          value={
-            execution.completedByName
-          }
-        />
-
-
-        <InfoCard
-          label="Fecha"
-          value={
-            formatDateTime(
-              execution.completedAt
-            )
-          }
-        />
-
-
-        <InfoCard
-          label="Cumplimiento"
-          value={`${compliancePercentage}%`}
-        />
-
-
-        <InfoCard
-          label="Brechas detectadas"
-          value={
-            String(
-              execution.nonCompliant
-            )
-          }
-        />
-
+        <InfoCard label="Realizado por" value={execution.completedByName || execution.completedByEmail} />
+        <InfoCard label={execution.status === "SUBMITTED" ? "Enviada" : "Última edición"} value={formatDateTime(execution.submittedAt ?? execution.updatedAt)} />
+        <InfoCard label="Cumplimiento" value={`${compliance}%`} />
+        <InfoCard label="Brechas detectadas" value={String(execution.nonCompliant)} />
       </div>
-
-
-      {/* ==================================================
-          RESUMEN
-      ================================================== */}
 
       <div className="form-detail-summary">
-
-        <div className="form-detail-result result-ok-large">
-
-          <CheckCircle2
-            size={19}
-          />
-
-          <div>
-
-            <strong>
-              {
-                execution.compliant
-              }
-            </strong>
-
-            <span>
-              Cumple
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <div className="form-detail-result result-alert-large">
-
-          <TriangleAlert
-            size={19}
-          />
-
-          <div>
-
-            <strong>
-              {
-                execution.nonCompliant
-              }
-            </strong>
-
-            <span>
-              No cumple
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <div className="form-detail-result result-requested-large">
-
-          <FileText
-            size={19}
-          />
-
-          <div>
-
-            <strong>
-              {
-                execution.requested
-              }
-            </strong>
-
-            <span>
-              Solicitado
-            </span>
-
-          </div>
-
-        </div>
-
+        <div className="form-detail-result result-ok-large"><CheckCircle2 size={19} /><div><strong>{execution.compliant}</strong><span>Cumple</span></div></div>
+        <div className="form-detail-result result-alert-large"><TriangleAlert size={19} /><div><strong>{execution.nonCompliant}</strong><span>No cumple</span></div></div>
+        <div className="form-detail-result result-requested-large"><FileText size={19} /><div><strong>{execution.requested}</strong><span>Solicitado</span></div></div>
       </div>
 
-
-      {/* ==================================================
-          BRECHAS QUE REQUIEREN GESTIÓN
-      ================================================== */}
-
-      {breaches.length >
-        0 && (
+      {breaches.length > 0 && (
         <section className="form-detail-section">
-
           <div className="form-detail-section-head">
-
             <div>
-
-              <div className="eyebrow">
-                SEGUIMIENTO
-              </div>
-
-
-              <h2>
-                Brechas y solicitudes
-              </h2>
-
-
-              <p>
-                Los ítems con brecha pueden
-                generar una solicitud o
-                vincularse con una gestión
-                existente.
-              </p>
-
+              <div className="eyebrow">SEGUIMIENTO</div>
+              <h2>Brechas y solicitudes</h2>
+              <p>Cada brecha se resuelve en el local o con una solicitud.</p>
             </div>
-
-
-            <span className="form-detail-counter">
-              {
-                breaches.length
-              }{" "}
-              brechas
-            </span>
-
+            <span className="form-detail-counter">{breaches.length} brecha{breaches.length === 1 ? "" : "s"}</span>
           </div>
-
-
           <div className="form-breach-list">
-
-            {breaches.map(
-              (breach) => {
-                const hasRequest =
-                  Boolean(
-                    breach.linkedRequestId
-                  )
-
-
-                return (
-                  <div
-                    key={
-                      breach.id
-                    }
-                    className="form-breach-item"
-                  >
-
-                    <div className="form-breach-status-icon">
-
-                      {breach.status ===
-                      "NO_CUMPLE" ? (
-                        <TriangleAlert
-                          size={20}
-                        />
-                      ) : (
-                        <FileText
-                          size={20}
-                        />
-                      )}
-
-                    </div>
-
-
-                    <div className="form-breach-content">
-
-                      <span className="form-breach-section">
-                        {
-                          breach.section
-                        }
-                      </span>
-
-
-                      <strong>
-                        {
-                          breach.question
-                        }
-                      </strong>
-
-
-                      {breach.mappedProcessCode && (
-                        <small>
-                          Proceso sugerido:{" "}
-                          {
-                            breach.mappedProcessCode
-                          }
-                        </small>
-                      )}
-
-                    </div>
-
-
-                    <div className="form-breach-action">
-
-                      {hasRequest ? (
-                        <button
-                          type="button"
-                          className="breach-existing-btn"
-                          onClick={() =>
-                            navigate(
-                              `/solicitudes/${breach.linkedRequestId}`
-                            )
-                          }
-                        >
-                          <Link2
-                            size={16}
-                          />
-
-                          Ver solicitud
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          className="breach-create-btn"
-                          onClick={() =>
-                            navigate(
-                              `/solicitudes/nueva?process=${breach.mappedProcessCode ?? ""}&breach=${breach.id}`
-                            )
-                          }
-                        >
-                          <Plus
-                            size={16}
-                          />
-
-                          Crear solicitud
-                        </button>
-                      )}
-
-                    </div>
-
+            {breaches.map(({ question, answer }) => {
+              const requestId = linkedRequest(answer)
+              return (
+                <div key={question.id} className="form-breach-item">
+                  <div className="form-breach-status-icon">{answer.status === "NO_CUMPLE" ? <TriangleAlert size={20} /> : <FileText size={20} />}</div>
+                  <div className="form-breach-content">
+                    <span className="form-breach-section">{question.section}</span>
+                    <strong>{question.question}</strong>
+                    {answer.detail && <small>{answer.detail}</small>}
+                    {answer.resolutionMode === "LOCAL_ACTION" && answer.localAction && (
+                      <small><Wrench size={13} /> Se resuelve en el local: {answer.localAction.note || "sin detalle"}{answer.localAction.owner ? ` · ${answer.localAction.owner}` : ""}{answer.localAction.dueDate ? ` · ${answer.localAction.dueDate}` : ""}</small>
+                    )}
                   </div>
-                )
-              }
-            )}
-
+                  <div className="form-breach-action">
+                    {requestId ? (
+                      <button type="button" className="breach-existing-btn" onClick={() => navigate(`/solicitudes/${requestId}`)}>
+                        <Link2 size={16} /> Ver solicitud
+                      </button>
+                    ) : answer.status === "NO_CUMPLE" && answer.resolutionMode !== "LOCAL_ACTION" && question.mappedProcesses?.length ? (
+                      <button type="button" className="breach-create-btn" onClick={() => createRequest(question.id)}>
+                        <Plus size={16} /> Crear solicitud
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              )
+            })}
           </div>
-
         </section>
       )}
 
-
-      {/* ==================================================
-          RESULTADO POR ÍTEM
-      ================================================== */}
-
       <section className="form-detail-section">
-
         <div className="form-detail-section-head">
-
           <div>
-
-            <div className="eyebrow">
-              RESULTADO
-            </div>
-
-
-            <h2>
-              Revisión por ítem
-            </h2>
-
-
-            <p>
-              Visualiza exactamente qué
-              elementos cumplen, cuáles
-              presentan brechas y cuáles
-              ya fueron solicitados.
-            </p>
-
+            <div className="eyebrow">RESULTADO</div>
+            <h2>Revisión por ítem</h2>
           </div>
-
         </div>
-
-
-        {Object.entries(
-          groupedItems
-        ).map(
-          ([
-            section,
-            sectionItems,
-          ]) => (
-            <div
-              key={
-                section
-              }
-              className="form-item-section"
-            >
-
-              <div className="form-item-section-title">
-
-                <span>
-                  {
-                    section
-                  }
-                </span>
-
-
-                <small>
-                  {
-                    sectionItems.length
-                  }{" "}
-                  ítems
-                </small>
-
-              </div>
-
-
+        {sections.map((section) => {
+          const items = answers.filter(({ question }) => question.section === section)
+          return (
+            <div key={section} className="form-item-section">
+              <div className="form-item-section-title"><span>{section}</span><small>{items.length} ítems</small></div>
               <div className="form-item-list">
-
-                {sectionItems.map(
-                  (item) => (
-                    <ItemResultRow
-                      key={
-                        item.id
-                      }
-                      item={
-                        item
-                      }
-                    />
-                  )
-                )}
-
+                {items.map(({ question, answer }) => (
+                  <div key={question.id} className={`form-item-row ${statusClass(answer.status)}`}>
+                    <div className="form-item-status">
+                      {answer.status === "CUMPLE" && <CheckCircle2 size={19} />}
+                      {answer.status === "NO_CUMPLE" && <TriangleAlert size={19} />}
+                      {answer.status === "SOLICITADO" && <FileText size={19} />}
+                    </div>
+                    <div className="form-item-content">
+                      <strong>{question.question}</strong>
+                      {answer.detail && <p>{answer.detail}</p>}
+                      {answer.evidence?.length ? <small>{answer.evidence.length} foto{answer.evidence.length === 1 ? "" : "s"} de evidencia</small> : null}
+                    </div>
+                    <span className="form-item-label">{statusLabel(answer.status)}</span>
+                  </div>
+                ))}
               </div>
-
             </div>
           )
-        )}
-
+        })}
       </section>
 
-
-      {/* ==================================================
-          NOTA DEMO
-      ================================================== */}
-
-      <div className="form-detail-demo-note">
-
-        <Eye
-          size={17}
-        />
-
-
-        <span>
-          Vista demo. Los resultados reales
-          vendrán desde las Lists de
-          ejecuciones y brechas.
-        </span>
-
-      </div>
-
+      {(execution.walkAdjustments || execution.pendingActions || execution.additionalComment) && (
+        <section className="form-detail-section">
+          <div className="form-detail-section-head">
+            <div>
+              <div className="eyebrow">CIERRE</div>
+              <h2>Ajustes y acciones</h2>
+            </div>
+          </div>
+          <div className="form-detail-info-grid">
+            {execution.walkAdjustments && <InfoCard label="Ajustes durante la caminata" value={execution.walkAdjustments} />}
+            {execution.pendingActions && <InfoCard label="Acciones pendientes" value={execution.pendingActions} />}
+            {execution.additionalComment && <InfoCard label="Comentario adicional" value={execution.additionalComment} />}
+          </div>
+        </section>
+      )}
     </div>
   )
 }
 
-
-// ======================================================
-// FILA RESULTADO
-// ======================================================
-
-function ItemResultRow({
-  item,
-}: {
-  item: MockItemResult
-}) {
-  return (
-    <div
-      className={`form-item-row ${getItemStatusClass(
-        item.status
-      )}`}
-    >
-
-      <div className="form-item-status">
-
-        {item.status ===
-        "CUMPLE" && (
-          <CheckCircle2
-            size={19}
-          />
-        )}
-
-
-        {item.status ===
-        "NO_CUMPLE" && (
-          <TriangleAlert
-            size={19}
-          />
-        )}
-
-
-        {item.status ===
-        "SOLICITADO" && (
-          <FileText
-            size={19}
-          />
-        )}
-
-      </div>
-
-
-      <div className="form-item-content">
-
-        <strong>
-          {
-            item.question
-          }
-        </strong>
-
-
-        {item.detail && (
-          <p>
-            {
-              item.detail
-            }
-          </p>
-        )}
-
-
-        {item.evidenceLabel && (
-          <small>
-            {
-              item.evidenceLabel
-            }
-          </small>
-        )}
-
-      </div>
-
-
-      <span className="form-item-label">
-        {
-          formatItemStatus(
-            item.status
-          )
-        }
-      </span>
-
-    </div>
-  )
-}
-
-
-// ======================================================
-// TARJETA INFO
-// ======================================================
-
-function InfoCard({
-  label,
-  value,
-}: {
-  label: string
-  value: string
-}) {
+function InfoCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="form-detail-info-card">
-
-      <span>
-        {
-          label
-        }
-      </span>
-
-
-      <strong>
-        {
-          value
-        }
-      </strong>
-
+      <span>{label}</span>
+      <strong>{value}</strong>
     </div>
   )
 }
 
-
-// ======================================================
-// AGRUPAR POR SECCIÓN
-// ======================================================
-
-function groupBySection(
-  items: MockItemResult[]
-) {
-  return items.reduce<
-    Record<
-      string,
-      MockItemResult[]
-    >
-  >(
-    (
-      groups,
-      item
-    ) => {
-      if (
-        !groups[
-          item.section
-        ]
-      ) {
-        groups[
-          item.section
-        ] = []
-      }
-
-
-      groups[
-        item.section
-      ].push(
-        item
-      )
-
-
-      return groups
-    },
-    {}
-  )
+function readLocal(key: string) {
+  try { return localStorage.getItem(key) ?? "" } catch { return "" }
 }
 
-
-// ======================================================
-// CUMPLIMIENTO
-// ======================================================
-
-function calculateCompliance(
-  compliant: number,
-  nonCompliant: number,
-  requested: number
-) {
-  const total =
-    compliant +
-    nonCompliant +
-    requested
-
-
-  if (
-    total === 0
-  ) {
-    return 0
-  }
-
-
-  return Math.round(
-    (
-      compliant /
-      total
-    ) *
-      100
-  )
+function statusClass(status?: RouteAnswerStatus) {
+  if (status === "CUMPLE") return "item-status-ok"
+  if (status === "NO_CUMPLE") return "item-status-alert"
+  if (status === "SOLICITADO") return "item-status-requested"
+  return ""
 }
 
-
-// ======================================================
-// CLASE ESTADO
-// ======================================================
-
-function getItemStatusClass(
-  status: ItemResultStatus
-) {
-  switch (
-    status
-  ) {
-    case "CUMPLE":
-      return "item-status-ok"
-
-    case "NO_CUMPLE":
-      return "item-status-alert"
-
-    case "SOLICITADO":
-      return "item-status-requested"
-  }
+function statusLabel(status?: RouteAnswerStatus) {
+  if (status === "CUMPLE") return "Cumple"
+  if (status === "NO_CUMPLE") return "No cumple"
+  if (status === "SOLICITADO") return "Solicitado"
+  return "Sin responder"
 }
 
-
-// ======================================================
-// TEXTO ESTADO
-// ======================================================
-
-function formatItemStatus(
-  status: ItemResultStatus
-) {
-  switch (
-    status
-  ) {
-    case "CUMPLE":
-      return "Cumple"
-
-    case "NO_CUMPLE":
-      return "No cumple"
-
-    case "SOLICITADO":
-      return "Solicitado"
-  }
-}
-
-
-// ======================================================
-// FECHA
-// ======================================================
-
-function formatDateTime(
-  value: string
-) {
-  return new Intl.DateTimeFormat(
-    "es-CL",
-    {
-      day: "2-digit",
-      month: "long",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    }
-  ).format(
-    new Date(value)
-  )
+function formatDateTime(value?: string) {
+  if (!value) return "—"
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(date)
 }

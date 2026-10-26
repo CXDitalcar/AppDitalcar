@@ -268,7 +268,7 @@ function RutaPanel({ currentUser, canLocalBoard, network }: { currentUser: UserS
 }
 
 // Otros formularios: Tour Manager y Frogmi (visibles para todos), con la cuenta Frogmi del local.
-function OtherForms({ currentUser }: { currentUser: UserScope }) {
+export function OtherForms({ currentUser }: { currentUser: UserScope }) {
   const [access, setAccess] = useState<ShowroomAccess | null>(null)
   const [showAll, setShowAll] = useState(false)
   useEffect(() => { getShowroomAccess().then(setAccess) }, [])
@@ -283,13 +283,13 @@ function OtherForms({ currentUser }: { currentUser: UserScope }) {
     <section className="portal-section" aria-labelledby="otros-title">
       <div className="portal-section-head">
         <h2 id="otros-title">Otros formularios</h2>
-        <p>Se abren en otra pestaña.</p>
+        <p>Sistemas externos: se abren en otra pestaña y sus resultados quedan en cada sistema.</p>
       </div>
       <div className="showroom-forms">
         {access.tourManagerUrl && (
           <a className="showroom-form-card" href={access.tourManagerUrl} target="_blank" rel="noopener noreferrer">
             <span className="portal-tile-icon"><ClipboardList size={22} /></span>
-            <span className="showroom-form-text"><strong>Tour Manager Resumido · Stellantis</strong><small>Formulario de Microsoft Forms.</small></span>
+            <span className="showroom-form-text"><strong>Ir a Tour Manager Resumido · Stellantis</strong><small>Formulario de Microsoft Forms.</small></span>
             <ArrowUpRight size={18} />
           </a>
         )}
@@ -297,7 +297,7 @@ function OtherForms({ currentUser }: { currentUser: UserScope }) {
           <div className="showroom-form-card frogmi">
             <a className="showroom-form-link" href={access.frogmiUrl} target="_blank" rel="noopener noreferrer">
               <span className="portal-tile-icon"><ClipboardCheck size={22} /></span>
-              <span className="showroom-form-text"><strong>Formularios Frogmi</strong><small>Entra con la cuenta de tu local.</small></span>
+              <span className="showroom-form-text"><strong>Ir a Formularios Frogmi</strong><small>Entra con la cuenta de tu local.</small></span>
               <ArrowUpRight size={18} />
             </a>
             {list.length > 0 && (

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { localMatches } from "../services/localMatch"
 import { userLocalList } from "../services/userLocals"
 import { useNavigate, useSearchParams } from "react-router-dom"
@@ -76,13 +76,21 @@ function emptyDraft(user: UserScope, mode: "RUTA" | "AUDITORIA" = "RUTA"): Draft
   return {
     id: newId(),
     mode,
-    local: user.local ?? user.localPrincipal ?? user.assignedLocals?.[0] ?? "",
+    local: defaultRouteLocal(user),
     answers: routeQuestions.map((question) => ({ itemId: question.id, evidence: [], missing: [] })),
     walkAdjustments: "",
     pendingActions: "",
     additionalComment: "",
     status: "DRAFT",
   }
+}
+
+// El local de 02_Usuarios puede tener otro nombre que en la Ruta ("Vespucio" ↔ "Chery-Renault Vespucio"):
+// se guarda con el nombre de la Ruta para que el seguimiento y las métricas por local lo encuentren.
+function defaultRouteLocal(user: UserScope) {
+  const own = user.local ?? user.localPrincipal ?? user.assignedLocals?.[0] ?? ""
+  if (!own) return ""
+  return routeLocals.find((route) => route === own || localMatches(own, route)) ?? own
 }
 
 function statusLabel(status?: RouteAnswerStatus) {
@@ -126,6 +134,10 @@ export default function RutaExperiencia({ currentUser }: { currentUser: UserScop
   const [error, setError] = useState("")
   const [autoSaveState, setAutoSaveState] = useState<AutoSaveState>("IDLE")
   const [showSubmitSummary, setShowSubmitSummary] = useState(false)
+  // Autoguardado en curso y bloqueo mientras se guarda a mano o se envía: evita que un borrador
+  // automático llegue después del envío y deje la Ruta otra vez como borrador.
+  const autoSaveRun = useRef<Promise<unknown> | null>(null)
+  const persisting = useRef(false)
 
   const localOptions = useMemo(() => {
     if (broadRouteAccess(currentUser)) return routeLocals
@@ -233,12 +245,16 @@ export default function RutaExperiencia({ currentUser }: { currentUser: UserScop
     const hasContent = draft.answers.some((answer) => answer.status || answer.detail || answer.evidence?.length || answer.localAction?.note) ||
       Boolean(draft.walkAdjustments || draft.pendingActions || draft.additionalComment)
     if (!hasContent) return
+    if (persisting.current) return
     setAutoSaveState("PENDING")
     const timer = window.setTimeout(() => {
+      if (persisting.current) return
       setAutoSaveState("SAVING")
-      saveRouteExecution({ ...draft, status: "DRAFT" })
+      const run = saveRouteExecution({ ...draft, status: "DRAFT" })
         .then(() => setAutoSaveState("SAVED"))
         .catch(() => setAutoSaveState("ERROR"))
+      autoSaveRun.current = run
+      void run.finally(() => { if (autoSaveRun.current === run) autoSaveRun.current = null })
     }, 1600)
     return () => window.clearTimeout(timer)
   }, [draft, readOnly])
@@ -279,11 +295,14 @@ export default function RutaExperiencia({ currentUser }: { currentUser: UserScop
     setSaving(true)
     setError("")
     setMessage("")
+    persisting.current = true
     try {
       if (status === "SUBMITTED") {
         const validation = validateDraft(draft)
         if (validation) throw new Error(validation)
       }
+      // Si hay un autoguardado en camino, se espera a que termine antes de guardar o enviar.
+      await autoSaveRun.current?.catch(() => undefined)
       const result = await saveRouteExecution({ ...draft, status })
       setDraft((current) => ({ ...current, status: result.execution.status }))
       setMessage(result.message)
@@ -296,6 +315,7 @@ export default function RutaExperiencia({ currentUser }: { currentUser: UserScop
       setError(err instanceof Error ? err.message : "No fue posible guardar la Ruta.")
       return null
     } finally {
+      persisting.current = false
       setSaving(false)
     }
   }
