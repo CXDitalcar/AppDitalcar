@@ -56,7 +56,7 @@ export default function Formularios({ currentUser }: { currentUser: UserScope })
   const myDrafts = (executions ?? []).filter((e) => e.status === "DRAFT" && e.completedByEmail?.toLowerCase() === currentUser.email.toLowerCase())
   const kinds: FormKind[] = canAudit(currentUser) ? ["RUTA", "AUDITORIA"] : ["RUTA"]
 
-  const openBreaches = submitted.reduce((n, e) => n + e.answers.filter((a) => a.status === "NO_CUMPLE" && !a.linkedRequestId).length, 0)
+  const openBreaches = submitted.reduce((n, e) => n + e.answers.filter((a) => a.status === "NO_CUMPLE" && !a.linkedRequestId && a.resolutionMode !== "LOCAL_ACTION").length, 0)
   const requested = submitted.reduce((n, e) => n + e.answers.filter((a) => a.status === "SOLICITADO" || a.linkedRequestId).length, 0)
 
   // Los formularios se realizan en Gestión de Showroom: desde la app completa se abre esa interfaz.
@@ -111,7 +111,7 @@ export default function Formularios({ currentUser }: { currentUser: UserScope })
 
         <div className="forms-summary-grid">
           <SummaryCard label="Revisiones enviadas" value={submitted.length} icon={CheckCircle2} />
-          <SummaryCard label="Brechas sin solicitud" value={openBreaches} icon={TriangleAlert} />
+          <SummaryCard label="Brechas sin gestionar" value={openBreaches} icon={TriangleAlert} />
           <SummaryCard label="Ya solicitadas" value={requested} icon={FileCheck2} />
         </div>
 
@@ -158,7 +158,7 @@ function FormCard({ kind, last, draft, loading, onRealize, onView }: {
   onRealize: () => void; onView: (id: string) => void
 }) {
   const form = FORMS[kind]
-  const breaches = last ? last.answers.filter((a) => a.status === "NO_CUMPLE" && !a.linkedRequestId).length : 0
+  const breaches = last ? last.answers.filter((a) => a.status === "NO_CUMPLE" && !a.linkedRequestId && a.resolutionMode !== "LOCAL_ACTION").length : 0
   return (
     <article className="form-card">
       <div className="form-card-top">
