@@ -228,6 +228,31 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
       { local: "Mall Plaza Vespucio", usuario: "ditalcar.mpvvn@ditalcar.cl" },
     ],
   }
+  // Cuenta Frogmi de un local por su sector ("Nueva Tobalaba" antes que "Tobalaba").
+  // Misma regla que accountMatches en src/services/showroomAccess.ts.
+  function frogmiAccountMatches(accountLocal, local) {
+    const key = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase()
+    const a = key(accountLocal)
+    const l = key(local)
+    const word = ["NUEVA TOBALABA", "CANTAGALLO", "CANTA GALLO", "NORTE", "ALAMEDA", "VESPUCIO", "COSTANERA", "TOBALABA"].find((w) => l.includes(w))
+    if (!word) return false
+    if (word === "TOBALABA") return a.includes("TOBALABA") && !a.includes("NUEVA")
+    if (word === "CANTA GALLO") return a.includes("CANTAGALLO")
+    return a.includes(word)
+  }
+
+  // Cada persona recibe solo las cuentas Frogmi de sus locales (la clave, solo si tiene alguna).
+  // Experiencia, gerencias de red y perfiles de Alcance Red sin locales reciben todas.
+  function showroomAccessFor(user, config) {
+    const locals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
+    const network = isExperienceUser(user) ||
+      ["GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role) ||
+      (!locals.length && user.scope === "RED" && user.role !== "VENDEDOR")
+    if (network) return config
+    const cuentas = (config.cuentas || []).filter((c) => locals.some((local) => frogmiAccountMatches(c.local, local)))
+    return { ...config, cuentas, clave: cuentas.length ? config.clave : "" }
+  }
+
   app.http("showroom-accesos", {
     methods: ["GET", "POST"], authLevel: "anonymous", route: "showroom/accesos",
     handler: handle(async (request) => {
@@ -236,7 +261,7 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
       const stored = await getAppConfig("SHOWROOM_ACCESOS")
       let config = { ...SHOWROOM_DEFAULTS }
       try { config = { ...config, ...JSON.parse(String(stored?.value || "{}")) } } catch { /* valores por defecto */ }
-      if (request.method === "GET") return json(200, config)
+      if (request.method === "GET") return json(200, showroomAccessFor(user, config))
       if (!isExperienceUser(user)) return forbidden()
       const data = await body(request)
       const url = (value, fallback) => {

@@ -270,7 +270,9 @@ export function registerSegRoutes({ app, currentUser, isExperienceUser, publicUs
         primeraVezSiga: masters.siga.records[r.nv]?._firstSeen || "",
         puedeConfirmarEntrega: r.confirmarEntrega && (isSellerOf(user, r) || isBranchHeadOf(user, r) || isExperienceUser(user)),
       }))
-      const contactos = seg.contactos.filter((c) => nvs.has(c.nv) || (rut && c.rut === rut)).sort((a, b) => String(b.at).localeCompare(String(a.at)))
+      // Solo contactos de las NV que la persona puede ver (o generales del cliente, sin NV):
+      // no se exponen gestiones de compras del mismo cliente en otros locales.
+      const contactos = seg.contactos.filter((c) => nvs.has(c.nv) || (rut && c.rut === rut && !c.nv)).sort((a, b) => String(b.at).localeCompare(String(a.at)))
       const reclamos = seg.reclamos.filter((c) => (nvs.has(c.nv) || (rut && c.rut === rut)) && canSeeClaim(user, c))
         .map((c) => ({ ...c, puedeActuar: canActOnClaim(user, c), puedeComentar: canCommentClaim(user, c), nivelLabel: CLAIM_LEVEL_LABELS[c.nivel] }))
       const first = rows[0]

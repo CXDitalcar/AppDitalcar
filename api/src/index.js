@@ -96,6 +96,23 @@ function isExperienceUser(user) {
 // - El resto ve lo propio: lo que pidió, lo que tiene a cargo, en lo que participó,
 //   lo que el catálogo le asigna (audiencia) y, si es jefatura o gerencia de marca, su local.
 function sameText(a, b) { return String(a || "").trim().toLowerCase() === String(b || "").trim().toLowerCase() }
+
+function userLocals(user) {
+  return [user?.local, user?.localPrincipal, ...(Array.isArray(user?.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
+}
+
+// Perfiles atados a su local (Alcance Local o Multilocal, vendedores y jefaturas de sucursal):
+// nunca ven datos de otros locales, aunque el proceso esté asignado a su cargo.
+function isLocalBound(user) {
+  if (!user || isExperienceUser(user)) return false
+  if (["GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "GERENCIA_ADMINISTRACION", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)) return false
+  return ["LOCAL", "MULTILOCAL"].includes(user.scope) || ["VENDEDOR", "JEFATURA_LOCAL"].includes(user.role)
+}
+
+function matchesUserLocal(user, local) {
+  return userLocals(user).some((value) => sameText(value, local) || localMatches(value, local))
+}
+
 function canSeeStoredRequest(user, item) {
   if (!user || !item) return false
   if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "GERENCIA_VENTAS", "GERENCIA_ADMINISTRACION"].includes(user.role)) return true
@@ -106,10 +123,10 @@ function canSeeStoredRequest(user, item) {
   if ((item.participants || []).some((value) => sameText(value, email))) return true
   const audience = item.audience || {}
   if ((audience.emails || []).some((value) => sameText(value, email))) return true
-  if ((audience.roles || []).includes(user.role)) return true
+  // Asignada al cargo (24_AsignacionesProceso): a un perfil de local solo le llega si es de su local.
+  if ((audience.roles || []).includes(user.role) && (!isLocalBound(user) || !item.local || matchesUserLocal(user, item.local))) return true
   if (["JEFATURA_LOCAL", "GERENCIA_MARCA", "JEFATURA_MARCA", "JEFATURA_ZONAL"].includes(user.role)) {
-    const locals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
-    if (locals.some((local) => sameText(local, item.local) || localMatches(local, item.local))) return true
+    if (matchesUserLocal(user, item.local)) return true
     if (user.role === "GERENCIA_MARCA" && canAccessRouteLocal(user, item.local)) return true
   }
   return false

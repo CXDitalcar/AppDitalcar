@@ -156,9 +156,11 @@ export default function RutaExperiencia({ currentUser }: { currentUser: UserScop
       if (byBrand.length) return byBrand
     }
 
+    // Sin locales propios, solo un perfil de red (Alcance Red, no vendedor) puede elegir cualquier local,
+    // igual que valida la API. Un perfil de local nunca ve la lista de otros locales.
+    if (!explicit.length && currentUser.scope === "RED" && currentUser.role !== "VENDEDOR") return routeLocals
     const configured = getLocalOptions(currentUser).options
-    const valid = configured.filter((local) => routeLocals.includes(local))
-    return valid.length ? valid : routeLocals
+    return configured.filter((local) => routeLocals.includes(local))
   }, [currentUser])
 
   const readOnly = draft.status === "SUBMITTED"

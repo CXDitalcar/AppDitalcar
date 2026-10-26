@@ -34,6 +34,14 @@ function userHasLocal(user: UserScope, local: string) {
   return locals.includes(target) || [user.local, user.localPrincipal, ...(user.assignedLocals ?? [])].some((value) => localMatches(value, local))
 }
 
+// Perfiles atados a su local (Alcance Local o Multilocal, vendedores y jefaturas de sucursal):
+// nunca ven datos de otros locales. Debe coincidir con isLocalBound en api/src/index.js.
+export function isLocalBound(user: UserScope) {
+  if (hasExperienceAccess(user)) return false
+  if (["GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "GERENCIA_ADMINISTRACION", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role)) return false
+  return user.scope === "LOCAL" || user.scope === "MULTILOCAL" || user.role === "VENDEDOR" || user.role === "JEFATURA_LOCAL"
+}
+
 function isGeelyLocal(local: string) {
   return normalized(local).includes("geely")
 }
@@ -80,7 +88,9 @@ export function canViewRequest(
   if (normalized(request.managementOwnerEmail) === email) return true
   if ((request.participants ?? []).some((value) => normalized(value) === email)) return true
   if ((request.audience?.emails ?? []).some((value) => normalized(value) === email)) return true
-  if ((request.audience?.roles ?? []).includes(user.role)) return true
+  // Lo asignado al cargo o al proceso le llega a un perfil de local solo si es de su local.
+  const ownLocal = !isLocalBound(user) || !request.local || userHasLocal(user, request.local)
+  if ((request.audience?.roles ?? []).includes(user.role) && ownLocal) return true
 
   if (user.role === "GERENCIA_MARCA") {
     // La Gerencia de Marca ve los locales asignados a su perfil.
@@ -102,7 +112,7 @@ export function canViewRequest(
     return !isGeelyLocal(request.local) && !isStellantisLocal(request.local)
   }
 
-  return assignments.some(
+  return ownLocal && assignments.some(
     (assignment) =>
       assignment.processCode === request.processCode &&
       assignmentMatchesUser(user, assignment)
