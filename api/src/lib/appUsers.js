@@ -76,12 +76,26 @@ export async function saveAppUser(input, actorEmail) {
 
 // Importación masiva desde Excel (Usuarios › Importar Excel). Crea o actualiza usuarios APP.
 // No toca a quienes ya vienen del directorio oficial (LIST/Excel conectado).
+function placeholderName(user) {
+  const name = String(user?.name || "").trim().toLowerCase()
+  const email = String(user?.email || "").trim().toLowerCase()
+  return !name || name === email || name === email.split("@")[0]
+}
+
 export async function importAppUsers(users, actorEmail) {
   const summary = { leidos: users.length, nuevos: 0, actualizados: 0, omitidos: 0, errores: [] }
   for (const item of users) {
     try {
       const existing = await getUser(normalizeEmail(item.email))
-      if (existing && existing.source !== "APP" && existing.passwordHash) { summary.omitidos += 1; continue }
+      if (existing && existing.source !== "APP" && existing.passwordHash) {
+        // Cuenta ya activada: no se tocan rol, locales ni clave. Solo se completa el nombre
+        // si hoy es el correo o su inicio (por ejemplo "flee" en vez de "Florencia Lee").
+        if (placeholderName(existing) && item.name && item.name !== item.email) {
+          await upsertUser({ ...existing, name: String(item.name).trim().slice(0, 120) })
+          summary.actualizados += 1
+        } else summary.omitidos += 1
+        continue
+      }
       await saveAppUser({
         mode: existing ? "update" : "create",
         email: item.email,
