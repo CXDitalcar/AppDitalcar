@@ -31,7 +31,7 @@ export function clasificar(ruta) {
   const marca = buscar(carpeta) || buscar(nombre) || null
   const tipo = /FLOTA|FLOTILLA|B2B/.test(nombre)
     ? "FLOTA"
-    : /ACCIONES COMERCIALES|AA\.?CC|CIRCULAR|INFORMATIVO|LANZAMIENTO|POLITICA|AUTODAY|\b(AP|AC|FT|JEEP|RAM|LPM)\s?0\d\d\b/.test(nombre)
+    : /ACCIONES COMERCIALES|AA\.?CC|CIRCULAR|INFORMATIVO|LANZAMIENTO|POLITICA|AUTODAY|BOLETIN|PROCEDIMIENTO|FICHA TECNICA|MANTENCION|PAUTA|COMPARATIVO|TOP ?5|WELCOME|\b(AP|AC|FT|JEEP|RAM|LPM|GPV)\s?0\d\d\b/.test(nombre)
       ? "CIRCULAR"
       : "RETAIL"
   return { marca, tipo }
@@ -71,16 +71,18 @@ function leerCheryRetail(paginas) {
 }
 
 // "Lista de Precios 21 OCTUBRE 2026" → vigente del 21 al último día del mes (o hasta la fecha que diga el PDF).
+// Sin día ("Lista de Precios AGOSTO 2026") → desde el 1.
 function periodoDesdeTitulo(t) {
   const meta = { titulo: null, canal: null, desde: null, hasta: null, observaciones: [], avisos: [] }
-  const m = t.match(/LISTA DE PRECIOS\s+(\d{1,2})\s+([A-Z]+)/)
+  const m = t.match(/LISTA DE PRECIOS?\s+(?:(\d{1,2})\s+)?([A-Z]+)/)
   const y = t.match(/\b(20\d\d)\b/)
   if (m && y && MESES[m[2]]) {
     const mes = MESES[m[2]]
     const anio = +y[1]
     const ultimo = diasMes(anio, mes)
-    meta.titulo = `Lista de Precios ${m[1]} ${m[2][0] + m[2].slice(1).toLowerCase()} ${anio}`
-    meta.desde = `${anio}-${p2(mes)}-${p2(+m[1])}`
+    const dia = m[1] ? +m[1] : 1
+    meta.titulo = `Lista de Precios ${m[1] ? `${m[1]} ` : ""}${m[2][0] + m[2].slice(1).toLowerCase()} ${anio}`
+    meta.desde = `${anio}-${p2(mes)}-${p2(dia)}`
     meta.hasta = `${anio}-${p2(mes)}-${p2(ultimo)}`
     const v = t.match(/HASTA EL (\d{1,2}) DE ([A-Z]+)/)
     if (v && MESES[v[2]] && +v[1] > diasMes(anio, MESES[v[2]])) meta.avisos.push(`El PDF dice vigencia hasta el ${v[1]} de ${v[2].toLowerCase()}; se usó el último día real del mes (${ultimo}).`)
@@ -120,7 +122,8 @@ function leerGeely(itemsPorPagina, paginas) {
       const valores = resto.filter((i) => /^\$?[\d.]+%?$|^\$[\d.]+$/.test(i.s.replace(/\s/g, "")))
       if (!valores.length) {
         const s = linea.items.map((i) => i.s).join(" ").trim()
-        if (/^[A-Z0-9][A-Z0-9 \-+]{1,30}$/.test(s) && !/LISTA|VIGENTE|PRECIO|BONO|GMC|VEHICULOS|INCENTIVO/.test(sinTildes(s).toUpperCase())) familia = s
+        // Títulos de familia sin montos ("GX3", "COOLRAY LITE", "EX5 EM-i"; pueden traer minúsculas).
+        if (/^[A-Z0-9][A-Za-z0-9 \-+]{1,30}$/.test(s) && !/LISTA|VIGENTE|PRECIO|BONO|GMC|VEHICULOS|INCENTIVO|COMBUSTION|ENERGIAS/.test(sinTildes(s).toUpperCase())) familia = s
         continue
       }
       if (!familia || !primero) continue

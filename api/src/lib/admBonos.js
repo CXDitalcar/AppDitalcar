@@ -22,7 +22,9 @@ const neto = (bruto) => Math.round((bruto || 0) / IVA)
 /* ---------------- Enlace de modelos ---------------- */
 // Chery: mismo enlace del paquete (parecido de palabras dentro de la familia; bajo 60 % no se enlaza).
 const SIN_CHERY = { "4WD": "4X4", "2WD": "4X2", AT: "AUT", CVT: "AUT", DCT: "AUT", MT: "MT" }
-const tokensChery = (n) => new Set(sinTildes(n).toUpperCase().replace(/[()]/g, " ").split(/\s+/)
+// SIGA agrega la norma al nombre ("TIGGO 2 PRO MAX GLX MT (EURO 6C)"): no es parte del modelo.
+const sinNorma = (n) => sinTildes(n).toUpperCase().replace(/\(?\bEURO\s*\w+\)?/g, " ")
+const tokensChery = (n) => new Set(sinNorma(n).replace(/[()]/g, " ").split(/\s+/)
   .filter((t) => t && !/^\d\.\d+T?D?$/.test(t) && t !== "ORIGINAL").map((t) => SIN_CHERY[t] || t))
 const familiaChery = (n) => sinTildes(n).toUpperCase().match(/^(TIGGO \d( PRO MAX| PRO)?|HIMLA|ARRIZO \d( PRO)?)/)?.[1] || null
 
@@ -50,7 +52,7 @@ function enlazarChery(modeloSistema, filas) {
 const SIN = { "+": "PLUS", "4WD": "4X4", "2WD": "4X2", CVT: "AUT", DCT: "AUT", AT: "AUT", DDCT6: "AUT", AT6: "AUT", MT6: "MT", CD: "CREW", "EM-I": "EMI" }
 const RUIDO = new Set(["NEW", "MCA", "GF", "GK", "GL", "ORIGINAL", "CAB", "FWD", "MY26", "MY27",
   "CHERY", "GEELY", "PEUGEOT", "CITROEN", "JEEP", "FIAT", "RAM", "LEAPMOTOR", "OPEL"])
-const tokens = (n) => [...new Set(sinTildes(n).toUpperCase().replace(/[()]/g, " ").replace(/\+/g, " + ").split(/\s+/)
+const tokens = (n) => [...new Set(sinNorma(n).replace(/[()]/g, " ").replace(/\+/g, " + ").split(/\s+/)
   .filter(Boolean).map((t) => SIN[t] || t).filter((t) => !/^\d\.\dT?D?$/.test(t) && !RUIDO.has(t)))]
 
 function enlazarGeneral(modeloSistema, filas) {
@@ -64,14 +66,18 @@ function enlazarGeneral(modeloSistema, filas) {
     const tl = tokens(fila.modelo)
     if (!tl.length) continue
     const inter = tl.filter((t) => set.has(t)).length
-    candidatos.push({ puntaje: (inter / tl.length + inter / ts.length) / 2, fila })
+    candidatos.push({ puntaje: (inter / tl.length + inter / ts.length) / 2, cubre: inter === ts.length, fila })
   }
   if (!candidatos.length) return null
   candidatos.sort((a, b) => b.puntaje - a.puntaje || a.fila.linea - b.fila.linea)
   const mejor = candidatos[0]
   if (mejor.puntaje < 0.5) return null
-  const empate = candidatos.length > 1 && Math.abs(candidatos[1].puntaje - mejor.puntaje) < 1e-9
-  return { fila: mejor.fila, puntaje: Math.round(mejor.puntaje * 1000) / 1000, porConfirmar: empate || mejor.puntaje < 1 }
+  // Empate solo si otra versión distinta tiene el mismo puntaje (filas repetidas de la misma versión no cuentan).
+  const clave = (f) => tokens(f.modelo).sort().join(" ")
+  const empate = candidatos.some((c) => c !== mejor && Math.abs(c.puntaje - mejor.puntaje) < 1e-9 && clave(c.fila) !== clave(mejor.fila))
+  // SIGA suele omitir la transmisión ("Coolray Lite Pop" ↔ "Coolray Lite Pop MT"): si todas sus palabras
+  // están en una sola versión de la lista, el enlace es firme.
+  return { fila: mejor.fila, puntaje: Math.round(mejor.puntaje * 1000) / 1000, porConfirmar: empate || !mejor.cubre }
 }
 
 export function enlazarModelo(marca, modeloSistema, filas) {
@@ -128,11 +134,21 @@ export function bonoDeFila(marca, fila, cond) {
 
 const enVigencia = (fecha, lista) => Boolean(fecha) && lista.desde <= fecha && fecha <= lista.hasta
 
-// Entre listas vigentes de la misma marca para una fecha, la más completa (más modelos) y la más reciente.
+// Entre listas vigentes de la misma marca para una fecha manda la más reciente (la que empieza más tarde,
+// p. ej. "SEPT PRE CYBER" desde el 21 reemplaza a "SEPT" desde el 1); luego la más completa.
 function listaVigente(listas, marca, fecha) {
   return listas
     .filter((l) => l.marca === marca && enVigencia(fecha, l))
-    .sort((a, b) => b.filas.length - a.filas.length || String(b.cargadoEn).localeCompare(String(a.cargadoEn)))[0]
+    .sort((a, b) => String(b.desde).localeCompare(String(a.desde)) || b.filas.length - a.filas.length || String(b.cargadoEn).localeCompare(String(a.cargadoEn)))[0]
+}
+
+// Ventas que no son retail de vehículo nuevo: usados, flota (va aparte) y ventas internas de administración.
+export function tipoVenta(local) {
+  const t = sinTildes(local).toUpperCase()
+  if (/USADO|SEMINUEVO/.test(t)) return "USADO"
+  if (/FLOTA/.test(t)) return "FLOTA"
+  if (/ADMINISTRACION/.test(t)) return "INTERNA"
+  return "RETAIL"
 }
 
 // nvs: [{ nv, marca, modelo, fechaFactura, fechaNV, nFactura, local, institucionCredito, tipoCredito, nula }]
@@ -141,8 +157,11 @@ export function calcularBonos({ listas, nvs, condiciones = {}, marca }) {
   const marcaKey = sinTildes(marca).toUpperCase()
   const filas = []
   const sinLista = []
+  const excluidas = { USADO: 0, FLOTA: 0, INTERNA: 0 }
   for (const nv of nvs) {
     if (nv.nula || !sinTildes(nv.marca).toUpperCase().replace(/\.$/, "").includes(marcaKey)) continue
+    const tipo = tipoVenta(nv.local)
+    if (tipo !== "RETAIL") { excluidas[tipo]++; continue }
     const fecha = nv.fechaFactura || nv.fechaNV
     const lista = listaVigente(listas, marcaKey, fecha)
     if (!lista) {
@@ -186,6 +205,7 @@ export function calcularBonos({ listas, nvs, condiciones = {}, marca }) {
       bruto: conBono.reduce((s, f) => s + f.bono.bruto, 0),
       porRevision: filas.reduce((acc, f) => ({ ...acc, [f.revision]: (acc[f.revision] || 0) + 1 }), {}),
       sinLista: sinLista.length,
+      excluidas,
     },
   }
 }

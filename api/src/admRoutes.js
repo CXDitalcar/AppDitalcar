@@ -8,7 +8,7 @@ import { readMaster } from "./lib/datosStore.js"
 import { sha256 } from "./lib/admPdf.js"
 import { leerArchivo } from "./lib/admLectores.js"
 import { calcularBonos } from "./lib/admBonos.js"
-import { saveBrandModels } from "./lib/catalogoDatos.js"
+import { readModelCatalog, saveBrandModels } from "./lib/catalogoDatos.js"
 import { getLista, listCondiciones, listListas, listasConFilas, readOriginal, saveCondicion, saveLista } from "./lib/admStore.js"
 
 const CONTABILIDAD_ROLES = new Set(["JEFATURA_ADMINISTRACION", "GERENCIA_ADMINISTRACION"])
@@ -38,6 +38,19 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
     }
   }
 
+  // El catálogo de modelos de una marca solo se reemplaza con una lista igual o más nueva que la que tiene
+  // (al subir varios meses juntos no debe quedar una lista antigua). Entradas antiguas sin vigencia se comparan por mes.
+  async function actualizarCatalogoSiEsNueva({ marca, desde, filas, archivo, user }) {
+    const nombre = NOMBRE_MARCA[marca] || marca
+    const catalogo = await readModelCatalog()
+    const actual = Object.entries(catalogo).find(([k]) => k.normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase() === marca)?.[1]
+    const vigente = actual?.desde || String(actual?.at || "").slice(0, 7)
+    if (vigente && String(desde) < vigente) return 0
+    const modelos = [...new Set(filas.map((f) => f.modelo).filter(Boolean))]
+    await saveBrandModels(nombre, modelos, { fileName: archivo, at: new Date().toISOString(), by: user.email, desde })
+    return modelos.length
+  }
+
   // Lee un archivo, lo guarda y, si es una lista retail leída, actualiza el catálogo de modelos.
   async function procesar({ sha, buffer, archivo, ruta, user, original = true }) {
     const lectura = await leerArchivo(buffer, ruta || archivo)
@@ -45,11 +58,22 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
     const lista = await saveLista({ sha, buffer, archivo, ruta, lectura, cargadoPor: user.email, original })
     let catalogo = 0
     if (lectura.estado === "OK" && lectura.tipo === "RETAIL" && lectura.marca && lectura.filas.length) {
-      const modelos = [...new Set(lectura.filas.map((f) => f.modelo).filter(Boolean))]
-      await saveBrandModels(NOMBRE_MARCA[lectura.marca] || lectura.marca, modelos, { fileName: archivo, at: new Date().toISOString(), by: user.email })
-      catalogo = modelos.length
+      catalogo = await actualizarCatalogoSiEsNueva({ marca: lectura.marca, desde: lectura.meta.desde, filas: lectura.filas, archivo, user })
     }
     return { lista, catalogo }
+  }
+
+  // Deja en el catálogo, por marca, los modelos de su lista retail más reciente.
+  async function restaurarCatalogo(user) {
+    const listas = await listasConFilas()
+    const marcas = [...new Set(listas.map((l) => l.marca).filter(Boolean))]
+    for (const marca of marcas) {
+      const nueva = listas.filter((l) => l.marca === marca).sort((a, b) => String(b.desde).localeCompare(String(a.desde)) || b.filas.length - a.filas.length)[0]
+      const nombre = NOMBRE_MARCA[marca] || marca
+      const modelos = [...new Set(nueva.filas.map((f) => f.modelo).filter(Boolean))]
+      await saveBrandModels(nombre, modelos, { fileName: nueva.archivo, at: new Date().toISOString(), by: user.email, desde: nueva.desde })
+    }
+    return marcas.length
   }
 
   // Gestión › Datos: un archivo de la carpeta mensual por llamada (PDF o Excel), con su ruta en la carpeta.
@@ -87,7 +111,8 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
         const { lista } = await procesar({ sha: meta.sha, buffer, archivo: meta.archivo, ruta: meta.ruta, user, original: false })
         if (lista.estado === "OK") leidas++
       }
-      return json(200, { revisadas: pendientes.length, leidas, message: `${leidas} de ${pendientes.length} archivos pendientes se leyeron.` })
+      const marcas = await restaurarCatalogo(user)
+      return json(200, { revisadas: pendientes.length, leidas, message: `${leidas} de ${pendientes.length} archivos pendientes se leyeron. Catálogo actualizado con la lista más reciente de ${marcas} marcas.` })
     }),
   })
 
