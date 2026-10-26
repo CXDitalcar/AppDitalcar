@@ -200,6 +200,30 @@ function routeCounts(answers = []) {
   }, { compliant: 0, nonCompliant: 0, requested: 0 })
 }
 
+// Solicitud creada desde una brecha de la Ruta: queda vinculada en la Ruta aunque ya esté enviada.
+// originBreachId viene como "<id de la Ruta>-<id de la pregunta>".
+async function linkRouteRequest(item, user) {
+  const executionId = String(item?.originExecutionId || "")
+  const breachId = String(item?.originBreachId || "")
+  if (!executionId || !breachId.startsWith(`${executionId}-`)) return
+  const itemId = breachId.slice(executionId.length + 1)
+  const execution = await getRouteExecution(executionId)
+  if (!execution || !canSeeRouteExecution(user, execution)) return
+  const answers = Array.isArray(execution.answers) ? execution.answers : []
+  if (!answers.some((answer) => answer?.itemId === itemId)) return
+  const nextAnswers = answers.map((answer) => answer?.itemId === itemId ? { ...answer, linkedRequestId: item.id, resolutionMode: "REQUEST" } : answer)
+  await saveRouteExecution({ ...execution, answers: nextAnswers, ...routeCounts(nextAnswers) })
+}
+
+// Un borrador guardado desde el navegador no debe borrar un vínculo que la API ya registró.
+function keepLinkedRequests(answers, previousAnswers = []) {
+  return answers.map((answer) => {
+    if (answer?.linkedRequestId) return answer
+    const previous = previousAnswers.find((item) => item?.itemId === answer?.itemId)
+    return previous?.linkedRequestId ? { ...answer, linkedRequestId: previous.linkedRequestId, resolutionMode: "REQUEST" } : answer
+  })
+}
+
 function submittedDate(item) {
   return item?.submittedAt || item?.updatedAt || item?.createdAt || ""
 }
@@ -909,7 +933,7 @@ app.http("route-executions", {
       return json(403, { message: "No tienes acceso a realizar una Ruta o Auditoría para ese local." })
     }
 
-    const answers = Array.isArray(data.answers) ? data.answers : []
+    const answers = keepLinkedRequests(Array.isArray(data.answers) ? data.answers : [], previous?.answers)
     const counts = routeCounts(answers)
     const execution = {
       ...(previous || {}),
@@ -1008,6 +1032,7 @@ app.http("stored-requests", {
       authorEmail: user.email, authorName: user.name, createdAt: item.createdAt || new Date().toISOString(),
       comment: "Solicitud ingresada en DitalApp.",
     })
+    await linkRouteRequest(item, user).catch(() => null)
     return json(200, { request: publicRequest(item), warnings: [] })
   },
 })
