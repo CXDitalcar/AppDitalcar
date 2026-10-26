@@ -77,6 +77,8 @@ type KpiData = {
     uploadedAt?: string
   }
   stale?: boolean
+  // La API recorta el detalle a los locales de la persona (perfiles de local).
+  scopedToLocal?: boolean
   warning?: string
 }
 
@@ -371,6 +373,24 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
             </div>
           </section>
 
+          {/* Perfil de local: la API entrega solo las filas de su local (los totales de arriba son de la red). */}
+          {data.scopedToLocal ? (
+            detail.length > 0 && (
+              <section className="kpi-detail-card">
+                <div className="kpi-section-head">
+                  <div><span className="kpi-eyebrow">DETALLE DASHBOARD</span><strong>Tu local</strong></div>
+                </div>
+                <div className="kpi-detail-table-wrap">
+                  <table className="kpi-detail-table">
+                    <thead><tr><th>Marca</th><th>Sucursal</th><th>Ventas</th><th>Facturadas</th><th>Meta</th><th>% meta</th></tr></thead>
+                    <tbody>
+                      {detail.map((row) => <DetailRow row={row} key={`${row.row}-${row.brand}-${row.local}`} />)}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )
+          ) : (
           <section className="kpi-detail-card">
             <div className="kpi-section-head">
               <div><span className="kpi-eyebrow">DETALLE DASHBOARD</span><strong>Marca y sucursal</strong></div>
@@ -391,6 +411,7 @@ export default function KPI({ currentUser }: { currentUser: UserScope }) {
               </table>
             </div>
           </section>
+          )}
         </>
       )}
     </div>

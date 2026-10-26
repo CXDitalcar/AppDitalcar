@@ -113,6 +113,15 @@ function matchesUserLocal(user, local) {
   return userLocals(user).some((value) => sameText(value, local) || localMatches(value, local))
 }
 
+// KPI para un perfil de local: totales de la red y evolución, y en el detalle solo las filas de sus locales
+// (sin totales por marca, que suman otros locales, ni la foto del tablero de la red).
+function kpiFor(user, snapshot) {
+  if (!isLocalBound(user)) return snapshot
+  const detail = (snapshot.detail || []).filter((row) => row.type === "detail" && matchesUserLocal(user, row.local))
+  const { photo: _photo, ...meta } = snapshot.meta || {}
+  return { ...snapshot, detail, meta, scopedToLocal: true }
+}
+
 function canSeeStoredRequest(user, item) {
   if (!user || !item) return false
   if (["EXPERIENCIA_CLIENTES", "PROJECT_MANAGER", "GERENCIA_VENTAS", "GERENCIA_ADMINISTRACION"].includes(user.role)) return true
@@ -799,6 +808,8 @@ app.http("kpi-photo", {
   handler: async (request) => {
     const user = await currentUser(request)
     if (!user) return json(401, { message: "Sesión no válida." })
+    // La foto muestra el tablero de toda la red: no se entrega a perfiles de local.
+    if (isLocalBound(user)) return json(403, { message: "La foto del dashboard es solo para perfiles de red." })
     const snapshot = await getKpiSnapshot()
     const blobName = snapshot?.meta?.photo?.blobName
     if (!blobName) return json(404, { message: "Sin foto KPI." })
@@ -815,7 +826,7 @@ app.http("kpi-data", {
     const user = await currentUser(request)
     if (!user) return json(401, { message: "Sesión no válida." })
     const snapshot = await getKpiSnapshot()
-    if (snapshot) return json(200, { ...snapshot, stale: false })
+    if (snapshot) return json(200, { ...kpiFor(user, snapshot), stale: false })
     return json(503, { message: "Todavía no existe un snapshot KPI válido. La fuente se carga en Gestión › Datos." })
   },
 })
