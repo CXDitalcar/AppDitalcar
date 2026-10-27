@@ -1,7 +1,7 @@
 // Interfaces separadas por tema, con su propio link y el mismo ingreso/usuarios.
 // Al entrar por su ruta (o por un dominio propio que empiece con su nombre), la pestaña
 // queda en esa interfaz hasta salir con "Ir a DitalApp completa".
-export type InterfaceId = "showroom" | "contabilidad"
+export type InterfaceId = "showroom" | "academia" | "adm"
 
 export const INTERFACES: Record<InterfaceId, { name: string; description: string; home: string; host: RegExp }> = {
   showroom: {
@@ -10,11 +10,17 @@ export const INTERFACES: Record<InterfaceId, { name: string; description: string
     home: "/showroom",
     host: /^showroom\./i,
   },
-  contabilidad: {
-    name: "Contabilidad",
-    description: "Listas de precio de marca y bonos por cobrar por NV.",
-    home: "/contabilidad",
-    host: /^contabilidad\./i,
+  academia: {
+    name: "Academia DITALCAR",
+    description: "Cursos, modelo CONSULTA y material para tu día a día.",
+    home: "/academia-ditalcar",
+    host: /^academia\./i,
+  },
+  adm: {
+    name: "Administración de Ventas",
+    description: "Seguimiento de notas de venta, patentes, transferencias y bonos por marca.",
+    home: "/adm-ventas",
+    host: /^(adm|administracion)\./i,
   },
 }
 
@@ -36,12 +42,6 @@ export function currentInterface(): InterfaceId | null {
   } catch {
     return byPath ?? null
   }
-}
-
-// Abre una ruta dentro de una interfaz (por ejemplo, los formularios se realizan en Gestión de Showroom).
-export function enterInterface(id: InterfaceId, path: string) {
-  try { sessionStorage.setItem(KEY, id) } catch { /* sin almacenamiento */ }
-  window.location.assign(path)
 }
 
 export function leaveInterface() {
