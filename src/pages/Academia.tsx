@@ -32,7 +32,7 @@ import {
   Users,
   XCircle,
 } from "lucide-react"
-import { useSearchParams } from "react-router-dom"
+import { Link, useSearchParams } from "react-router-dom"
 import type { UserScope } from "../types"
 import { academyQuestions, type AcademyQuestion } from "../data/academyQuestions"
 import {
@@ -193,7 +193,8 @@ const TAB_LABELS: Record<AcademyTab, string> = {
   BIBLIOTECA: "Biblioteca",
 }
 
-export default function Academia({ currentUser }: { currentUser: UserScope }) {
+// embedded: dentro de la interfaz "Academia DITALCAR" (la portada propia reemplaza al encabezado y a "Tu ruta de hoy").
+export default function Academia({ currentUser, embedded = false }: { currentUser: UserScope; embedded?: boolean }) {
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedTab = searchParams.get("tab")?.toUpperCase() as AcademyTab | undefined
   const initialTab: AcademyTab = [
@@ -215,7 +216,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const [selectedJuniorPlaybook, setSelectedJuniorPlaybook] = useState(
     juniorPlaybooks[0]?.id ?? ""
   )
-  const [selectedCourse, setSelectedCourse] = useState<string | null>(null)
+  // ?curso=ID abre directamente ese curso (por ejemplo, desde "Continuar" en la portada).
+  const [selectedCourse, setSelectedCourse] = useState<string | null>(searchParams.get("curso"))
   const [courseSearch, setCourseSearch] = useState("")
   const [brandFilter, setBrandFilter] = useState("Todas")
   const [localFilter, setLocalFilter] = useState("Todos")
@@ -413,6 +415,14 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
     if (!tabHasContent[tab]) setTab("MODELO")
   }, [tab, tabHasContent.CURSOS, tabHasContent.EVALUACIONES, tabHasContent.BIBLIOTECA, tabHasContent.PLAYBOOKS])
 
+  // Al llegar con ?curso=ID, se muestra ese curso abierto en pantalla.
+  useEffect(() => {
+    const id = searchParams.get("curso")
+    if (!id) return
+    const timer = window.setTimeout(() => document.getElementById(`curso-${id}`)?.scrollIntoView({ behavior: "smooth", block: "start" }), 250)
+    return () => window.clearTimeout(timer)
+  }, [])
+
   function changeTab(next: AcademyTab) {
     setTab(next)
     setSearchParams({ tab: next.toLowerCase() })
@@ -482,7 +492,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
   const favoritesCount = state.favorites.length
 
   return (
-    <div className="academy-page">
+    <div className={`academy-page ${embedded ? "academy-embedded" : ""}`}>
+      {!embedded && (<>
       <section className="academy-hero">
         <div>
           <span className="academy-eyebrow">ACADEMIA DITALCAR · PILOTO</span>
@@ -643,6 +654,8 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
           </div>
         )}
       </section>
+
+      </>)}
 
       <nav className="academy-tabs academy-tabs-grouped" aria-label="Academia Ditalcar">
         {TAB_GROUPS.filter((group) => group.tabs.some((item) => tabHasContent[item])).map((group) => (
@@ -1115,7 +1128,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
               const open = selectedCourse === course.id
 
               return (
-                <article className={`course-card ${open ? "open" : ""}`} key={course.id}>
+                <article className={`course-card ${open ? "open" : ""}`} key={course.id} id={`curso-${course.id}`}>
                   <div className="course-top">
                     <div>
                       <span>{course.status}</span>
@@ -1149,15 +1162,21 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                       <i style={{ width: `${progress}%` }} />
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    className="course-action"
-                    onClick={() => setSelectedCourse(open ? null : course.id)}
-                  >
-                    {progress > 0 ? "Continuar" : "Ver módulos"} <ArrowRight size={15} />
-                  </button>
+                  {embedded ? (
+                    <Link className="course-action" to={`/academia-ditalcar/curso/${encodeURIComponent(course.id)}`}>
+                      {progress >= 100 ? "Repasar el curso" : progress > 0 ? "Continuar el curso" : "Entrar al curso"} <ArrowRight size={15} />
+                    </Link>
+                  ) : (
+                    <button
+                      type="button"
+                      className="course-action"
+                      onClick={() => setSelectedCourse(open ? null : course.id)}
+                    >
+                      {progress > 0 ? "Continuar" : "Ver módulos"} <ArrowRight size={15} />
+                    </button>
+                  )}
 
-                  {open && (
+                  {open && !embedded && (
                     <div className="course-modules">
                       {course.modules.map((module, index) => {
                         const completed = completedModules.includes(module.id)
@@ -1207,7 +1226,7 @@ export default function Academia({ currentUser }: { currentUser: UserScope }) {
                       })}
                     </div>
                   )}
-                  {open && (
+                  {open && !embedded && (
                     <AcademyFeedbackPanel
                       contentId={course.id}
                       contentType="CURSO"
