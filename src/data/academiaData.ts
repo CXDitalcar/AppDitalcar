@@ -1280,6 +1280,8 @@ export type CourseModule = {
   bullets?: string[]
   highlight?: string
   note?: string
+  // Video del módulo (YouTube, Vimeo, Microsoft Stream/SharePoint o archivo .mp4). Opcional.
+  video?: string
 }
 
 export type AcademyCourse = {
@@ -1307,7 +1309,7 @@ function module(
   detail: string,
   available = true,
   releaseLabel?: string,
-  extra?: Pick<CourseModule, "bullets" | "highlight" | "note">
+  extra?: Pick<CourseModule, "bullets" | "highlight" | "note" | "video">
 ): CourseModule {
   return { id, title, duration, detail, available, releaseLabel, ...extra }
 }
