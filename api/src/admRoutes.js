@@ -1,15 +1,28 @@
 // Contabilidad (interfaz /contabilidad): listas de precio de marca y bonos por cobrar por NV.
 // - La carpeta mensual de listas se sube una sola vez en Gestión › Datos (Experiencia): alimenta el
 //   catálogo de modelos y Contabilidad. Flota y circulares se guardan aparte.
-// - Contabilidad la ven solo Administración (Jefatura y Gerencia) y Experiencia/PM.
-//   Debe coincidir con src/services/contabilidadAccess.ts.
+// - Contabilidad la ven Administración (Jefatura y Gerencia), Experiencia/PM y los correos que Experiencia
+//   define en la config ADM_VENTAS_ACCESO (por defecto Bruno Reveco y Mónica Ulloa). La portada consulta
+//   /api/adm/acceso para saber si mostrar o no la interfaz.
 import { json, body } from "./lib/http.js"
+import { getAppConfig, setAppConfig } from "./lib/store.js"
 import { readMaster } from "./lib/datosStore.js"
 import { sha256 } from "./lib/admPdf.js"
 import { leerArchivo } from "./lib/admLectores.js"
 import { calcularBonos } from "./lib/admBonos.js"
 import { readModelCatalog, saveBrandModels } from "./lib/catalogoDatos.js"
 import { getLista, listCondiciones, listListas, listasConFilas, readOriginal, saveCondicion, saveLista } from "./lib/admStore.js"
+
+const ADM_CONFIG = "ADM_VENTAS_ACCESO"
+const ADM_DEFAULT_EMAILS = ["breveco@ditalcar.cl", "mulloa@ditalcar.cl"]
+async function admEmails() {
+  const stored = await getAppConfig(ADM_CONFIG).catch(() => null)
+  try {
+    const parsed = JSON.parse(String(stored?.value || "{}"))
+    if (Array.isArray(parsed.emails)) return parsed.emails.map((e) => String(e).toLowerCase())
+  } catch { /* usa la lista por defecto */ }
+  return ADM_DEFAULT_EMAILS
+}
 
 const CONTABILIDAD_ROLES = new Set(["JEFATURA_ADMINISTRACION", "GERENCIA_ADMINISTRACION"])
 const MAX_BYTES = 15 * 1024 * 1024
@@ -25,18 +38,42 @@ function mesDeRuta(ruta) {
 }
 
 export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
-  const canAccess = (user) => Boolean(user) && (isExperienceUser(user) || CONTABILIDAD_ROLES.has(user.role))
+  const canAccess = async (user) => Boolean(user) && (isExperienceUser(user) || CONTABILIDAD_ROLES.has(user.role) ||
+    (await admEmails()).includes(String(user.email || "").toLowerCase()))
   const handle = (allowed, fn) => async (request) => {
     try {
       const user = await currentUser(request)
       if (!user) return json(401, { message: "Sesión no válida." })
-      if (!allowed(user)) return json(403, { message: "Esta sección no está disponible para tu cargo." })
+      if (!(await allowed(user))) return json(403, { message: "Esta sección no está disponible para tu cargo." })
       return await fn(request, user)
     } catch (error) {
       console.error("admRoutes", error?.message)
       return json(500, { message: error?.message || "Error inesperado." })
     }
   }
+
+  // Quién puede entrar a Contabilidad. GET lo usa la portada; POST (solo Experiencia) edita la lista de correos.
+  app.http("adm-acceso", {
+    methods: ["GET", "POST"], authLevel: "anonymous", route: "adm/acceso",
+    handler: async (request) => {
+      try {
+        const user = await currentUser(request)
+        if (!user) return json(401, { message: "Sesión no válida." })
+        const manage = isExperienceUser(user)
+        const emails = await admEmails()
+        if (request.method === "GET") return json(200, { allowed: await canAccess(user), canManage: manage, ...(manage ? { emails } : {}) })
+        if (!manage) return json(403, { message: "Solo Experiencia puede cambiar quién entra." })
+        const data = await body(request)
+        const list = [...new Set((Array.isArray(data.emails) ? data.emails : []).map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))].slice(0, 30)
+        const bad = list.find((e) => !/^[^\s@]+@ditalcar\.cl$/.test(e))
+        if (bad) return json(400, { message: `"${bad}" no es un correo @ditalcar.cl.` })
+        await setAppConfig(ADM_CONFIG, JSON.stringify({ emails: list, updatedAt: new Date().toISOString(), updatedBy: user.email }))
+        return json(200, { allowed: true, canManage: true, emails: list, message: "Acceso guardado." })
+      } catch (error) {
+        return json(500, { message: error?.message || "Error inesperado." })
+      }
+    },
+  })
 
   // El catálogo de modelos de una marca solo se reemplaza con una lista igual o más nueva que la que tiene
   // (al subir varios meses juntos no debe quedar una lista antigua). Entradas antiguas sin vigencia se comparan por mes.
