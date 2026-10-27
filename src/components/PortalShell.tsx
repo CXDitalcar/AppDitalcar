@@ -30,17 +30,19 @@ type Props = {
   homePath?: string
   productName?: string
   avisosOverride?: number
+  // Interfaz Academia: el aviso cuenta solo cursos y evaluaciones pendientes (se actualiza al avanzar).
+  avisosKey?: "academia"
   onLeave?: () => void
 }
 
-export default function PortalShell({ children, currentUser, authenticatedUser, onLogout, viewAsOptions, viewAsEmail, onViewAs, showPilotFeedback, homePath = "/", productName, avisosOverride, onLeave }: Props) {
+export default function PortalShell({ children, currentUser, authenticatedUser, onLogout, viewAsOptions, viewAsEmail, onViewAs, showPilotFeedback, homePath = "/", productName, avisosOverride, avisosKey, onLeave }: Props) {
   const { pathname } = useLocation()
   const badges = useNavBadges(currentUser)
   const [accountOpen, setAccountOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const atHome = pathname === homePath
   // En este inicio, "Para hoy" incluye los cursos y evaluaciones asignados: el aviso suma ambos.
-  const avisos = avisosOverride ?? badges.inicio + badges.academia
+  const avisos = avisosKey === "academia" ? badges.academia : avisosOverride ?? badges.inicio + badges.academia
   const viewingAs = Boolean(authenticatedUser && currentUser && authenticatedUser.email !== currentUser.email)
 
   useEffect(() => { setAccountOpen(false); window.scrollTo(0, 0) }, [pathname])

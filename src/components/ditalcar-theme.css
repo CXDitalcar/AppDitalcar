@@ -150,6 +150,14 @@
 .auth-ditalcar .auth-back, .auth-ditalcar .auth-pilot-toggle { color: var(--dc-rojo); }
 .auth-ditalcar .auth-message { color: var(--dc-negro); }
 
+/* Tarjetas de acceso (portal-tile) sobre crema */
+.theme-ditalcar .portal-tile-link { color: var(--dc-negro); }
+.theme-ditalcar .portal-tile-text strong { color: var(--dc-negro); font-family: Montserrat, Inter, sans-serif; font-weight: 600; }
+.theme-ditalcar .portal-tile-text > span { color: var(--dc-texto-suave); }
+.theme-ditalcar .portal-tile-arrow { color: var(--dc-texto-suave); }
+.theme-ditalcar .portal-tile:hover { border-color: var(--dc-rojo); }
+.theme-ditalcar .portal-tile:hover .portal-tile-arrow { color: var(--dc-rojo); }
+
 /* Celular: logo y nombre del producto caben sin desbordar la barra */
 @media (max-width:560px){
   .theme-ditalcar .portal-product-brand{gap:8px;min-width:0}
