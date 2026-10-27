@@ -114,3 +114,10 @@ button.conta-brand-row{font:inherit;text-align:left;cursor:pointer;color:inherit
 button.conta-brand-row:hover{border-color:var(--c-rojo)}
 .conta-details summary{cursor:pointer;font-family:Montserrat,Inter,sans-serif;font-weight:600;font-size:16px}
 .conta-toolbar h2{margin:0}
+
+/* Acceso restringido (portada de Contabilidad) */
+.adm-closed{background:#FFFEF1;color:#1E1E1E;border-radius:16px;border-top:4px solid #9D202F;padding:28px;display:grid;gap:12px;max-width:560px;margin:40px auto}
+.adm-closed h1{margin:0;font-size:24px;color:#1E1E1E}
+.adm-closed p{margin:0;color:#5f5a4e;line-height:1.5}
+.adm-btn{display:inline-flex;align-items:center;gap:6px;justify-self:start;min-height:44px;padding:0 18px;border-radius:12px;border:0;background:#9D202F;color:#FFFEF1;font:inherit;font-weight:700;cursor:pointer}
+.adm-btn:hover{background:#86192a}
