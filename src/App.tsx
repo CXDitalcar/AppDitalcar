@@ -7,7 +7,9 @@ import Portal from "./pages/Portal"
 import Showroom from "./pages/Showroom"
 import AcademiaHome from "./pages/AcademiaHome"
 import CursoDitalcar from "./pages/CursoDitalcar"
-import AdmVentas from "./pages/AdmVentas"
+import Contabilidad from "./pages/Contabilidad"
+import { canAccessContabilidad } from "./services/contabilidadAccess"
+import { getAdmAccess } from "./services/admAccess"
 import { INTERFACES, currentInterface, leaveInterface } from "./services/interfaceMode"
 import { showroomTasks, useShowroomRequests } from "./services/showroomData"
 import { isExperienceProcess } from "./services/requestCatalog"
@@ -49,6 +51,28 @@ import {
 import type { UserScope } from "./types"
 import { canSeeDatos, canSeeSeguimiento, hasExperienceAccess } from "./services/experienceAccess"
 import { loadLocals } from "./services/localesStore"
+
+// La API decide quién entra a Contabilidad (roles de Administración, Experiencia/PM y correos autorizados).
+function ContabilidadGate({ currentUser }: { currentUser: UserScope }) {
+  const [allowed, setAllowed] = useState<boolean | null>(canAccessContabilidad(currentUser) ? true : null)
+  useEffect(() => {
+    if (allowed) return
+    getAdmAccess().then((a) => setAllowed(a.allowed))
+  }, [allowed])
+  if (allowed === null) return <div className="portal-page"><p>Cargando…</p></div>
+  if (!allowed) {
+    return (
+      <div className="portal-page">
+        <section className="adm-closed">
+          <h1>Este enlace es de uso restringido</h1>
+          <p>Tu cuenta no tiene acceso a esta sección. Si crees que debería tenerlo, pídeselo al equipo de Experiencia.</p>
+          <button type="button" className="adm-btn" onClick={leaveInterface}>Ir a DitalApp</button>
+        </section>
+      </div>
+    )
+  }
+  return <Contabilidad currentUser={currentUser} />
+}
 
 export default function App() {
   const [apiUser, setApiUser] = useState<UserScope | null>(null)
@@ -241,8 +265,8 @@ export default function App() {
     )
   }
 
-  // Link propio "Administración de Ventas" (/adm-ventas): acceso restringido (la API valida quién entra).
-  if (interfaceId === "adm") {
+  // Link propio "Contabilidad" (/contabilidad): Administración, Experiencia/PM y los correos autorizados.
+  if (interfaceId === "contabilidad") {
     return (
       <BrowserRouter>
         <PortalShell
@@ -252,14 +276,14 @@ export default function App() {
           viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
           viewAsEmail={viewAsUser?.email ?? baseUserEmail}
           onViewAs={experienceCanViewAs ? handleViewAs : undefined}
-          homePath={INTERFACES.adm.home}
-          productName={INTERFACES.adm.name}
+          homePath={INTERFACES.contabilidad.home}
+          productName={INTERFACES.contabilidad.name}
           avisosOverride={0}
           onLeave={leaveInterface}
         >
           <Routes>
-            <Route path="/adm-ventas" element={<AdmVentas currentUser={currentUser} />} />
-            <Route path="*" element={<Navigate to="/adm-ventas" replace />} />
+            <Route path="/contabilidad" element={<ContabilidadGate currentUser={currentUser} />} />
+            <Route path="*" element={<Navigate to="/contabilidad" replace />} />
           </Routes>
         </PortalShell>
       </BrowserRouter>
