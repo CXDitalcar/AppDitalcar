@@ -5,8 +5,9 @@ import Shell from "./components/Shell"
 import PortalShell from "./components/PortalShell"
 import Portal from "./pages/Portal"
 import Showroom from "./pages/Showroom"
-import Contabilidad from "./pages/Contabilidad"
-import { canAccessContabilidad } from "./services/contabilidadAccess"
+import AcademiaHome from "./pages/AcademiaHome"
+import CursoDitalcar from "./pages/CursoDitalcar"
+import AdmVentas from "./pages/AdmVentas"
 import { INTERFACES, currentInterface, leaveInterface } from "./services/interfaceMode"
 import { showroomTasks, useShowroomRequests } from "./services/showroomData"
 import { isExperienceProcess } from "./services/requestCatalog"
@@ -212,13 +213,8 @@ export default function App() {
     )
   }
 
-  // Link propio "Contabilidad" (/contabilidad): solo Administración y Experiencia/PM.
-  // A quien no le corresponde se le devuelve a DitalApp sin mostrar nada de Contabilidad.
-  if (interfaceId === "contabilidad") {
-    if (!canAccessContabilidad(currentUser)) {
-      leaveInterface()
-      return null
-    }
+  // Link propio "Academia DITALCAR" (/academia-ditalcar): portada con lo que sigue, cursos y material.
+  if (interfaceId === "academia") {
     return (
       <BrowserRouter>
         <PortalShell
@@ -228,14 +224,42 @@ export default function App() {
           viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
           viewAsEmail={viewAsUser?.email ?? baseUserEmail}
           onViewAs={experienceCanViewAs ? handleViewAs : undefined}
-          homePath={INTERFACES.contabilidad.home}
-          productName={INTERFACES.contabilidad.name}
+          homePath={INTERFACES.academia.home}
+          productName={INTERFACES.academia.name}
+          avisosKey="academia"
+          onLeave={leaveInterface}
+        >
+          <Routes>
+            <Route path="/academia-ditalcar" element={<AcademiaHome currentUser={currentUser} />} />
+            <Route path="/academia-ditalcar/curso/:courseId" element={<CursoDitalcar currentUser={currentUser} />} />
+            <Route path="/academia-ditalcar/curso/:courseId/:step" element={<CursoDitalcar currentUser={currentUser} />} />
+            <Route path="/academia" element={<Academia currentUser={currentUser} embedded />} />
+            <Route path="*" element={<Navigate to="/academia-ditalcar" replace />} />
+          </Routes>
+        </PortalShell>
+      </BrowserRouter>
+    )
+  }
+
+  // Link propio "Administración de Ventas" (/adm-ventas): acceso restringido (la API valida quién entra).
+  if (interfaceId === "adm") {
+    return (
+      <BrowserRouter>
+        <PortalShell
+          currentUser={currentUser}
+          authenticatedUser={baseUser}
+          onLogout={exitApi}
+          viewAsOptions={experienceCanViewAs ? viewAsOptions : undefined}
+          viewAsEmail={viewAsUser?.email ?? baseUserEmail}
+          onViewAs={experienceCanViewAs ? handleViewAs : undefined}
+          homePath={INTERFACES.adm.home}
+          productName={INTERFACES.adm.name}
           avisosOverride={0}
           onLeave={leaveInterface}
         >
           <Routes>
-            <Route path="/contabilidad" element={<Contabilidad currentUser={currentUser} />} />
-            <Route path="*" element={<Navigate to="/contabilidad" replace />} />
+            <Route path="/adm-ventas" element={<AdmVentas currentUser={currentUser} />} />
+            <Route path="*" element={<Navigate to="/adm-ventas" replace />} />
           </Routes>
         </PortalShell>
       </BrowserRouter>
