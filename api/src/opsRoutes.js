@@ -11,6 +11,18 @@ import { EVOLUTIVO_BASE, JUNIOR_FORMS, JUNIOR_LOCALS, TM_LOCALS, UMBRAL, compute
 import { computeGespark } from "./lib/gespark.js"
 
 const FROGMI_CONFIG = "datos/frogmi-config.json"
+const ADM_CONFIG = "ADM_VENTAS_ACCESO"
+const ADM_DEFAULT_EMAILS = ["breveco@ditalcar.cl", "mulloa@ditalcar.cl"]
+
+async function admEmails() {
+  const stored = await getAppConfig(ADM_CONFIG).catch(() => null)
+  try {
+    const parsed = JSON.parse(String(stored?.value || "{}"))
+    if (Array.isArray(parsed.emails)) return parsed.emails.map((e) => String(e).toLowerCase())
+  } catch { /* usa la lista por defecto */ }
+  return ADM_DEFAULT_EMAILS
+}
+
 const LOCAL_ROLES = new Set(["ASISTENTE_JUNIOR", "JEFATURA_LOCAL"])
 
 async function readFrogmiConfig() {
@@ -228,31 +240,6 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
       { local: "Mall Plaza Vespucio", usuario: "ditalcar.mpvvn@ditalcar.cl" },
     ],
   }
-  // Cuenta Frogmi de un local por su sector ("Nueva Tobalaba" antes que "Tobalaba").
-  // Misma regla que accountMatches en src/services/showroomAccess.ts.
-  function frogmiAccountMatches(accountLocal, local) {
-    const key = (value) => String(value || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase()
-    const a = key(accountLocal)
-    const l = key(local)
-    const word = ["NUEVA TOBALABA", "CANTAGALLO", "CANTA GALLO", "NORTE", "ALAMEDA", "VESPUCIO", "COSTANERA", "TOBALABA"].find((w) => l.includes(w))
-    if (!word) return false
-    if (word === "TOBALABA") return a.includes("TOBALABA") && !a.includes("NUEVA")
-    if (word === "CANTA GALLO") return a.includes("CANTAGALLO")
-    return a.includes(word)
-  }
-
-  // Cada persona recibe solo las cuentas Frogmi de sus locales (la clave, solo si tiene alguna).
-  // Experiencia, gerencias de red y perfiles de Alcance Red sin locales reciben todas.
-  function showroomAccessFor(user, config) {
-    const locals = [user.local, user.localPrincipal, ...(Array.isArray(user.assignedLocals) ? user.assignedLocals : [])].filter(Boolean)
-    const network = isExperienceUser(user) ||
-      ["GERENCIA_GENERAL", "GERENCIA_COMERCIAL", "GERENCIA_VENTAS", "JEFATURA_COMERCIAL_CLIENTES"].includes(user.role) ||
-      (!locals.length && user.scope === "RED" && user.role !== "VENDEDOR")
-    if (network) return config
-    const cuentas = (config.cuentas || []).filter((c) => locals.some((local) => frogmiAccountMatches(c.local, local)))
-    return { ...config, cuentas, clave: cuentas.length ? config.clave : "" }
-  }
-
   app.http("showroom-accesos", {
     methods: ["GET", "POST"], authLevel: "anonymous", route: "showroom/accesos",
     handler: handle(async (request) => {
@@ -261,7 +248,7 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
       const stored = await getAppConfig("SHOWROOM_ACCESOS")
       let config = { ...SHOWROOM_DEFAULTS }
       try { config = { ...config, ...JSON.parse(String(stored?.value || "{}")) } } catch { /* valores por defecto */ }
-      if (request.method === "GET") return json(200, showroomAccessFor(user, config))
+      if (request.method === "GET") return json(200, config)
       if (!isExperienceUser(user)) return forbidden()
       const data = await body(request)
       const url = (value, fallback) => {
@@ -281,6 +268,26 @@ export function registerOpsRoutes({ app, currentUser, isExperienceUser }) {
       }
       await setAppConfig("SHOWROOM_ACCESOS", JSON.stringify(next))
       return json(200, { ...next, message: "Accesos de Gestión de Showroom guardados." })
+    }),
+  })
+
+  // ================= ADMINISTRACIÓN DE VENTAS =================
+  // Acceso restringido: Experiencia/PM + la lista de correos que Experiencia define (por defecto Bruno y Mónica).
+  app.http("adm-acceso", {
+    methods: ["GET", "POST"], authLevel: "anonymous", route: "adm/acceso",
+    handler: handle(async (request) => {
+      const user = await currentUser(request)
+      if (!user) return json(401, { message: "Sesión no válida." })
+      const emails = await admEmails()
+      const allowed = isExperienceUser(user) || emails.includes(String(user.email || "").toLowerCase())
+      if (request.method === "GET") return json(200, { allowed, canManage: isExperienceUser(user), ...(isExperienceUser(user) ? { emails } : {}) })
+      if (!isExperienceUser(user)) return forbidden()
+      const data = await body(request)
+      const list = [...new Set((Array.isArray(data.emails) ? data.emails : []).map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))].slice(0, 30)
+      const bad = list.find((e) => !/^[^\s@]+@ditalcar\.cl$/.test(e))
+      if (bad) return json(400, { message: `"${bad}" no es un correo @ditalcar.cl.` })
+      await setAppConfig(ADM_CONFIG, JSON.stringify({ emails: list, updatedAt: new Date().toISOString(), updatedBy: user.email }))
+      return json(200, { allowed: true, canManage: true, emails: list, message: "Acceso guardado." })
     }),
   })
 
