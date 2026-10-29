@@ -190,7 +190,7 @@ export default function NuevaSolicitud({
     return {
       code: sourceExecution.formCode,
       name: sourceExecution.formCode === "FOR-AUD-RUTA-01" ? "Auditoría Ruta Experiencia" : "Ruta de Experiencia",
-      description: "Hallazgo generado dentro de DitalApp.",
+      description: "Hallazgo generado dentro de DITO.",
       url: "",
       frequency: "SEMANAL" as const,
       roles: [currentUser.role],

@@ -78,7 +78,7 @@ export default function Home({
     <div className="home-pilot-page">
       <section className="home-pilot-head">
         <div>
-          <span className="eyebrow">DITALAPP</span>
+          <span className="eyebrow">DITO</span>
           <h1>Hola, {firstName}</h1>
           <p>{branch} · aquí se concentra lo que necesita tu atención.</p>
         </div>

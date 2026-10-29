@@ -6,13 +6,15 @@ import {
   type BonoNv, type BonosRespuesta, type Canal, type CondicionNv, type EstadoLista, type ListaPrecio, type Revision,
 } from "../services/contabilidadApi"
 import type { UserScope } from "../types"
+import { CargarArchivos, ResumenAcumuladoCard } from "./ContabilidadCarga"
 import "./Contabilidad.css"
 
-type Tab = "resumen" | "bonos" | "listas"
+type Tab = "resumen" | "bonos" | "listas" | "cargar"
 const TABS: { id: Tab; label: string }[] = [
   { id: "resumen", label: "Resumen" },
   { id: "bonos", label: "Bonos por NV" },
   { id: "listas", label: "Listas de precio" },
+  { id: "cargar", label: "Cargar archivos" },
 ]
 
 const REVISION: Record<Revision, { label: string; hint: string }> = {
@@ -31,9 +33,10 @@ const fechaHora = (iso?: string | null) => (iso ? new Intl.DateTimeFormat("es-CL
 const nombreMes = (mes?: string | null) => (mes ? new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" }).format(new Date(`${mes}-15T12:00:00`)) : "Sin mes")
 
 // Interfaz "Contabilidad": bonos por cobrar a la marca por NV, calculados desde la lista de precios vigente.
-export default function Contabilidad({ currentUser }: { currentUser: UserScope }) {
+export default function Contabilidad({ currentUser, canManage = false }: { currentUser: UserScope; canManage?: boolean }) {
   const [params, setParams] = useSearchParams()
-  const tab = (TABS.find((t) => t.id === params.get("tab"))?.id ?? "resumen") as Tab
+  const tabs = TABS.filter((t) => t.id !== "cargar" || canManage)
+  const tab = (tabs.find((t) => t.id === params.get("tab"))?.id ?? "resumen") as Tab
   const [data, setData] = useState<BonosRespuesta | null>(null)
   const [error, setError] = useState("")
 
@@ -53,7 +56,7 @@ export default function Contabilidad({ currentUser }: { currentUser: UserScope }
       </header>
 
       <nav className="conta-tabs" aria-label="Secciones de Contabilidad">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button key={t.id} type="button" className={tab === t.id ? "active" : ""} aria-current={tab === t.id ? "page" : undefined}
             onClick={() => setParams(t.id === "resumen" ? {} : { tab: t.id })}>{t.label}</button>
         ))}
@@ -62,22 +65,23 @@ export default function Contabilidad({ currentUser }: { currentUser: UserScope }
       {error && <div className="conta-alert error"><AlertTriangle size={18} /> {error}</div>}
       {!data && !error && <div className="conta-card conta-muted">Cargando…</div>}
 
-      {data && tab === "resumen" && <Resumen data={data} onGo={(t, marca) => setParams(marca ? { tab: t, marca } : { tab: t })} />}
-      {data && tab === "bonos" && <Bonos data={data} marcaInicial={params.get("marca") ?? "TODAS"} onChanged={load} />}
-      {data && tab === "listas" && <Listas listas={data.listas} />}
+      {data && tab === "resumen" && <Resumen data={data} canManage={canManage} onGo={(t, marca) => setParams(marca ? { tab: t, marca } : { tab: t })} />}
+      {data && tab === "bonos" && <Bonos data={data} canManage={canManage} marcaInicial={params.get("marca") ?? "TODAS"} onChanged={load} />}
+      {data && tab === "listas" && <Listas listas={data.listas} canManage={canManage} />}
+      {tab === "cargar" && canManage && <CargarArchivos onDone={() => void load()} />}
     </div>
   )
 }
 
 /* ---------------- Resumen ---------------- */
-function Resumen({ data, onGo }: { data: BonosRespuesta; onGo: (tab: Tab, marca?: string) => void }) {
+function Resumen({ data, onGo, canManage }: { data: BonosRespuesta; onGo: (tab: Tab, marca?: string) => void; canManage: boolean }) {
   const retail = data.listas.filter((l) => l.tipo === "RETAIL" && l.estado === "OK")
   if (!retail.length) {
     return (
       <section className="conta-card conta-empty">
         <FileText size={30} />
         <h2>Aún no hay listas de precio leídas</h2>
-        <p>Las listas de cada mes se cargan en Gestión › Datos, en "Carpeta mensual de listas". Apenas estén, aquí verás los bonos por cobrar.</p>
+        <p>{canManage ? "Carga las listas del mes en la pestaña Cargar archivos. Apenas estén, aquí verás los bonos por cobrar." : "Apenas se carguen las listas del mes, aquí verás los bonos por cobrar."}</p>
       </section>
     )
   }
@@ -116,6 +120,7 @@ function Resumen({ data, onGo }: { data: BonosRespuesta; onGo: (tab: Tab, marca?
         Fuente de NV: SIGA cargado en Gestión › Datos{data.siga.actualizado ? ` (actualizado ${fechaHora(data.siga.actualizado)})` : ""}.
         Las listas de flota se llevan aparte y no se suman aquí.
       </p>
+      <ResumenAcumuladoCard />
     </>
   )
 }
@@ -130,7 +135,7 @@ function Kpi({ tone, label, value, hint, onClick }: { tone: "ok" | "warn" | "neu
 /* ---------------- Bonos por NV ---------------- */
 type FilaMarca = BonoNv & { marca: string; condiciones: CondicionNv[] }
 
-function Bonos({ data, marcaInicial, onChanged }: { data: BonosRespuesta; marcaInicial: string; onChanged: () => Promise<void> }) {
+function Bonos({ data, marcaInicial, onChanged, canManage }: { data: BonosRespuesta; marcaInicial: string; onChanged: () => Promise<void>; canManage: boolean }) {
   const [marca, setMarca] = useState(marcaInicial)
   const [filtro, setFiltro] = useState<Revision | "TODAS">("TODAS")
   const [buscar, setBuscar] = useState("")
@@ -200,17 +205,17 @@ function Bonos({ data, marcaInicial, onChanged }: { data: BonosRespuesta; marcaI
                 <td className="conta-conds">
                   {f.condiciones.includes("financia") && (
                     <span><small>{f.marca === "CHERY" ? "SCF" : "Crédito"}</small>
-                      <TriState value={f.financiaScf} busy={guardando === `${f.nv}-financia`} label={`Crédito NV ${f.nv}`} onChange={(v) => void cambiar(f, { financiaScf: v }, "financia")} />
+                      <TriState value={f.financiaScf} busy={!canManage || guardando === `${f.nv}-financia`} label={`Crédito NV ${f.nv}`} onChange={(v) => void cambiar(f, { financiaScf: v }, "financia")} />
                     </span>
                   )}
                   {f.condiciones.includes("retoma") && (
                     <span><small>Retoma</small>
-                      <TriState value={f.tieneRetoma} busy={guardando === `${f.nv}-retoma`} label={`Retoma NV ${f.nv}`} onChange={(v) => void cambiar(f, { tieneRetoma: v }, "retoma")} />
+                      <TriState value={f.tieneRetoma} busy={!canManage || guardando === `${f.nv}-retoma`} label={`Retoma NV ${f.nv}`} onChange={(v) => void cambiar(f, { tieneRetoma: v }, "retoma")} />
                     </span>
                   )}
                   {f.condiciones.includes("canal") && (
                     <span><small>Canal</small>
-                      <select className="conta-canal" value={f.canal ?? ""} disabled={guardando === `${f.nv}-canal`} aria-label={`Canal NV ${f.nv}`}
+                      <select className="conta-canal" value={f.canal ?? ""} disabled={!canManage || guardando === `${f.nv}-canal`} aria-label={`Canal NV ${f.nv}`}
                         onChange={(e) => void cambiar(f, { canal: (e.target.value || null) as Canal | null }, "canal")}>
                         <option value="">Sin confirmar</option>
                         {(Object.keys(CANAL) as Canal[]).map((c) => <option key={c} value={c}>{CANAL[c]}</option>)}
@@ -244,8 +249,8 @@ function TriState({ value, onChange, busy, label }: { value: boolean | null; onC
   )
 }
 
-/* ---------------- Listas de precio (solo consulta; se cargan en Gestión › Datos) ---------------- */
-function Listas({ listas }: { listas: ListaPrecio[] }) {
+/* ---------------- Listas de precio (consulta; se cargan en la pestaña Cargar archivos) ---------------- */
+function Listas({ listas, canManage }: { listas: ListaPrecio[]; canManage: boolean }) {
   const meses = [...new Set(listas.map((l) => l.mes || ""))].sort().reverse()
   const [mes, setMes] = useState(meses[0] ?? "")
   const delMes = listas.filter((l) => (l.mes || "") === mes)
@@ -258,7 +263,7 @@ function Listas({ listas }: { listas: ListaPrecio[] }) {
       <section className="conta-card conta-empty">
         <FileText size={30} />
         <h2>Aún no hay listas cargadas</h2>
-        <p>Se cargan una vez al mes en Gestión › Datos, en "Carpeta mensual de listas".</p>
+        <p>{canManage ? "Se cargan una vez al mes en la pestaña Cargar archivos." : "Aparecerán cuando se carguen las del mes."}</p>
       </section>
     )
   }
@@ -277,7 +282,7 @@ function Listas({ listas }: { listas: ListaPrecio[] }) {
             </label>
           )}
         </div>
-        <p className="conta-msg">Se cargan en Gestión › Datos. Las que dicen "Falta lector" quedan guardadas y se leen apenas se agregue el lector de su marca.</p>
+        <p className="conta-msg">Las que dicen "Falta lector" quedan guardadas y se leen apenas se agregue el lector de su marca.</p>
         <ListaArchivos items={retail} />
       </section>
 

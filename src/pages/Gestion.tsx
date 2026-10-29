@@ -7,6 +7,7 @@ import {
   Database,
   ShieldCheck,
   UsersRound,
+  Archive,
   type LucideIcon,
 } from "lucide-react"
 import SignalLight, { type SignalTone } from "../components/SignalLight"
@@ -26,6 +27,8 @@ type GestionProps = {
   // Usuarios y fuentes de datos: sólo con el perfil REAL de Experiencia
   // (no se habilita con "Ver como"). El backend también lo valida.
   showAdmin: boolean
+  // Interruptor, respaldo y vaciado: solo los 3 administradores de DITO.
+  showDitoAdmin?: boolean
 }
 
 type GestionItem = {
@@ -44,6 +47,7 @@ export default function Gestion({
   showKpi,
   showForms,
   showAdmin,
+  showDitoAdmin = false,
 }: GestionProps) {
   const operation: GestionItem[] = [
     showApprovals && {
@@ -115,6 +119,18 @@ export default function Gestion({
         },
       ]
     : []
+
+  if (showDitoAdmin) {
+    administration.push({
+      key: "dito-admin",
+      title: "Administración de DITO",
+      description: "Interruptor de implementación de la Ruta, respaldo y vaciado del detalle, evolutivos anteriores.",
+      to: "/dito-admin",
+      icon: Archive,
+      tone: "green",
+      status: "Solo administradores",
+    })
+  }
 
   return (
     <div className="gestion-page">
