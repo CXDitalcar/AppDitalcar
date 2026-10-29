@@ -8,7 +8,6 @@ import Showroom from "./pages/Showroom"
 import AcademiaHome from "./pages/AcademiaHome"
 import CursoDitalcar from "./pages/CursoDitalcar"
 import Contabilidad from "./pages/Contabilidad"
-import { canAccessContabilidad } from "./services/contabilidadAccess"
 import { getAdmAccess } from "./services/admAccess"
 import { INTERFACES, currentInterface, leaveInterface } from "./services/interfaceMode"
 import { showroomTasks, useShowroomRequests } from "./services/showroomData"
@@ -29,6 +28,8 @@ import KPI from "./pages/KPI"
 import Usuarios from "./pages/Usuarios"
 import RutaExperiencia from "./pages/RutaExperiencia"
 import Gestion from "./pages/Gestion"
+import AdminDito from "./pages/AdminDito"
+import { isDitoAdminUser } from "./services/ditoAccess"
 import Datos from "./pages/Datos"
 import Seguimiento from "./pages/Seguimiento"
 import SeguimientoMacro from "./pages/SeguimientoMacro"
@@ -54,24 +55,21 @@ import { loadLocals } from "./services/localesStore"
 
 // La API decide quién entra a Contabilidad (roles de Administración, Experiencia/PM y correos autorizados).
 function ContabilidadGate({ currentUser }: { currentUser: UserScope }) {
-  const [allowed, setAllowed] = useState<boolean | null>(canAccessContabilidad(currentUser) ? true : null)
-  useEffect(() => {
-    if (allowed) return
-    getAdmAccess().then((a) => setAllowed(a.allowed))
-  }, [allowed])
-  if (allowed === null) return <div className="portal-page"><p>Cargando…</p></div>
-  if (!allowed) {
+  const [access, setAccess] = useState<{ allowed: boolean; canManage: boolean } | null>(null)
+  useEffect(() => { getAdmAccess().then(setAccess) }, [])
+  if (!access) return <div className="portal-page"><p>Cargando…</p></div>
+  if (!access.allowed) {
     return (
       <div className="portal-page">
         <section className="adm-closed">
           <h1>Este enlace es de uso restringido</h1>
           <p>Tu cuenta no tiene acceso a esta sección. Si crees que debería tenerlo, pídeselo al equipo de Experiencia.</p>
-          <button type="button" className="adm-btn" onClick={leaveInterface}>Ir a DitalApp</button>
+          <button type="button" className="adm-btn" onClick={leaveInterface}>Ir a DITO</button>
         </section>
       </div>
     )
   }
-  return <Contabilidad currentUser={currentUser} />
+  return <Contabilidad currentUser={currentUser} canManage={access.canManage} />
 }
 
 export default function App() {
@@ -154,7 +152,7 @@ export default function App() {
   if (authLoading) {
     return (
       <div className="auth-loading-screen">
-        <strong>DitalApp</strong>
+        <strong>DITO</strong>
         <span>Validando sesión…</span>
       </div>
     )
@@ -344,6 +342,7 @@ export default function App() {
                   showKpi={canSeeKPI}
                   showForms={canSeeFormularios}
                   showAdmin={experienceCanViewAs}
+                  showDitoAdmin={isDitoAdminUser(currentUser)}
                 />
               ) : (
                 <Navigate to="/" replace />
@@ -376,6 +375,11 @@ export default function App() {
           />
 
           <Route path="/seguimiento/cliente" element={<ClienteFicha currentUser={currentUser} />} />
+
+          <Route
+            path="/dito-admin"
+            element={isDitoAdminUser(currentUser) ? <AdminDito /> : <Navigate to="/" replace />}
+          />
 
           <Route
             path="/datos"
