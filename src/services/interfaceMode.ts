@@ -1,6 +1,6 @@
 // Interfaces separadas por tema, con su propio link y el mismo ingreso/usuarios.
 // Al entrar por su ruta (o por un dominio propio que empiece con su nombre), la pestaña
-// queda en esa interfaz hasta salir con "Ir a DitalApp completa".
+// queda en esa interfaz hasta salir con "Ir a DITO".
 export type InterfaceId = "showroom" | "academia" | "contabilidad"
 
 export const INTERFACES: Record<InterfaceId, { name: string; description: string; home: string; host: RegExp }> = {

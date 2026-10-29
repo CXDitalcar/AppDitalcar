@@ -86,3 +86,11 @@ export function guardarCondicion(nv: string, cambio: { financiaScf?: boolean | n
     body: JSON.stringify({ nv, ...cambio }),
   })
 }
+
+export type ResumenAcumulado = {
+  generado: string
+  totalListas: number
+  listas: { marca: string; mes: string; archivos: number; leidas: number; porRevisar: number; filas: number }[]
+  cargas: { en: string; por: string; archivo: string; resultado: string; marca?: string; mes?: string; filas?: number }[]
+}
+export const getResumenAcumulado = () => apiJson<ResumenAcumulado>("/api/adm/resumen")

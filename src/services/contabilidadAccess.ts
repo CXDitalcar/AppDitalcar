@@ -1,10 +1,10 @@
 import type { UserScope } from "../types"
-import { hasExperienceAccess } from "./experienceAccess"
+import { isDitoAdminUser, isGerenteUser } from "./ditoAccess"
 
-// Contabilidad es solo para Administración (Jefatura y Gerencia) y Experiencia/PM, que administran la app.
-// Debe coincidir con CONTABILIDAD_ROLES en api/src/admRoutes.js.
-const CONTABILIDAD_ROLES: UserScope["role"][] = ["JEFATURA_ADMINISTRACION", "GERENCIA_ADMINISTRACION"]
-
+// Contabilidad es confidencial: la ven los 3 administradores de DITO (con carga y edición) y los cargos de Gerente
+// (solo lectura). Debe coincidir con api/src/lib/accessRules.js; la API vuelve a validar en cada llamada.
 export function canAccessContabilidad(user: UserScope) {
-  return Boolean(user.active) && (hasExperienceAccess(user) || CONTABILIDAD_ROLES.includes(user.role))
+  return Boolean(user.active) && (isDitoAdminUser(user) || isGerenteUser(user))
 }
+
+export const canManageContabilidad = (user: UserScope) => Boolean(user.active) && isDitoAdminUser(user)

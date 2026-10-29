@@ -66,7 +66,33 @@ export type RouteComparison = {
   exactitude: number
 }
 
+export type LocalKpis = {
+  enImplementacion: boolean
+  adherencia: { value: number | null; done: number; expected: number; period: string; desde?: string } | null
+  cumplimientoEstandares: { value: number | null; date: string } | null
+  cumplimientoAuditoria: { value: number | null; date: string } | null
+  exactitud: { value: number | null; brecha: number | null; date: string } | null
+}
+
+export type MacroPoint = {
+  done: number
+  expected: number
+  adherencia: number | null
+  cumplimientoEstandares: number | null
+  cumplimientoAuditoria: number | null
+  exactitud: number | null
+  brecha: number | null
+  manual?: boolean
+}
+export type MacroWeek = MacroPoint & { week: string }
+export type MacroMonth = MacroPoint & { period: string }
+
 export type RouteMetrics = {
+  kpis?: LocalKpis
+  evolutivo?: { weekly: MacroWeek[]; monthly: MacroMonth[]; windowStart: string }
+  implementacion?: { active: boolean; activatedAt: string | null }
+  ultimaRuta?: { date: string; answers: { itemId: string; status?: RouteAnswerStatus; detail: string }[] } | null
+  byLocal?: Record<string, LocalKpis>
   local?: string
   latest: RouteComparison | null
   monthly: RouteComparison[]

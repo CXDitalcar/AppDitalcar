@@ -3,6 +3,8 @@
 // nombre, descripción, enlace (por ejemplo, a una interfaz separada) o desactivarla,
 // y agregar accesos a otros sistemas (Gestión › Datos › Accesos del inicio).
 import type { UserScope } from "../types"
+import { canAccessContabilidad } from "./contabilidadAccess"
+import { isDitoAdminUser } from "./ditoAccess"
 
 export type PortalSection = "TABLEROS" | "ACCESOS"
 export type BadgeKey = "solicitudes" | "bandeja" | "academia" | "seguimiento" | "miLocal" | "frogmi" | "ruta"
@@ -24,6 +26,8 @@ export type PortalCardDef = {
   url: string
   icon: "kpi" | "ventas" | "seguimiento" | "frogmi" | "local" | "solicitudes" | "bandeja" | "academia" | "ruta" | "externo"
   badge?: BadgeKey
+  /** Interfaz con link propio: se abre en otra pestaña aunque sea una ruta de la misma app. */
+  newTab?: boolean
   visible: (user: UserScope, perms: PortalPermissions) => boolean
 }
 
@@ -50,9 +54,11 @@ export const DEFAULT_CARDS: PortalCardDef[] = [
   { id: "frogmi", seccion: "TABLEROS", nombre: "Frogmi", descripcion: "Formularios de tu local por VIN y cumplimiento del corte.", url: "/frogmi", icon: "frogmi", badge: "frogmi", visible: (u) => u.role === "ASISTENTE_JUNIOR" || u.role === "JEFATURA_LOCAL" },
   { id: "mi-local", seccion: "TABLEROS", nombre: "Mi local", descripcion: "Resultados de la Ruta y la Auditoría de tu sucursal.", url: "/mi-local", icon: "local", badge: "miLocal", visible: (_u, p) => p.miLocal },
   // ---------- Accesos ----------
-  { id: "solicitudes", seccion: "ACCESOS", nombre: "Solicitudes", descripcion: "Pide lo que necesitas y revisa en qué va cada solicitud.", url: "/solicitudes", icon: "solicitudes", badge: "solicitudes", visible: (_u, p) => p.solicitudes },
+  { id: "solicitudes", seccion: "ACCESOS", nombre: "Solicitudes", descripcion: "Pide lo que necesitas y revisa en qué va cada solicitud.", url: "/showroom", newTab: true, icon: "solicitudes", badge: "solicitudes", visible: (_u, p) => p.solicitudes },
   { id: "bandeja", seccion: "ACCESOS", nombre: "Por revisar", descripcion: "Solicitudes que esperan tu aprobación o tu gestión.", url: "/aprobaciones", icon: "bandeja", badge: "bandeja", visible: (_u, p) => p.bandeja },
-  { id: "academia", seccion: "ACCESOS", nombre: "Academia", descripcion: "Cursos, modelo CONSULTA, playbooks y material de consulta.", url: "/academia", icon: "academia", badge: "academia", visible: (_u, p) => p.academia },
+  { id: "academia", seccion: "ACCESOS", nombre: "Academia", descripcion: "Cursos, modelo CONSULTA, playbooks y material de consulta.", url: "/academia-ditalcar", newTab: true, icon: "academia", badge: "academia", visible: (_u, p) => p.academia },
+  { id: "contabilidad", seccion: "ACCESOS", nombre: "Contabilidad", descripcion: "Listas de precio de marca, bonos por cobrar y seguimiento de notas de venta.", url: "/contabilidad", newTab: true, icon: "bandeja", visible: (u) => canAccessContabilidad(u) },
+  { id: "dito-admin", seccion: "ACCESOS", nombre: "Administración de DITO", descripcion: "Interruptor de la Ruta, respaldo y vaciado, evolutivos anteriores (solo administradores).", url: "/dito-admin", icon: "externo", visible: (u) => isDitoAdminUser(u) },
   { id: "ruta", seccion: "ACCESOS", nombre: "Ruta de Experiencia", descripcion: "Formulario semanal de la sucursal y auditorías.", url: "/formularios", icon: "ruta", badge: "ruta", visible: (_u, p) => p.formularios },
   { id: "seguimiento-comercial", seccion: "ACCESOS", nombre: "Seguimiento Comercial", descripcion: "Ventas, créditos, seguros, tasaciones y leads por local.", url: "https://lolivares284.github.io/seguimiento-comercial/", icon: "externo", visible: notJunior },
 ]
@@ -104,7 +110,7 @@ export function resolvePortalCards(user: UserScope, perms: PortalPermissions, ov
     if (o?.activo === false) continue
     const url = o?.url || def.url
     const { visible: _visible, ...rest } = def
-    cards.push({ ...rest, nombre: o?.nombre || def.nombre, descripcion: o?.descripcion || def.descripcion, url, external: isExternalUrl(url) })
+    cards.push({ ...rest, nombre: o?.nombre || def.nombre, descripcion: o?.descripcion || def.descripcion, url, external: isExternalUrl(url) || Boolean(def.newTab) })
   }
   for (const o of overrides.filter((item) => item.custom && item.activo !== false && item.url)) {
     if (o.grupos?.length && !o.grupos.some((g) => groups.includes(g))) continue

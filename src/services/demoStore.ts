@@ -33,7 +33,7 @@ export function createDemoRequest(request: RequestItem) {
     authorEmail: request.requesterEmail,
     authorName: request.requesterName,
     createdAt: request.createdAt,
-    comment: "Solicitud ingresada en DitalApp.",
+    comment: "Solicitud ingresada en DITO.",
   })
 }
 
