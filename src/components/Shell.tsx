@@ -27,6 +27,8 @@ import Brand from "./Brand"
 import PilotFeedback from "./PilotFeedback"
 
 import "./Shell.css"
+import "./dito-theme.generated.css"
+import "./dito-theme.css"
 
 import type {
   UserScope,
@@ -191,7 +193,7 @@ export default function Shell({
       ? formatRole(
           currentUser.role
         )
-      : "DitalApp"
+      : "DITO"
 
 
   const { pathname } = useLocation()
@@ -227,7 +229,7 @@ export default function Shell({
 
 
   return (
-    <div className="app-shell">
+    <div className="app-shell theme-dito">
 
       {/* ==================================================
           SIDEBAR

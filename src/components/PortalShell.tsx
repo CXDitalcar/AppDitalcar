@@ -57,7 +57,7 @@ export default function PortalShell({ children, currentUser, authenticatedUser, 
     <div className={`portal-shell ${productName ? "theme-ditalcar" : ""}`}>
       {viewAsOptions && onViewAs && (
         <div className="portal-viewas">
-          <span>{viewingAs ? `Estás viendo DitalApp como ${currentUser?.name} · ${formatRole(currentUser!.role)}` : "Vista de prueba"}</span>
+          <span>{viewingAs ? `Estás viendo DITO como ${currentUser?.name} · ${formatRole(currentUser!.role)}` : "Vista de prueba"}</span>
           <select value={viewAsEmail ?? authenticatedUser?.email ?? ""} onChange={(e) => onViewAs(e.target.value)} aria-label="Ver como">
             {authenticatedUser && <option value={authenticatedUser.email}>Volver a mi perfil</option>}
             {viewAsOptions.filter((u) => u.email !== authenticatedUser?.email).map((u) => (
@@ -70,7 +70,7 @@ export default function PortalShell({ children, currentUser, authenticatedUser, 
       <header className="portal-topbar">
         <div className="portal-topbar-inner">
           {atHome ? (
-            <Link to={homePath} className="portal-brand" aria-label={`Inicio ${productName ?? "DitalApp"}`}>
+            <Link to={homePath} className="portal-brand" aria-label={`Inicio ${productName ?? "DITO"}`}>
               {productName ? <ProductBrand name={productName} /> : <Brand />}
             </Link>
           ) : (
@@ -102,7 +102,7 @@ export default function PortalShell({ children, currentUser, authenticatedUser, 
                   </div>
                   {onLeave && (
                     <button type="button" role="menuitem" className="portal-logout" onClick={onLeave}>
-                      Ir a DitalApp completa
+                      Ir a DITO
                     </button>
                   )}
                   {onLogout && (

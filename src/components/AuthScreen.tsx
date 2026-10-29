@@ -224,7 +224,7 @@ export default function AuthScreen({
       <div className="auth-card">
         {product ? <img className="auth-brand-logo" src="/assets/logo-principal-con-slogan.png" alt="Ditalcar · Experiencia que te lleva lejos" /> : <Brand large />}
         <div className="auth-title">
-          <span>{product ? "INGRESA CON TU CUENTA DITALAPP" : "DITALAPP"}</span>
+          <span>{product ? "INGRESA CON TU CUENTA DITO" : "DITO"}</span>
           <h1>{view === "LOGIN" && product ? product.name : titleFor(view)}</h1>
           <p>{view === "LOGIN" && product ? product.description : descriptionFor(view)}</p>
         </div>
