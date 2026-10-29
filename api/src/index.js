@@ -1,3 +1,5 @@
+import { buildMacroPayload } from "./lib/rutaMacro.js"
+import { jefaturaPredicate } from "./lib/rutaJefatura.js"
 import { app } from "@azure/functions"
 import { body, json } from "./lib/http.js"
 import {
@@ -53,6 +55,7 @@ import { registerSegRoutes } from "./segRoutes.js"
 import { localMatches } from "./lib/segNormalize.js"
 import { registerOpsRoutes } from "./opsRoutes.js"
 import { registerAdmRoutes } from "./admRoutes.js"
+import { registerDitoRoutes } from "./ditoRoutes.js"
 import { importAppUsers, listAppDirectoryUsers, saveAppUser } from "./lib/appUsers.js"
 import { parseUsersWorkbook } from "./lib/usersExcel.js"
 import {
@@ -931,7 +934,9 @@ app.http("route-metrics", {
     if (requestedLocal && !canAccessRouteLocal(user, requestedLocal)) {
       return json(403, { message: "No tienes acceso a las mediciones de ese local." })
     }
-    return json(200, buildRouteMetrics(visible, requestedLocal || undefined))
+    const isJefe = await jefaturaPredicate(visible)
+    const macro = await buildMacroPayload({ executions: visible, isJefe, local: requestedLocal || undefined, canSeeLocal: (name) => canAccessRouteLocal(user, name) })
+    return json(200, { ...buildRouteMetrics(visible, requestedLocal || undefined), ...macro })
   },
 })
 
@@ -1421,3 +1426,4 @@ registerSegRoutes({ app, currentUser, isExperienceUser, publicUser, sessionDays:
 registerOpsRoutes({ app, currentUser, isExperienceUser })
 
 registerAdmRoutes({ app, currentUser, isExperienceUser })
+registerDitoRoutes({ app, currentUser })

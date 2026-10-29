@@ -1,10 +1,10 @@
 // Contabilidad (interfaz /contabilidad): listas de precio de marca y bonos por cobrar por NV.
-// - La carpeta mensual de listas se sube una sola vez en Gestión › Datos (Experiencia): alimenta el
-//   catálogo de modelos y Contabilidad. Flota y circulares se guardan aparte.
-// - Contabilidad la ven Administración (Jefatura y Gerencia), Experiencia/PM y los correos que Experiencia
-//   define en la config ADM_VENTAS_ACCESO (por defecto Bruno Reveco y Mónica Ulloa). La portada consulta
-//   /api/adm/acceso para saber si mostrar o no la interfaz.
+// - La carpeta mensual de listas se sube en Contabilidad › Cargar archivos (solo los 3 administradores de DITO):
+//   alimenta el catálogo de modelos y Contabilidad. Flota y circulares se guardan aparte.
+// - Contabilidad la ven los 3 administradores (con carga y edición) y los cargos de Gerente (solo lectura).
+//   Reglas en lib/accessRules.js; debe coincidir con src/services/ditoAccess.ts.
 import { json, body } from "./lib/http.js"
+import { canViewContabilidad, isDitoAdmin } from "./lib/accessRules.js"
 import { getAppConfig, setAppConfig } from "./lib/store.js"
 import { readMaster } from "./lib/datosStore.js"
 import { sha256 } from "./lib/admPdf.js"
@@ -13,18 +13,6 @@ import { calcularBonos } from "./lib/admBonos.js"
 import { readModelCatalog, saveBrandModels } from "./lib/catalogoDatos.js"
 import { getLista, listCondiciones, listListas, listasConFilas, readOriginal, saveCondicion, saveLista } from "./lib/admStore.js"
 
-const ADM_CONFIG = "ADM_VENTAS_ACCESO"
-const ADM_DEFAULT_EMAILS = ["breveco@ditalcar.cl", "mulloa@ditalcar.cl"]
-async function admEmails() {
-  const stored = await getAppConfig(ADM_CONFIG).catch(() => null)
-  try {
-    const parsed = JSON.parse(String(stored?.value || "{}"))
-    if (Array.isArray(parsed.emails)) return parsed.emails.map((e) => String(e).toLowerCase())
-  } catch { /* usa la lista por defecto */ }
-  return ADM_DEFAULT_EMAILS
-}
-
-const CONTABILIDAD_ROLES = new Set(["JEFATURA_ADMINISTRACION", "GERENCIA_ADMINISTRACION"])
 const MAX_BYTES = 15 * 1024 * 1024
 const MESES = { ENERO: 1, FEBRERO: 2, MARZO: 3, ABRIL: 4, MAYO: 5, JUNIO: 6, JULIO: 7, AGOSTO: 8, SEPTIEMBRE: 9, SETIEMBRE: 9, OCTUBRE: 10, NOVIEMBRE: 11, DICIEMBRE: 12 }
 // Nombre de la marca en el catálogo de modelos (el mismo que usan las solicitudes).
@@ -38,8 +26,8 @@ function mesDeRuta(ruta) {
 }
 
 export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
-  const canAccess = async (user) => Boolean(user) && (isExperienceUser(user) || CONTABILIDAD_ROLES.has(user.role) ||
-    (await admEmails()).includes(String(user.email || "").toLowerCase()))
+  const canAccess = canViewContabilidad
+  const canManage = isDitoAdmin
   const handle = (allowed, fn) => async (request) => {
     try {
       const user = await currentUser(request)
@@ -52,28 +40,29 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
     }
   }
 
-  // Quién puede entrar a Contabilidad. GET lo usa la portada; POST (solo Experiencia) edita la lista de correos.
+  // Quién puede entrar a Contabilidad y qué puede hacer: la portada lo consulta antes de mostrar nada.
   app.http("adm-acceso", {
-    methods: ["GET", "POST"], authLevel: "anonymous", route: "adm/acceso",
+    methods: ["GET"], authLevel: "anonymous", route: "adm/acceso",
     handler: async (request) => {
       try {
         const user = await currentUser(request)
         if (!user) return json(401, { message: "Sesión no válida." })
-        const manage = isExperienceUser(user)
-        const emails = await admEmails()
-        if (request.method === "GET") return json(200, { allowed: await canAccess(user), canManage: manage, ...(manage ? { emails } : {}) })
-        if (!manage) return json(403, { message: "Solo Experiencia puede cambiar quién entra." })
-        const data = await body(request)
-        const list = [...new Set((Array.isArray(data.emails) ? data.emails : []).map((e) => String(e || "").trim().toLowerCase()).filter(Boolean))].slice(0, 30)
-        const bad = list.find((e) => !/^[^\s@]+@ditalcar\.cl$/.test(e))
-        if (bad) return json(400, { message: `"${bad}" no es un correo @ditalcar.cl.` })
-        await setAppConfig(ADM_CONFIG, JSON.stringify({ emails: list, updatedAt: new Date().toISOString(), updatedBy: user.email }))
-        return json(200, { allowed: true, canManage: true, emails: list, message: "Acceso guardado." })
+        const manage = await canManage(user)
+        return json(200, { allowed: manage || (await canAccess(user)), canManage: manage })
       } catch (error) {
         return json(500, { message: error?.message || "Error inesperado." })
       }
     },
   })
+
+  // Registro de cargas (quién subió qué y con qué resultado): base del resumen acumulado.
+  async function registrarCarga(entry) {
+    const stored = await getAppConfig("ADM_CARGAS_LOG").catch(() => null)
+    let log = []
+    try { log = JSON.parse(String(stored?.value || "[]")) } catch { log = [] }
+    log.unshift({ ...entry, en: new Date().toISOString() })
+    await setAppConfig("ADM_CARGAS_LOG", JSON.stringify(log.slice(0, 300)))
+  }
 
   // El catálogo de modelos de una marca solo se reemplaza con una lista igual o más nueva que la que tiene
   // (al subir varios meses juntos no debe quedar una lista antigua). Entradas antiguas sin vigencia se comparan por mes.
@@ -116,7 +105,7 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
   // Gestión › Datos: un archivo de la carpeta mensual por llamada (PDF o Excel), con su ruta en la carpeta.
   app.http("datos-listas-precio", {
     methods: ["POST"], authLevel: "anonymous", route: "datos/listas-precio",
-    handler: handle(isExperienceUser, async (request, user) => {
+    handler: handle(canManage, async (request, user) => {
       const declared = Number(request.headers.get("content-length") || 0)
       if (declared > MAX_BYTES) return json(413, { message: "Cada archivo puede pesar como máximo 15 MB." })
       const buffer = Buffer.from(await request.arrayBuffer())
@@ -130,8 +119,12 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
 
       const sha = sha256(buffer)
       const existente = await getLista(sha)
-      if (existente) return json(200, { lista: existente, duplicado: true, message: `${archivo}: ya estaba cargado.` })
+      if (existente) {
+        await registrarCarga({ por: user.email, archivo, resultado: "YA_ESTABA", marca: existente.marca || "", mes: existente.mes || "" }).catch(() => {})
+        return json(200, { lista: existente, duplicado: true, message: `${archivo}: ya estaba cargado.` })
+      }
       const { lista, catalogo } = await procesar({ sha, buffer, archivo, ruta, user })
+      await registrarCarga({ por: user.email, archivo, resultado: lista?.estado || "GUARDADO", marca: lista?.marca || "", mes: lista?.mes || "", filas: lista?.filas || 0 }).catch(() => {})
       return json(200, { lista, duplicado: false, catalogo })
     }),
   })
@@ -139,7 +132,7 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
   // Vuelve a leer los archivos guardados que no tenían lector o quedaron para revisar (al agregar un lector nuevo).
   app.http("adm-listas-releer", {
     methods: ["POST"], authLevel: "anonymous", route: "adm/listas/releer",
-    handler: handle(isExperienceUser, async (_request, user) => {
+    handler: handle(canManage, async (_request, user) => {
       const pendientes = (await listListas()).filter((l) => l.estado === "FALTA_LECTOR" || l.estado === "REVISAR")
       let leidas = 0
       for (const meta of pendientes) {
@@ -156,6 +149,32 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
   app.http("adm-listas", {
     methods: ["GET"], authLevel: "anonymous", route: "adm/listas",
     handler: handle(canAccess, async () => json(200, { listas: await listListas() })),
+  })
+
+  // Resumen acumulado hasta el momento: listas cargadas por marca y mes, estado de lectura y últimas cargas.
+  app.http("adm-resumen", {
+    methods: ["GET"], authLevel: "anonymous", route: "adm/resumen",
+    handler: handle(canAccess, async () => {
+      const listas = await listListas()
+      const porMarca = {}
+      for (const l of listas) {
+        const k = `${l.marca || "Sin marca"}|${l.mes || "Sin mes"}`
+        const row = porMarca[k] || (porMarca[k] = { marca: l.marca || "Sin marca", mes: l.mes || "Sin mes", archivos: 0, leidas: 0, porRevisar: 0, filas: 0 })
+        row.archivos += 1
+        row.filas += Number(l.filas || 0)
+        if (l.estado === "OK") row.leidas += 1
+        else row.porRevisar += 1
+      }
+      const stored = await getAppConfig("ADM_CARGAS_LOG").catch(() => null)
+      let cargas = []
+      try { cargas = JSON.parse(String(stored?.value || "[]")) } catch { cargas = [] }
+      return json(200, {
+        generado: new Date().toISOString(),
+        totalListas: listas.length,
+        listas: Object.values(porMarca).sort((a, b) => String(b.mes).localeCompare(String(a.mes)) || a.marca.localeCompare(b.marca)),
+        cargas: cargas.slice(0, 100),
+      })
+    }),
   })
 
   app.http("adm-bonos", {
@@ -178,7 +197,7 @@ export function registerAdmRoutes({ app, currentUser, isExperienceUser }) {
 
   app.http("adm-condiciones", {
     methods: ["POST"], authLevel: "anonymous", route: "adm/condiciones",
-    handler: handle(canAccess, async (request, user) => {
+    handler: handle(canManage, async (request, user) => {
       const data = await body(request)
       const nv = String(data.nv || "").trim()
       if (!/^\d{3,10}$/.test(nv)) return json(400, { message: "Falta el número de NV." })
