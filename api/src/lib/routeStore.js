@@ -57,3 +57,17 @@ export async function listRouteExecutions() {
   }
   return rows.sort((a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
 }
+
+export async function deleteRouteExecutions(ids) {
+  await ensure()
+  let deleted = 0
+  for (const id of ids) {
+    try {
+      await executions.deleteEntity("ROUTE", key(id))
+      deleted += 1
+    } catch (error) {
+      if (error?.statusCode !== 404) throw error
+    }
+  }
+  return deleted
+}
